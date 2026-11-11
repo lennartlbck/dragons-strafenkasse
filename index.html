@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f2f86">
+<link rel="icon" href="img/p29.jpg">
+<link rel="apple-touch-icon" href="img/p29.jpg">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.4 system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Dragons Strafenkasse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: mobile-first Kassen-App — sticky Kopfzeile mit Kassenstand, Inhalt, feste Tab-Leiste unten, Bottom-Sheets zum Eintragen */
+:root{
+  --bg:#eef2f9; --surface:#ffffff; --ink:#0e1a33; --muted:#5a6682; --line:#d9e1ee;
+  --brand:#1747c4; --brand-2:#0f2f86; --on-brand:#ffffff; --chip:#e5ecfb;
+  --accent:#d97a06; --paypal:#0b63c4; --good:#1d7f47; --good-bg:#e3f4ea; --bad:#c2352a; --bad-bg:#fbe7e5;
+  --shadow:0 10px 30px rgba(15,35,90,.18);
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0a1120; --surface:#121b2f; --ink:#e7ecf6; --muted:#93a0bb; --line:#23304b;
+  --brand:#4f7dff; --brand-2:#1a2f6b; --on-brand:#ffffff; --chip:#1a2746;
+  --accent:#f4a640; --paypal:#2f7fe0; --good:#46c27e; --good-bg:#14301f; --bad:#ff6d60; --bad-bg:#3a1714;
+  --shadow:0 10px 30px rgba(0,0,0,.5); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0a1120; --surface:#121b2f; --ink:#e7ecf6; --muted:#93a0bb; --line:#23304b;
+  --brand:#4f7dff; --brand-2:#1a2f6b; --on-brand:#ffffff; --chip:#1a2746;
+  --accent:#f4a640; --paypal:#2f7fe0; --good:#46c27e; --good-bg:#14301f; --bad:#ff6d60; --bad-bg:#3a1714;
+  --shadow:0 10px 30px rgba(0,0,0,.5); color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.4}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--brand-2)}
+.pad{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:760px;margin:0 auto}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+/* Kopf */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:linear-gradient(160deg,var(--brand-2),var(--brand));color:var(--on-brand);padding-block:12px 14px}
+.top .wrap{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.brand small{display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.8}
+.brand h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:28px;line-height:1;letter-spacing:.01em;text-transform:uppercase}
+.kasse{text-align:right}
+.kasse span{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.8}
+.kasse b{font-family:var(--f-display);font-size:26px;line-height:1}
+
+main{padding-block:16px 110px}
+.section-h{font-family:var(--f-display);font-weight:700;font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:22px 0 8px}
+.section-h:first-child{margin-top:4px}
+.note{color:var(--muted);font-size:13px}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:12px;padding:20px;text-align:center;color:var(--muted)}
+
+/* Suche */
+.search{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit}
+
+/* Strafen-Liste */
+.fines{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fine{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--surface);border:0;padding:12px 14px}
+.fine:hover{background:var(--chip)}
+.fine .t{flex:1;min-width:0}
+.fine .t b{display:block;font-weight:600}
+.fine .t i{display:block;font-style:normal;color:var(--muted);font-size:12.5px;margin-top:2px}
+.price{flex:none;text-align:right;font-weight:600;color:var(--accent);font-size:14px;max-width:46%}
+.tag{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.04em;padding:2px 7px;border-radius:99px;background:var(--chip);color:var(--brand);white-space:nowrap}
+.tag.kf{background:var(--bad-bg);color:var(--bad)}
+.tag.ok{background:var(--good-bg);color:var(--good)}
+.free{display:flex;gap:10px;align-items:center;width:100%;margin-top:12px;padding:12px 14px;border-radius:12px;border:1.5px dashed var(--brand);background:transparent;color:var(--brand);font-weight:600}
+
+/* Kennzahlen */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0}
+.stat span{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.stat b{font-family:var(--f-display);font-size:24px}
+.stat.open b{color:var(--accent)} .stat.paid b{color:var(--good)} .stat.kf b{color:var(--bad)}
+
+/* Personenliste */
+.people{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.person{display:flex;align-items:center;gap:12px;background:var(--surface);border:0;width:100%;text-align:left;padding:10px 14px}
+.person:hover{background:var(--chip)}
+.person .n{flex:1;min-width:0}
+.person .n b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.person .n i{font-style:normal;color:var(--muted);font-size:12.5px}
+.person .amt{font-family:var(--f-display);font-size:20px;font-weight:700;text-align:right}
+.person .amt.zero{color:var(--muted);font-weight:600}
+.person .amt.pos{color:var(--accent)}
+.av{flex:none;width:44px;height:44px;border-radius:50%;object-fit:cover;background:var(--chip);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;color:var(--brand);overflow:hidden}
+.av img{width:100%;height:100%;object-fit:cover}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.btn{border:1px solid var(--line);background:var(--surface);padding:9px 14px;border-radius:10px;font-weight:600}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.btn.good{background:var(--good);border-color:var(--good);color:#fff}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.seg{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:3px}
+.seg button{border:0;background:transparent;padding:6px 12px;border-radius:8px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--brand);color:var(--on-brand)}
+
+/* Verlauf / Buchungen */
+.rows{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.row{display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:center;background:var(--surface);padding:10px 14px}
+.row .av{width:36px;height:36px;font-size:13px}
+.row .m{min-width:0}
+.row .m b{font-weight:600}
+.row .m i{display:block;font-style:normal;color:var(--muted);font-size:12.5px}
+.row .r{text-align:right;display:grid;gap:4px;justify-items:end}
+.row .r strong{font-family:var(--f-display);font-size:18px}
+.row.paid .r strong{color:var(--muted);text-decoration:line-through}
+.row .acts{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.mini{border:1px solid var(--line);background:transparent;border-radius:8px;padding:5px 10px;font-size:13px;font-weight:600}
+.mini.on{background:var(--good-bg);color:var(--good);border-color:transparent}
+.mini.warn{color:var(--bad);border-color:var(--bad)}
+
+/* Tabs */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs .wrap{display:flex}
+.tabs button{flex:1;border:0;background:transparent;padding:10px 4px 12px;display:grid;justify-items:center;gap:3px;font-size:12px;font-weight:600;color:var(--muted)}
+.tabs button svg{width:22px;height:22px}
+.tabs button[aria-current="page"]{color:var(--brand)}
+
+/* Sheet */
+.scrim{position:fixed;inset:0;z-index:20;background:rgba(5,12,30,.5);display:flex;align-items:flex-end;justify-content:center}
+.sheet{width:100%;max-width:760px;max-height:92%;display:flex;flex-direction:column;background:var(--bg);border-radius:18px 18px 0 0;box-shadow:var(--shadow);padding-bottom:env(safe-area-inset-bottom,0px)}
+.sheet-h{display:flex;align-items:flex-start;gap:12px;padding-top:16px;padding-bottom:10px}
+.sheet-h .t{flex:1;min-width:0}
+.sheet-h h2{margin:0;font-family:var(--f-display);font-size:24px;line-height:1.05;text-wrap:balance}
+.sheet-h p{margin:4px 0 0;color:var(--muted);font-size:13px}
+.x{border:0;background:var(--surface);width:36px;height:36px;border-radius:50%;font-size:20px;line-height:1;flex:none}
+.sheet-b{overflow:auto;padding-bottom:12px}
+.sheet-f{border-top:1px solid var(--line);background:var(--surface);padding-block:12px}
+.sheet-f .btn{width:100%;padding:13px;font-size:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
+.pick{position:relative;border:2px solid transparent;background:var(--surface);border-radius:12px;padding:8px 4px 6px;display:grid;justify-items:center;gap:4px;min-width:0}
+.pick .av{width:54px;height:54px}
+.pick b{font-size:12.5px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pick .no{position:absolute;top:4px;left:6px;font-family:var(--f-display);font-weight:700;font-size:14px;color:var(--muted)}
+.pick[aria-pressed="true"]{border-color:var(--brand);background:var(--chip)}
+.pick[aria-pressed="true"]::after{content:"✓";position:absolute;top:4px;right:6px;width:20px;height:20px;border-radius:50%;background:var(--brand);color:var(--on-brand);font-size:12px;display:grid;place-items:center}
+.fields{display:grid;gap:12px;margin-top:6px}
+.field label{display:block;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stepper{display:flex;align-items:center;gap:8px}
+.stepper button{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:22px}
+.stepper input{text-align:center;font-family:var(--f-display);font-size:22px}
+.check{display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-weight:500}
+.check input{width:20px;height:20px}
+.hint{background:var(--chip);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--ink)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--ink);color:var(--bg);border-radius:12px;padding:10px 14px;display:flex;gap:14px;align-items:center;box-shadow:var(--shadow);max-width:calc(100% - 32px)}
+.toast button{border:0;background:transparent;color:var(--accent);font-weight:700}
+.banner{background:var(--bad-bg);color:var(--bad);border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:12px}
+/* Bezahlen */
+.paybox{display:grid;gap:8px;background:var(--surface);border:2px solid var(--paypal);border-radius:14px;padding:14px;margin-bottom:14px}
+.paybox.done{border-color:var(--good);grid-template-columns:auto 1fr;align-items:center}
+.paybox p{margin:0}
+.pay-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.pay-h span{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pay-h b{font-family:var(--f-display);font-size:30px;color:var(--accent)}
+.btn.paypal{display:block;text-align:center;text-decoration:none;background:var(--paypal);border-color:var(--paypal);color:#fff;padding:13px;font-size:16px}
+.pp-addr{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;min-width:0}
+.pp-addr span{min-width:0;overflow-wrap:anywhere}
+.zahltag{background:var(--paypal);color:#fff;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:14px}
+details.bank{border-top:1px solid var(--line);padding-top:8px;display:grid;gap:6px}
+details.bank summary{cursor:pointer;font-weight:600;color:var(--brand);padding:4px 0}
+details.bank .pp-addr{margin-top:6px}
+.zahltag{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.zahltag .btn{background:#fff;color:var(--paypal);border-color:#fff;margin-left:auto}
+.kwcard{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;background:var(--surface);border:1px dashed var(--brand);border-radius:12px;padding:12px 14px;margin-bottom:14px}
+.kwcard b{display:block;font-family:var(--f-display);font-size:16px;letter-spacing:.06em;text-transform:uppercase;color:var(--brand)}
+.kwcard span{font-size:13.5px;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.btn.pulse{animation:pulse 1.4s ease-in-out 3}@keyframes pulse{50%{transform:scale(1.03);box-shadow:0 0 0 6px var(--good-bg)}}}
+.auth{max-width:420px;margin:24px auto;display:grid;gap:14px}
+.auth h2{margin:0;font-family:var(--f-display);font-size:30px;text-transform:uppercase}
+.auth p{margin:0}
+/* Übersicht */
+.monthbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px}
+.monthbar h2{margin:0;font-family:var(--f-display);font-size:26px;text-transform:uppercase;letter-spacing:.02em;text-align:center;flex:1}
+.monthbar .x{background:var(--surface);border:1px solid var(--line)}
+.monthbar .x:disabled{opacity:.35}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media (max-width:560px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0}
+.kpi span{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.kpi b{font-family:var(--f-display);font-size:24px}
+.kpi.net{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.kpi.net span{color:var(--on-brand);opacity:.8}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table.maka{border-collapse:separate;border-spacing:0;width:100%;min-width:860px;font-size:13.5px}
+.maka th,.maka td{padding:8px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+.maka thead th{position:sticky;top:0;background:var(--brand-2);color:var(--on-brand);font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+.maka th:first-child,.maka td:first-child{position:sticky;left:0;text-align:left;background:var(--surface);z-index:1;box-shadow:1px 0 0 var(--line)}
+.maka thead th:first-child{background:var(--brand-2);z-index:2}
+.maka td.zero{color:var(--muted);opacity:.55}
+.maka td.sum{font-weight:700}
+.maka td.gut{color:var(--good)}
+.maka td.owe{color:var(--bad);font-weight:700}
+.maka td.cred{color:var(--good);font-weight:700}
+.maka td.pname{font-weight:600}
+.maka td.pname small{display:block;font-weight:400;color:var(--muted);font-size:11.5px}
+.maka tfoot td{background:var(--chip);font-weight:700;border-bottom:0}
+.maka tfoot td:first-child{background:var(--chip)}
+.maka tbody tr:hover td{background:var(--chip)}
+.costs{display:grid;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+.cost{display:grid;grid-template-columns:minmax(110px,30%) 1fr auto;gap:10px;align-items:center}
+.cost .lbl{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cost .bar{height:14px;background:var(--chip);border-radius:4px;overflow:hidden}
+.cost .bar i{display:block;height:100%;background:var(--brand);border-radius:0 4px 4px 0}
+.cost .val{font-variant-numeric:tabular-nums;font-weight:600;text-align:right;min-width:88px}
+.cost .val small{color:var(--muted);font-weight:400;margin-left:4px}
+.legend-note{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:8px}
+.legend-note b{font-weight:600}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.seg.full{display:flex;width:100%}.seg.full button{flex:1}
+@media (max-width:420px){.stats b{font-size:20px}.brand h1{font-size:24px}.tabs button{font-size:11px}}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:up .22s ease-out}@keyframes up{from{transform:translateY(30px);opacity:.6}}}
+</style>
+
+<header class="top pad"><div class="wrap">
+  <div class="brand"><small>TSG Münster · 1. Herren · Saison 26/27</small><h1>Dragons Strafenkasse</h1></div>
+  <div class="kasse"><span>Offen</span><b class="num" id="kOpen">–</b></div>
+</div></header>
+<main class="pad"><div class="wrap" id="view"></div></main>
+<nav class="tabs" aria-label="Bereiche"><div class="wrap" id="tabs"></div></nav>
+<div id="sheetRoot"></div>
+<div id="toast" class="toast" hidden></div>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'});
+const eur=n=>fmt.format(Math.round((Number(n)||0)*100)/100);
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const dDE=s=>{if(!s)return'';const [y,m,d]=s.split('-');return `${d}.${m}.${y}`};
+const num=v=>{const n=parseFloat(String(v).replace(',','.'));return isFinite(n)?n:0};
+const CAT_ORDER=['Beiträge & Getränke','Pünktlichkeit & Anwesenheit','Spiel & Training','Handy & Verhalten','Kleidung & Eigentum','Ämter','Sonderstrafen','Kasse'];
+
+const S={players:[],fines:[],entries:[],bills:[],got:{p:0,f:0,e:0,b:0},db:null,uid:null,canWrite:null,canEdit:false,
+  settings:{},links:[],prof:{},zahltags:[],members:[],me:null,tab:'erfassen',q:'',status:'loading',filter:'open',sheet:null,stale:false,month:today().slice(0,7),kview:'personen'};
+const COLS=[['beitrag','Monatsbeitrag'],['strafen','Strafen'],['fussball','Fußball'],['bier','Bier'],['sonder','Sonderausgaben']];
+const COL_BY_FINE={f01:'beitrag',f02:'bier',f03:'bier',f26:'fussball'};
+const colOf=e=>e.col||COL_BY_FINE[e.fineId]||(e.billId?'sonder':'strafen');
+const isCost=b=>!b.kind||b.kind==='ausgabe';
+const BILL_CATS=['Duschdas','Bier','Pfand','Musikbox','Teamevent','Tickets Kerb','Auslagen Oktoberfest','Fußball','Würfel','Plakat & Sticker','Spieltag Verpflegung','Babyöl','Mega KBF','Auslagen letzte Saison','Therme','Spende'];
+const MONTHS=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+const monthName=m=>m==='saison'?'Saison 26/27':MONTHS[+m.slice(5,7)-1]+' '+m.slice(0,4);
+const inPeriod=(d,m)=>m==='saison'||String(d||'').slice(0,7)===m;
+const shortName=p=>{if(!p)return'?';const [f,...r]=p.name.split(' ');const dup=S.players.filter(x=>x.name.split(' ')[0]===f).length>1;return dup&&r.length?f+' '+r[r.length-1][0]+'.':f};
+try{const t=localStorage.getItem('tab');if(t)S.tab=t}catch(e){}
+
+const ICONS={
+ erfassen:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+ konten:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.8-3.2 3.2-5 6-5s5.2 1.8 6 5"/><path d="M16 5.5a3 3 0 0 1 0 5.6M18 14c1.6.7 2.6 2.4 3 5"/></svg>',
+ uebersicht:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M9.5 9.5V20"/></svg>',
+ rechnungen:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
+ verlauf:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
+ verwalten:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>'};
+
+/* ---------- Ableitungen ---------- */
+const pById=id=>S.players.find(p=>p.id===id);
+function sortedPlayers(all){
+  const list=S.players.filter(p=>all||p.active!==false);
+  return list.sort((a,b)=>{const sa=a.role==='Spieler'?0:1,sb=b.role==='Spieler'?0:1;if(sa!==sb)return sa-sb;
+    if(sa===0)return (a.number??999)-(b.number??999);return (a.order??50)-(b.order??50)||a.name.localeCompare(b.name)});
+}
+function balance(pid){let open=0,paid=0,kf=0,credit=0;for(const e of S.entries){if(e.playerId!==pid)continue;
+  if(e.paid)paid+=e.amount||0;else open+=e.amount||0; if(e.kabinenfest&&!e.kfDone)kf++;}
+  for(const b of S.bills)if(b.kind!=='einzahlung'&&b.paidBy===pid&&!b.refunded)credit+=b.amount||0;return{open,paid,kf,credit}}
+function totals(){let open=0,paid=0,kf=0;for(const e of S.entries){if(e.paid)paid+=e.amount||0;else open+=e.amount||0;if(e.kabinenfest&&!e.kfDone)kf++}return{open,paid,kf}}
+function priceLabel(f){const p=[];if(f.base)p.push(eur(f.base));if(f.per)p.push((f.base?'+ ':'')+eur(f.per)+' / '+(f.unit||'Stück'));
+  if(f.kabinenfest)p.push((p.length?'+ ':'')+'Kabinenfest');if(f.wuerfeln)p.push((p.length?'+ ':'')+'Würfeln');return p.join(' ')||'Betrag frei'}
+function avatar(p,cls=''){if(!p)return `<span class="av ${cls}">?</span>`;
+  if(p.img)return `<span class="av ${cls}"><img src="${esc(p.img)}" alt="" loading="lazy"></span>`;
+  const ini=p.name.split(/\s+/).map(w=>w[0]).slice(0,2).join('');return `<span class="av ${cls}">${esc(ini)}</span>`}
+const pLabel=p=>p?(p.role==='Spieler'&&p.number!=null?'#'+p.number+' · ':'')+(p.role&&p.role!=='Spieler'?p.role:'Spieler'):'';
+
+/* ---------- Rendering ---------- */
+function renderTabs(){
+  const tabs=[['erfassen','Eintragen'],['uebersicht','Übersicht'],['konten','Konten'],['rechnungen','Rechnungen']];
+  if(S.canEdit)tabs.push(['verwalten','Verwalten']);
+  if(!tabs.some(t=>t[0]===S.tab))S.tab='erfassen';
+  $('#tabs').innerHTML=tabs.map(([k,l])=>`<button data-act="tab" data-k="${k}" ${S.tab===k?'aria-current="page"':''}>${ICONS[k]}${l}</button>`).join('');
+}
+function statusBanner(){
+  if(S.status==='nodb')return `<div class="banner">Die Kasse ist gerade nicht erreichbar. Prüfe deine Internetverbindung und lade die Seite neu.</div>`;
+  if(S.stale)return `<div class="banner">Die Daten sind gerade nicht erreichbar. Was du siehst, ist eventuell nicht aktuell.</div>`;
+  if(S.canWrite===false)return `<div class="note" style="margin-bottom:10px">Du siehst die Kasse und kannst bezahlen. Strafen und Rechnungen trägt der Kassenwart ein.</div>`;
+  return '';
+}
+function render(){
+  if(S.status==='auth')return;
+  renderTabs();
+  $('#kOpen').textContent=S.status==='ready'?eur(totals().open):'–';
+  const v=$('#view');
+  if(S.tab==='erfassen'){
+    if(!$('#finelist')){v.innerHTML=`<div id="bn"></div><input class="search" id="q" type="search" placeholder="Strafe suchen …" value="${esc(S.q)}" aria-label="Strafe suchen"><div id="finelist"></div>`}
+    $('#bn').innerHTML=statusBanner();
+    $('#finelist').innerHTML=fineList();
+  } else{const sx=v.querySelector('.tablewrap')?.scrollLeft||0;
+    v.innerHTML=statusBanner()+((S.tab==='uebersicht'||S.tab==='konten')?zahltagBanner():'')+(S.tab==='uebersicht'?uebersicht():S.tab==='konten'?(kontenSeg()+(S.kview==='verlauf'?verlauf():konten())):S.tab==='rechnungen'?rechnungen():verwalten());
+    const tw=v.querySelector('.tablewrap');if(tw)tw.scrollLeft=sx;}
+  if(S.sheet)renderSheet(true);
+  checkPenalties();
+}
+function loadingOr(html,what){
+  if(S.status==='loading')return `<div class="empty">Lade ${what} …</div>`;
+  return html;
+}
+function fineList(){
+  const q=S.q.trim().toLowerCase();
+  const fines=S.fines.filter(f=>!q||(f.title+' '+(f.hint||'')+' '+(f.cat||'')).toLowerCase().includes(q));
+  if(S.status==='loading')return `<div class="empty" style="margin-top:12px">Lade Strafenkatalog …</div>`;
+  if(!S.fines.length)return `<div class="empty" style="margin-top:12px">Noch kein Strafenkatalog hinterlegt.${S.canEdit?' Lege unter „Verwalten“ die erste Strafe an.':''}</div>`;
+  const groups={};for(const f of fines)(groups[f.cat||'Sonstiges']??=[]).push(f);
+  const cats=Object.keys(groups).sort((a,b)=>{const ia=CAT_ORDER.indexOf(a),ib=CAT_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)});
+  let h='';
+  if(!q)h+=`<button class="free" data-act="free">＋ Freier Betrag (Sonstiges, Würfelergebnis …)</button>`;
+  if(!cats.length)h+=`<div class="empty" style="margin-top:12px">Keine Strafe passt zu „${esc(S.q)}“.</div>`;
+  for(const c of cats){
+    h+=`<h2 class="section-h">${esc(c)}</h2><div class="fines">`+groups[c].sort((a,b)=>(a.order??0)-(b.order??0)).map(f=>
+      `<button class="fine" data-act="fine" data-id="${esc(f.id)}"><span class="t"><b>${esc(f.title)}</b>${f.hint?`<i>${esc(f.hint)}</i>`:''}</span><span class="price">${esc(priceLabel(f))}</span></button>`).join('')+`</div>`;
+  }
+  return h;
+}
+/* ---------- Bezahlen per PayPal ---------- */
+function ppTarget(){let v=String(S.settings.paypal||'').trim();if(!v)return null;
+  if(v.includes('@')&&!/paypal\.me/i.test(v))return{type:'mail',v};
+  v=v.replace(/^https?:\/\//i,'').replace(/^(www\.)?paypal\.me\//i,'').split(/[/?#]/)[0];return v?{type:'me',v}:null}
+function paypalUrl(amount,name){const t=ppTarget();if(!t)return null;const a=(Math.round(amount*100)/100).toFixed(2);
+  if(t.type==='me')return `https://www.paypal.me/${encodeURIComponent(t.v)}/${a}EUR`;
+  return `https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=${encodeURIComponent(t.v)}&amount=${a}&currency_code=EUR&no_shipping=1&item_name=${encodeURIComponent('Mannschaftskasse Dragons – '+name)}`}
+const ibanOk=v=>{if(!/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(v))return false;const r=(v.slice(4)+v.slice(0,4)).replace(/[A-Z]/g,c=>c.charCodeAt(0)-55);let m=0;for(const ch of r)m=(m*10+ +ch)%97;return m===1};
+const fmtIban=v=>String(v).replace(/\s/g,'').replace(/(.{4})/g,'$1 ').trim();
+const purpose=p=>'Mannschaftskasse Dragons '+p.name;
+const toPay=b=>Math.max(0,Math.round((b.open-b.credit)*100)/100);
+const DAY=864e5,KW_DEFAULT='p29',LATE_FEE=10;
+const myPid=()=>S.me?S.me.player_id:null;
+const kwPid=()=>S.settings.kassenwartPlayer||KW_DEFAULT;
+const isKW=()=>!!S.me&&S.me.role==='kassenwart';
+const zt=()=>{const z=[...S.zahltags].sort((a,b)=>String(b.startedAt).localeCompare(String(a.startedAt)))[0];return z&&z.active&&z.endsAt?z:null};
+const zOpen=()=>{const z=zt();return !!z&&Date.now()<Date.parse(z.endsAt)};
+function leftTxt(ms){if(ms<=0)return 'abgelaufen';const d=Math.floor(ms/DAY),h=Math.floor(ms%DAY/36e5),m=Math.ceil(ms%36e5/6e4);
+  return d?`noch ${d} ${d===1?'Tag':'Tage'}${h?' '+h+' Std.':''}`:h?`noch ${h} Std.`:`noch ${m} Min.`}
+const dtDE=iso=>{const d=new Date(iso);return d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})+', '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' Uhr'};
+function payBox(p,b){
+  if(!zOpen())return '';
+  const z=zt(),amt=toPay(b),url=paypalUrl(amt,p.name),t=ppTarget();
+  const mine=myPid()===p.id,canMark=mine||isKW()||S.canEdit;
+  const head=`<div class="pay-h"><span>Zahltag · bis ${esc(dtDE(z.endsAt))} · ${esc(leftTxt(Date.parse(z.endsAt)-Date.now()))}</span>${amt>0?`<b class="num">${eur(amt)}</b>`:''}</div>`;
+  if(amt<=0)return `<div class="paybox done">${head}<span>${esc(mine?'Du musst':p.name.split(' ')[0]+' muss')} gerade nichts zahlen${b.credit>b.open?` – Guthaben ${eur(b.credit-b.open)}`:''}.</span></div>`;
+  return `<div class="paybox">${head}
+    ${b.credit?`<p class="note">Offen ${eur(b.open)} − Guthaben ${eur(b.credit)}</p>`:''}${S.settings.payNote?`<p>${esc(S.settings.payNote)}</p>`:''}
+    ${url?`<a class="btn paypal" href="${esc(url)}" target="_blank" rel="noopener" data-act="ppOpened" data-id="${esc(p.id)}">Mit PayPal bezahlen · ${eur(amt)}</a>
+    <div class="pp-addr"><span>An: <b>${esc(t.v)}</b></span><button class="mini" data-act="copyPP">Kopieren</button></div>`:''}
+    ${S.settings.iban?`<details class="bank" ${url?'':'open'}><summary>Lieber per Überweisung</summary>
+      <div class="pp-addr"><span>IBAN: <b class="num">${esc(fmtIban(S.settings.iban))}</b></span><button class="mini" data-act="copyTxt" data-v="${esc(S.settings.iban.replace(/\s/g,''))}">Kopieren</button></div>
+      ${S.settings.owner?`<div class="pp-addr"><span>Empfänger: <b>${esc(S.settings.owner)}</b></span></div>`:''}
+      <div class="pp-addr"><span>Betrag: <b class="num">${eur(amt)}</b></span><button class="mini" data-act="copyTxt" data-v="${amt.toFixed(2).replace('.',',')}">Kopieren</button></div>
+      <div class="pp-addr"><span>Verwendungszweck: <b>${esc(purpose(p))}</b></span><button class="mini" data-act="copyTxt" data-v="${esc(purpose(p))}">Kopieren</button></div></details>`:''}
+    ${canMark?`<button class="btn good ${S.ppOpened===p.id?'pulse':''}" data-act="selfPaid" data-id="${esc(p.id)}">${S.confirmPaid===p.id?`Ja, ${eur(b.open)} als bezahlt markieren`:(mine?'Ich habe bezahlt':'Als bezahlt markieren')}</button>`
+      :''}
+    <p class="note">Wer bis ${esc(dtDE(z.endsAt))} nicht bezahlt hat, bekommt automatisch ${eur(LATE_FEE)} Strafe (Zahlungsverzug).</p></div>`;
+}
+function zahltagBanner(){
+  let h='';
+  if(zOpen()){const z=zt(),me=myPid();
+    h+=`<div class="zahltag"><b>Zahltag bis ${esc(dtDE(z.endsAt))}</b> <span>(${esc(leftTxt(Date.parse(z.endsAt)-Date.now()))}). ${me?'':'Tippe unter „Konten“ auf deinen Namen und dann auf „Mit PayPal bezahlen“. '}Wer bis dahin nicht zahlt, bekommt automatisch ${eur(LATE_FEE)} Strafe.${S.settings.payNote?' '+esc(S.settings.payNote):''}</span>${me?`<button class="btn" data-act="person" data-id="${esc(me)}">Mein Konto &amp; bezahlen</button>`:''}</div>`}
+  if(isKW())h+=kwCard();
+  return h;
+}
+function kwCard(){
+  const open=zOpen(),ready=!!(S.settings.paypal||S.settings.iban);
+  return `<div class="kwcard"><div><b>Kassenwart</b><span>${open?`Zahltag läuft bis ${esc(dtDE(zt().endsAt))}.`:'Starte den Zahltag – er schließt sich nach genau 7 Tagen von selbst.'}</span></div>
+    ${open?`<button class="btn danger" data-act="endZahltag">${S.confirmEnd?'Wirklich beenden? (ohne Strafen)':'Zahltag vorzeitig beenden'}</button>`
+    :`<button class="btn primary" data-act="startZahltag" ${ready&&S.canWrite!==false?'':'disabled'}>Zahltag starten (7 Tage)</button>`}</div>`;
+}
+function meLine(){
+  if(!S.me)return '';const p=pById(myPid());
+  return `<p class="note" style="margin:-4px 0 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">Angemeldet als <b>${esc(p?p.name:S.email||'')}</b>${S.me.role!=='member'?` <span class="tag">${S.me.role==='admin'?'Admin':'Kassenwart'}</span>`:''} <button class="mini" data-act="logout">Abmelden</button></p>`;
+}
+
+function kontenSeg(){return `<div class="toolbar" style="margin-top:0"><div class="seg full" role="group" aria-label="Ansicht">${[['personen','Personen'],['verlauf','Verlauf']].map(([k,l])=>`<button data-act="kview" data-k="${k}" aria-pressed="${S.kview===k}">${l}</button>`).join('')}</div></div>`}
+
+/* ---------- Übersicht (wie die MaKa-Tabelle) ---------- */
+function periods(){
+  const set=new Set([today().slice(0,7)]);
+  for(const e of S.entries)if(e.date)set.add(e.date.slice(0,7));
+  for(const b of S.bills)if(b.date)set.add(b.date.slice(0,7));
+  return [...set].sort();
+}
+function uebersicht(){
+  if(S.status==='loading')return `<div class="empty">Lade Übersicht …</div>`;
+  const ps=periods(),m=S.month;const idx=m==='saison'?ps.length:ps.indexOf(m);
+  let h=`<div class="monthbar"><button class="x" data-act="month" data-d="-1" aria-label="Vorheriger Monat" ${idx<=0?'disabled':''}>‹</button><h2>${esc(monthName(m))}</h2><button class="x" data-act="month" data-d="1" aria-label="Nächster Monat" ${m==='saison'?'disabled':''}>›</button></div>`;
+  // Personen-Zeilen
+  const rows=[];const tot={beitrag:0,strafen:0,fussball:0,bier:0,sonder:0,aus:0,gut:0,sum:0};
+  const ent=S.entries.filter(e=>inPeriod(e.date,m)),bills=S.bills.filter(b=>inPeriod(b.date,m));
+  for(const p of sortedPlayers(true)){
+    const r={p,beitrag:0,strafen:0,fussball:0,bier:0,sonder:0,gut:0,open:0,n:0};
+    for(const e of ent)if(e.playerId===p.id){r[colOf(e)]+=e.amount||0;r.n++;if(!e.paid)r.open+=e.amount||0}
+    for(const b of bills)if(b.kind!=='einzahlung'&&b.paidBy===p.id)r.gut+=b.amount||0;
+    r.aus=r.beitrag+r.strafen+r.fussball+r.bier+r.sonder;r.sum=r.aus-r.gut;
+    if(p.role!=='Spieler'&&!r.aus&&!r.gut)continue;
+    if(p.active===false&&!r.aus&&!r.gut)continue;
+    rows.push(r);for(const k in tot)tot[k]+=r[k]||0;
+  }
+  const einnahmen=tot.aus,ausgaben=bills.filter(isCost).reduce((s,b)=>s+(b.amount||0),0),
+        sonderein=bills.filter(b=>b.kind==='einzahlung').reduce((s,b)=>s+(b.amount||0),0),netto=einnahmen-ausgaben+sonderein;
+  h+=`<div class="kpis"><div class="kpi"><span>Einnahmen</span><b class="num">${eur(einnahmen)}</b></div><div class="kpi"><span>Ausgaben</span><b class="num">${eur(ausgaben)}</b></div><div class="kpi"><span>Sondereinzahlungen</span><b class="num">${eur(sonderein)}</b></div><div class="kpi net"><span>Netto</span><b class="num">${eur(netto)}</b></div></div>`;
+  const c=v=>`<td class="num ${v?'':'zero'}">${eur(v)}</td>`;
+  h+=`<h2 class="section-h">Mannschaftskasse</h2><div class="tablewrap"><table class="maka"><thead><tr><th>Name</th>${COLS.map(([,l])=>`<th>${l}</th>`).join('')}<th>Ausgaben</th><th>Gutschrift</th><th>Summe</th><th>Status</th></tr></thead><tbody>`;
+  h+=rows.map(r=>{const st=!r.n?'<span class="note">–</span>':r.open>0?`<span class="tag kf">offen ${eur(r.open)}</span>`:'<span class="tag ok">bezahlt</span>';
+    return `<tr><td class="pname">${esc(r.p.name)}<small>${esc(r.p.role==='Spieler'?(r.p.number!=null?'#'+r.p.number:'Spieler'):r.p.role)}</small></td>${COLS.map(([k])=>c(r[k])).join('')}<td class="num sum">${eur(r.aus)}</td><td class="num ${r.gut?'gut':'zero'}">${r.gut?eur(r.gut):'–'}</td><td class="num ${r.sum>0?'owe':'cred'}">${eur(r.sum)}</td><td>${st}</td></tr>`}).join('');
+  h+=`</tbody><tfoot><tr><td>Gesamt</td>${COLS.map(([k])=>`<td class="num">${eur(tot[k])}</td>`).join('')}<td class="num">${eur(tot.aus)}</td><td class="num">${eur(tot.gut)}</td><td class="num">${eur(tot.sum)}</td><td></td></tr></tfoot></table></div>`;
+  h+=`<div class="legend-note"><span><span class="dot" style="background:var(--bad)"></span><b>Summe rot</b> = muss noch zahlen</span><span><span class="dot" style="background:var(--good)"></span><b>grün</b> = bekommt Geld zurück (Gutschrift aus Rechnungen)</span></div>`;
+  // Kostenliste
+  const byCat={};for(const b of bills)if(isCost(b))byCat[b.cat||'Sonstiges']=(byCat[b.cat||'Sonstiges']||0)+(b.amount||0);
+  const cats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);const max=Math.max(1,...cats.map(x=>x[1]));
+  h+=`<h2 class="section-h">Kostenliste · Ausgaben des Teams</h2>`;
+  h+=cats.length?`<div class="costs">`+cats.map(([k,v])=>`<div class="cost" title="${esc(k)}: ${eur(v)} (${Math.round(v/ausgaben*100)} %)"><span class="lbl">${esc(k)}</span><span class="bar"><i style="width:${(v/max*100).toFixed(1)}%"></i></span><span class="val">${eur(v)}<small>${Math.round(v/ausgaben*100)} %</small></span></div>`).join('')+
+    `<div class="cost" style="border-top:1px solid var(--line);padding-top:10px"><b>Gesamt</b><span></span><b class="val">${eur(ausgaben)}</b></div></div>`
+    :`<div class="empty">Keine Rechnungen in diesem Zeitraum. Unter „Rechnungen“ kannst du Ausgaben wie Bier, Duschdas oder Tickets eintragen.</div>`;
+  h+=`<div class="toolbar" style="margin-top:16px"><button class="btn" data-act="copyMonth">Übersicht für die Gruppe kopieren</button></div>`;
+  S._lastOverview={rows,tot,einnahmen,ausgaben,sonderein,netto,cats};
+  return h;
+}
+
+/* ---------- Rechnungen ---------- */
+function rechnungen(){
+  if(S.status==='loading')return `<div class="empty">Lade Rechnungen …</div>`;
+  let h=S.canWrite!==false?`<div class="toolbar" style="margin-top:0"><button class="btn primary" data-act="editBill" data-k="ausgabe">＋ Rechnung</button><button class="btn" data-act="editBill" data-k="einzahlung">＋ Sondereinzahlung</button></div>`:'';
+  if(!S.bills.length)return h+`<div class="empty">Noch keine Rechnungen. Trag hier Ausgaben fürs Team ein – z. B. Bier, Duschdas oder Kerb-Tickets. Wer ausgelegt hat, bekommt den Betrag als Gutschrift; auf Wunsch wird die Rechnung als Sonderausgabe auf Spieler umgelegt.</div>`;
+  const list=[...S.bills].sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.createdAt).localeCompare(String(a.createdAt)));
+  let cur='';
+  for(const b of list){
+    const mo=String(b.date||'').slice(0,7);
+    if(mo!==cur){if(cur)h+='</div>';cur=mo;const sum=list.filter(x=>String(x.date).slice(0,7)===mo&&isCost(x)).reduce((s,x)=>s+(x.amount||0),0);
+      h+=`<h2 class="section-h">${esc(monthName(mo))} · ${eur(sum)} Ausgaben</h2><div class="rows">`}
+    const p=b.paidBy?pById(b.paidBy):null;const ein=b.kind==='einzahlung';
+    const gs=b.kind==='gutschrift';const meta=[dDE(b.date)];if(gs)meta.push('Gutschrift für '+(p?p.name:'?'));else if(!ein)meta.push(p?'ausgelegt von '+p.name:'aus der Kasse');if(b.splitIds?.length)meta.push('umgelegt auf '+b.splitIds.length+' × '+eur(b.perPerson));if(b.note)meta.push(b.note);
+    let acts='';
+    if(S.canWrite!==false){
+      if(p)acts+=`<button class="mini ${b.refunded?'on':''}" data-act="refund" data-id="${esc(b.id)}">${b.refunded?'✓ Erstattet':'Als erstattet markieren'}</button>`;
+      acts+=`<button class="mini" data-act="editBill" data-id="${esc(b.id)}">Bearbeiten</button>`;
+    }
+    h+=`<div class="row">${p?avatar(p):`<span class="av">${ein?'＋':'€'}</span>`}<div class="m"><b>${esc(b.title||b.cat)}</b><i>${esc((b.title&&b.cat&&b.title!==b.cat?b.cat+' · ':'')+meta.join(' · '))}</i></div><div class="r"><strong class="num" style="${ein?'color:var(--good)':''}">${ein?'+ ':''}${eur(b.amount)}</strong>${ein?'<span class="tag ok">Sondereinzahlung</span>':gs?'<span class="tag">nur Gutschrift</span>':''}</div>${acts?`<div class="acts">${acts}</div>`:''}</div>`;
+  }
+  return h+'</div>';
+}
+
+function konten(){
+  if(S.status==='loading')return `<div class="empty">Lade Konten …</div>`;
+  const me=meLine();
+  const t=totals();
+  let h=me+`<div class="stats"><div class="stat open"><span>Offen</span><b class="num">${eur(t.open)}</b></div><div class="stat paid"><span>Bezahlt</span><b class="num">${eur(t.paid)}</b></div><div class="stat kf"><span>Kabinenfeste</span><b class="num">${t.kf}</b></div></div>`;
+  h+=`<div class="toolbar"><button class="btn" data-act="copy">Offene Beträge für die Gruppe kopieren</button></div>`;
+  const ps=sortedPlayers(false).map(p=>({p,b:balance(p.id)}));
+  if(!ps.length)return h+`<div class="empty">Noch keine Personen im Kader.</div>`;
+  ps.sort((a,b)=>b.b.open-a.b.open||((a.p.number??999)-(b.p.number??999)));
+  h+=`<div class="people">`+ps.map(({p,b})=>`<button class="person" data-act="person" data-id="${esc(p.id)}">${avatar(p)}<span class="n"><b>${esc(p.name)}</b><i>${esc(pLabel(p))}${b.paid?' · bezahlt '+eur(b.paid):''}${b.credit?' · Guthaben '+eur(b.credit):''}</i></span>${b.kf?`<span class="tag kf">${b.kf}× Kabinenfest</span>`:''}<span class="amt num ${b.open>0?'pos':'zero'}">${eur(b.open)}</span></button>`).join('')+`</div>`;
+  return h;
+}
+function entryRow(e,withPerson){
+  const p=pById(e.playerId);
+  const meta=[dDE(e.date)];if(e.qty&&e.unit)meta.push(e.qty+' '+e.unit);if(e.note)meta.push(e.note);
+  let acts='';
+  if(S.canWrite!==false){
+    acts+=`<button class="mini ${e.paid?'on':''}" data-act="paid" data-id="${esc(e.id)}">${e.paid?'✓ Bezahlt':'Als bezahlt markieren'}</button>`;
+    if(e.kabinenfest)acts+=`<button class="mini ${e.kfDone?'on':''}" data-act="kf" data-id="${esc(e.id)}">${e.kfDone?'✓ Kabinenfest erledigt':'Kabinenfest erledigt'}</button>`;
+    acts+=`<button class="mini ${S.confirmDel===e.id?'warn':''}" data-act="del" data-id="${esc(e.id)}">${S.confirmDel===e.id?'Wirklich löschen?':'Löschen'}</button>`;
+  }
+  return `<div class="row ${e.paid?'paid':''}">${withPerson?avatar(p):'<span></span>'}<div class="m"><b>${esc(withPerson?(p?.name||'Unbekannt'):e.title)}</b><i>${withPerson?esc(e.title)+' · ':''}${esc(meta.join(' · '))}</i></div><div class="r"><strong class="num">${eur(e.amount)}</strong>${e.kabinenfest?'<span class="tag kf">+ Kabinenfest</span>':''}${e.paid&&e.paidVia==='gemeldet'?'<span class="tag">selbst gemeldet</span>':''}${e.auto?'<span class="tag kf">automatisch</span>':''}</div>${acts?`<div class="acts">${acts}</div>`:''}</div>`;
+}
+function verlauf(){
+  if(S.status==='loading')return `<div class="empty">Lade Verlauf …</div>`;
+  const f=S.filter;const list=S.entries.filter(e=>f==='all'||(f==='open'?!e.paid:e.paid));
+  let h=`<div class="toolbar"><div class="seg" role="group" aria-label="Filter">${[['open','Offen'],['paid','Bezahlt'],['all','Alle']].map(([k,l])=>`<button data-act="filter" data-k="${k}" aria-pressed="${f===k}">${l}</button>`).join('')}</div></div>`;
+  if(!list.length)return h+`<div class="empty">${S.entries.length?'Keine Einträge in diesem Filter.':'Noch keine Strafen eingetragen. Tippe unter „Eintragen“ auf eine Strafe und wähle die Person.'}</div>`;
+  return h+`<div class="rows">`+list.slice(0,300).map(e=>entryRow(e,true)).join('')+`</div>`;
+}
+function verwalten(){
+  if(S.status==='loading')return `<div class="empty">Lade …</div>`;
+  const st=S.settings,kp=pById(kwPid()),z=zt();
+  const claims=S.links.filter(l=>l.playerId===kwPid());
+  let h=`<h2 class="section-h">Bezahlen</h2><div class="stat" style="display:grid;gap:10px;padding:14px">
+    <div><span>PayPal</span><div style="font-weight:600;margin-top:2px">${st.paypal?esc(st.paypal):'<span class="note">noch keine Adresse hinterlegt</span>'}</div></div>
+    <div><span>Überweisung</span><div style="font-weight:600;margin-top:2px" class="num">${st.iban?esc(fmtIban(st.iban))+(st.owner?' · '+esc(st.owner):''):'<span class="note">keine IBAN hinterlegt</span>'}</div></div>
+    <div><span>Zahltag</span><div style="margin-top:4px">${zOpen()?`<span class="tag ok">läuft bis ${esc(dtDE(z.endsAt))}</span>`:z?`<span class="tag">abgelaufen am ${esc(dtDE(z.endsAt))}</span>`:'<span class="tag">aus</span>'}</div></div>
+    <div class="toolbar" style="margin:0"><button class="btn" data-act="editSettings">Zahlungsdaten bearbeiten</button></div></div>`;
+  const ms=[...S.members].sort((a,b)=>(a.approved?1:0)-(b.approved?1:0)||String(a.email).localeCompare(String(b.email)));
+  h+=`<h2 class="section-h">Mitglieder &amp; Rollen</h2><p class="note" style="margin-top:-2px">Nur freigeschaltete Konten sehen die Kasse. Nur der <b>Kassenwart</b> kann den Zahltag starten; Kassenwart und Admins tragen Strafen und Rechnungen ein.</p>`;
+  h+=ms.length?`<div class="rows">`+ms.map(m=>{const pp=pById(m.player_id);return `<div class="row"><span>${avatar(pp)}</span><div class="m"><b>${esc(pp?pp.name:'– kein Spieler –')}</b><i>${esc(m.email||'')}${m.user_id===S.uid?' · du':''}</i></div><div class="r">${m.approved?`<span class="tag ok">freigeschaltet</span>`:`<span class="tag kf">wartet</span>`}</div>
+    <div class="acts"><select class="mini" data-act="role" data-id="${esc(m.user_id)}" aria-label="Rolle" ${m.user_id===S.uid?'disabled':''}>${[['member','Spieler'],['kassenwart','Kassenwart'],['admin','Admin']].map(([k,l])=>`<option value="${k}" ${m.role===k?'selected':''}>${l}</option>`).join('')}</select>
+    ${m.user_id===S.uid?'':`<button class="mini ${m.approved?'':'on'}" data-act="approve" data-id="${esc(m.user_id)}">${m.approved?'Sperren':'Freischalten'}</button><button class="mini ${S.confirmDel==='m'+m.user_id?'warn':''}" data-act="delMember" data-id="${esc(m.user_id)}">${S.confirmDel==='m'+m.user_id?'Wirklich entfernen?':'Entfernen'}</button>`}</div></div>`}).join('')+`</div>`
+    :`<div class="empty">Noch keine Mitglieder.</div>`;
+  h+=`<h2 class="section-h">Strafenkatalog</h2><div class="toolbar"><button class="btn primary" data-act="editFine" data-id="">＋ Neue Strafe</button></div>`;
+  const fs=[...S.fines].sort((a,b)=>{const ia=CAT_ORDER.indexOf(a.cat),ib=CAT_ORDER.indexOf(b.cat);return (ia<0?99:ia)-(ib<0?99:ib)||(a.order??0)-(b.order??0)});
+  h+=fs.length?`<div class="fines">`+fs.map(f=>`<button class="fine" data-act="editFine" data-id="${esc(f.id)}"><span class="t"><b>${esc(f.title)}</b><i>${esc(f.cat||'Sonstiges')}</i></span><span class="price">${esc(priceLabel(f))}</span></button>`).join('')+`</div>`:`<div class="empty">Noch keine Strafen.</div>`;
+  h+=`<h2 class="section-h">Kader</h2><div class="toolbar"><button class="btn primary" data-act="editPlayer" data-id="">＋ Person hinzufügen</button></div>`;
+  const ps=sortedPlayers(true);
+  h+=ps.length?`<div class="people">`+ps.map(p=>`<button class="person" data-act="editPlayer" data-id="${esc(p.id)}">${avatar(p)}<span class="n"><b>${esc(p.name)}</b><i>${esc(pLabel(p))}</i></span>${p.active===false?'<span class="tag">inaktiv</span>':''}</button>`).join('')+`</div>`:`<div class="empty">Noch niemand im Kader.</div>`;
+  return h;
+}
+
+/* ---------- Sheets ---------- */
+function openSheet(s){S.sheet=s;S.confirmDel=null;renderSheet(false)}
+function closeSheet(){S.sheet=null;$('#sheetRoot').innerHTML=''}
+function fineAmount(s){if(s.touched)return num(s.amount);const f=s.fine;return (f.base||0)+(f.per||0)*(s.qty||0)}
+function renderSheet(refresh){
+  const s=S.sheet,root=$('#sheetRoot');if(!s)return;
+  if(refresh&&(s.type==='fine'||s.type==='editFine'||s.type==='editPlayer'||s.type==='bill'||s.type==='settings'))return; // Formulare nicht unter den Fingern neu bauen
+  const keepScroll=root.querySelector('.sheet-b')?.scrollTop||0;
+  let head='',body='',foot='';
+  if(s.type==='fine'){
+    const f=s.fine;
+    head=`<h2>${esc(f.title)}</h2><p>${esc(priceLabel(f))}</p>`;
+    body+=f.hint?`<div class="hint" style="margin-bottom:12px">${esc(f.hint)}</div>`:'';
+    body+=`<h3 class="section-h">Wer?</h3><div class="grid">`+sortedPlayers(false).map(p=>`<button class="pick" data-act="pick" data-id="${esc(p.id)}" aria-pressed="${s.sel.has(p.id)}">${p.role==='Spieler'&&p.number!=null?`<span class="no">${p.number}</span>`:''}${avatar(p)}<b>${esc(p.name.split(' ')[0])}</b><span class="note" style="font-size:11px;margin-top:-4px">${esc(p.role==='Spieler'?(p.name.split(' ').slice(1).join(' ')):p.role)}</span></button>`).join('')+`</div>`;
+    body+=`<div class="fields">`;
+    if(f.per)body+=`<div class="field"><label for="qty">Anzahl (${esc(f.unit||'Stück')})</label><div class="stepper"><button data-act="qty" data-d="-1" aria-label="weniger">−</button><input id="qty" inputmode="numeric" value="${s.qty}"><button data-act="qty" data-d="1" aria-label="mehr">＋</button></div></div>`;
+    body+=`<div class="two"><div class="field"><label for="amt">Betrag pro Person (€)</label><input id="amt" inputmode="decimal" value="${String(fineAmount(s)).replace('.',',')}"></div><div class="field"><label for="dt">Datum</label><input id="dt" type="date" value="${esc(s.date)}"></div></div>`;
+    if(!f.id)body+=`<div class="field"><label for="colsel">Spalte in der Übersicht</label><select id="colsel">${COLS.map(([k,l])=>`<option value="${k}" ${s.col===k?'selected':''}>${l}</option>`).join('')}</select></div>`;
+    body+=`<label class="check"><input type="checkbox" id="kfc" ${s.kf?'checked':''}> Zusätzlich Kabinenfest fällig</label>`;
+    body+=`<div class="field"><label for="nt">Notiz (optional)</label><input id="nt" value="${esc(s.note)}" placeholder="${f.wuerfeln?'z. B. gewürfelt: 4':'z. B. Training Dienstag'}"></div>`;
+    body+=`<p class="note" style="margin:0">Jede Strafe kann gewürfelt werden – das Ergebnis einfach als Betrag eintragen.</p></div>`;
+    foot=`<button class="btn primary" id="submit" data-act="submitFine"></button>`;
+  } else if(s.type==='person'){
+    const p=pById(s.id);if(!p){closeSheet();return}
+    const b=balance(p.id);const list=S.entries.filter(e=>e.playerId===p.id).sort((a,c)=>(a.paid?1:0)-(c.paid?1:0)||String(c.date).localeCompare(String(a.date)));
+    head=`<div style="display:flex;gap:12px;align-items:center">${avatar(p)}<div><h2>${esc(p.name)}${myPid()===p.id?' <span class="tag ok">du</span>':''}</h2><p>${esc(pLabel(p))} · offen <b class="num" style="color:var(--accent)">${eur(b.open)}</b> · bezahlt ${eur(b.paid)}</p></div></div>`;
+    body=payBox(p,b)+(list.length?`<div class="rows">`+list.map(e=>entryRow(e,false)).join('')+`</div>`:`<div class="empty">Keine Einträge – sauber!</div>`);
+    if(S.canWrite!==false)foot=`<div style="display:flex;gap:8px"><button class="btn" style="flex:1" data-act="addFor" data-id="${esc(p.id)}">＋ Strafe</button><button class="btn good" style="flex:1" data-act="payAll" data-id="${esc(p.id)}" ${b.open>0?'':'disabled'}>Alles bezahlt (${eur(b.open)})</button></div>`;
+  } else if(s.type==='settings'){
+    const st=S.settings;
+    head=`<h2>Zahlungsdaten &amp; Zahltag</h2><p>Wohin die Mannschaft bezahlt</p>`;
+    body=`<div class="fields">
+      <div class="field"><label for="spp">PayPal-E-Mail oder PayPal.Me-Name</label><input id="spp" value="${esc(st.paypal||'')}" placeholder="kasse@beispiel.de oder paypal.me/dragonskasse" autocomplete="off"></div>
+      <div class="hint">Mit einem PayPal.Me-Namen öffnet sich PayPal direkt mit dem Betrag. Bei einer E-Mail-Adresse öffnet sich PayPals Zahlungsseite mit Adresse und Betrag schon ausgefüllt.</div>
+      <div class="field"><label for="siban">IBAN für Überweisungen (optional)</label><input id="siban" value="${esc(fmtIban(st.iban||''))}" autocomplete="off" inputmode="text"></div>
+      <div class="field"><label for="sowner">Kontoinhaber (optional)</label><input id="sowner" value="${esc(st.owner||'')}" autocomplete="off"></div>
+      <div class="field"><label for="snote">Hinweis an die Mannschaft (optional)</label><input id="snote" value="${esc(st.payNote||'')}" placeholder="z. B. Bitte als „Freunde & Familie“ senden"></div></div>`;
+    foot=`<button class="btn primary" data-act="saveSettings">Speichern</button>`;
+  } else if(s.type==='bill'){
+    const b=s.bill,ein=b.kind==='einzahlung';
+    head=`<h2>${b.id?(ein?'Sondereinzahlung bearbeiten':'Rechnung bearbeiten'):(ein?'Neue Sondereinzahlung':'Neue Rechnung')}</h2><p>${ein?'Geld, das zusätzlich in die Kasse kommt (Sponsor, Spende …)':'Ausgabe fürs Team – erscheint in der Kostenliste'}</p>`;
+    body=`<div class="fields">`;
+    if(!ein)body+=`<div class="field"><label for="bc">Kategorie</label><input id="bc" list="bcats" value="${esc(b.cat||'')}" placeholder="z. B. Bier"><datalist id="bcats">${[...new Set([...BILL_CATS,...S.bills.map(x=>x.cat).filter(Boolean)])].map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>`;
+    body+=`<div class="field"><label for="bt">${ein?'Von wem / wofür':'Beschreibung (optional)'}</label><input id="bt" value="${esc(b.title||'')}" placeholder="${ein?'z. B. Sponsor Horn':'z. B. 3 Kisten nach dem Heimspiel'}"></div>
+      <div class="two"><div class="field"><label for="ba">Betrag (€)</label><input id="ba" inputmode="decimal" value="${b.amount?String(b.amount).replace('.',','):''}"></div><div class="field"><label for="bd">Datum</label><input id="bd" type="date" value="${esc(b.date||today())}"></div></div>`;
+    if(!ein){
+      body+=`<div class="field"><label for="bp">Bezahlt von</label><select id="bp"><option value="">Mannschaftskasse</option>${sortedPlayers(true).map(p=>`<option value="${esc(p.id)}" ${b.paidBy===p.id?'selected':''}>${esc(p.name)} (ausgelegt → Gutschrift)</option>`).join('')}</select></div>`;
+      if(!b.id){
+        body+=`<label class="check"><input type="checkbox" id="bs" ${s.split?'checked':''}> Auf Spieler umlegen (als Sonderausgabe)</label>`;
+        body+=`<div id="splitbox" ${s.split?'':'hidden'}><div class="field"><label for="bpp">Betrag pro Person (€)</label><input id="bpp" inputmode="decimal" value="${esc(s.per||'')}"></div><h3 class="section-h">Wer zahlt mit?</h3><div class="grid">`+sortedPlayers(false).map(p=>`<button class="pick" data-act="billpick" data-id="${esc(p.id)}" aria-pressed="${s.sel.has(p.id)}">${p.role==='Spieler'&&p.number!=null?`<span class="no">${p.number}</span>`:''}${avatar(p)}<b>${esc(p.name.split(' ')[0])}</b></button>`).join('')+`</div><p class="note" id="splitinfo"></p></div>`;
+      } else if(b.splitIds?.length)body+=`<div class="hint">Umgelegt auf ${b.splitIds.length} Personen × ${eur(b.perPerson)}. Die Einträge stehen bei den Personen unter „Sonderausgaben“.</div>`;
+    }
+    body+=`<div class="field"><label for="bn">Notiz (optional)</label><input id="bn" value="${esc(b.note||'')}"></div></div>`;
+    foot=`<div style="display:flex;gap:8px">${b.id?`<button class="btn danger" data-act="delBill">${S.confirmDel==='bill'?'Wirklich löschen?':'Löschen'}</button>`:''}<button class="btn primary" style="flex:1" data-act="saveBill" id="billsave">Speichern</button></div>`;
+  } else if(s.type==='editFine'){
+    const f=s.fine;
+    head=`<h2>${f.id?'Strafe bearbeiten':'Neue Strafe'}</h2>`;
+    body=`<div class="fields">
+      <div class="field"><label for="ft">Bezeichnung</label><input id="ft" value="${esc(f.title)}"></div>
+      <div class="field"><label for="fc">Kategorie</label><input id="fc" list="cats" value="${esc(f.cat||'')}"><datalist id="cats">${CAT_ORDER.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>
+      <div class="two"><div class="field"><label for="fb">Grundbetrag (€)</label><input id="fb" inputmode="decimal" value="${String(f.base||0).replace('.',',')}"></div>
+      <div class="field"><label for="fp">Zusatz pro Einheit (€)</label><input id="fp" inputmode="decimal" value="${String(f.per||0).replace('.',',')}"></div></div>
+      <div class="field"><label for="fu">Einheit (z. B. min, Teil, Tag, Stück)</label><input id="fu" value="${esc(f.unit||'')}"></div>
+      <label class="check"><input type="checkbox" id="fk" ${f.kabinenfest?'checked':''}> Kabinenfest fällig</label>
+      <label class="check"><input type="checkbox" id="fw" ${f.wuerfeln?'checked':''}> Wird gewürfelt</label>
+      <div class="field"><label for="fh">Erklärung (optional)</label><textarea id="fh" rows="2">${esc(f.hint||'')}</textarea></div>
+      <div class="field"><label for="fo">Reihenfolge</label><input id="fo" inputmode="numeric" value="${f.order??0}"></div></div>`;
+    foot=`<div style="display:flex;gap:8px">${f.id?`<button class="btn danger" data-act="delFine">${S.confirmDel==='fine'?'Wirklich löschen?':'Löschen'}</button>`:''}<button class="btn primary" style="flex:1" data-act="saveFine">Speichern</button></div>`;
+  } else if(s.type==='editPlayer'){
+    const p=s.player;
+    head=`<h2>${p.id?'Person bearbeiten':'Person hinzufügen'}</h2>`;
+    body=`<div class="fields">
+      <div class="field"><label for="pn">Name</label><input id="pn" value="${esc(p.name||'')}"></div>
+      <div class="two"><div class="field"><label for="pr">Rolle</label><input id="pr" list="roles" value="${esc(p.role||'Spieler')}"><datalist id="roles"><option value="Spieler"><option value="Trainer"><option value="Co-Trainer"><option value="Physio"><option value="Mannschaftsverantwortlicher"></datalist></div>
+      <div class="field"><label for="pno">Rückennummer</label><input id="pno" inputmode="numeric" value="${p.number??''}"></div></div>
+      <label class="check"><input type="checkbox" id="pa" ${p.active!==false?'checked':''}> Aktiv (erscheint beim Eintragen)</label></div>`;
+    foot=`<button class="btn primary" data-act="savePlayer">Speichern</button>`;
+  }
+  root.innerHTML=`<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true"><div class="sheet-h pad">${`<div class="t">${head}</div>`}<button class="x" data-act="close" aria-label="Schließen">×</button></div><div class="sheet-b pad">${body}</div>${foot?`<div class="sheet-f pad">${foot}</div>`:''}</div></div>`;
+  root.querySelector('.sheet-b').scrollTop=keepScroll;
+  if(s.type==='fine')updateSubmit();
+  if(s.type==='bill')updateSplit();
+}
+function updateSplit(){
+  const s=S.sheet,i=$('#splitinfo');if(!s||!i)return;
+  const n=s.sel.size,per=num(s.per);
+  i.textContent=n?`${n} ${n===1?'Person':'Personen'} × ${eur(per)} = ${eur(n*per)} als Sonderausgabe`:'Personen antippen, die mitzahlen.';
+}
+async function saveBill(){
+  const s=S.sheet,b=s.bill,ein=b.kind==='einzahlung';
+  const d={kind:b.kind,cat:ein?'Sondereinzahlung':($('#bc').value.trim()||'Sonstiges'),title:$('#bt').value.trim()||null,amount:Math.round(num($('#ba').value)*100)/100,
+    date:$('#bd').value||today(),paidBy:ein?null:($('#bp').value||null),note:$('#bn').value.trim()||null,
+    refunded:!!b.refunded,splitIds:b.splitIds||[],perPerson:b.perPerson||0,createdAt:b.createdAt||new Date().toISOString(),createdBy:b.createdBy||S.uid||null};
+  if(!(d.amount>0)){toast('Bitte einen Betrag eingeben');return}
+  const split=!b.id&&!ein&&s.split;
+  if(split){if(!s.sel.size){toast('Bitte auswählen, wer mitzahlt');return}d.splitIds=[...s.sel];d.perPerson=Math.round(num(s.per)*100)/100;if(!(d.perPerson>0)){toast('Bitte Betrag pro Person eingeben');return}}
+  const btn=$('#billsave');if(btn)btn.disabled=true;
+  try{
+    const id=b.id||('b'+Date.now().toString(36));
+    await S.db.doc('bills/'+id).set(d);
+    if(split){const now=new Date().toISOString();const col=S.db.collection('entries');
+      await Promise.all(d.splitIds.map(pid=>col.doc().set({playerId:pid,fineId:null,billId:id,col:'sonder',title:d.title||d.cat,amount:d.perPerson,qty:null,unit:null,kabinenfest:false,kfDone:false,note:d.cat,date:d.date,createdAt:now,createdBy:S.uid||null,paid:false,paidAt:null})))}
+    closeSheet();toast(split?`Rechnung gespeichert und auf ${d.splitIds.length} Personen umgelegt`:'Gespeichert');
+  }catch(e){if(btn)btn.disabled=false;toast(errMsg(e))}
+}
+function updateSubmit(){
+  const s=S.sheet,b=$('#submit');if(!b||!s)return;
+  const a=fineAmount(s),n=s.sel.size;
+  b.disabled=!n||(a<=0&&!s.kf)||S.status!=='ready'||S.canWrite===false||s.busy;
+  b.textContent=!n?'Person(en) auswählen':`Eintragen für ${n} ${n===1?'Person':'Personen'} · ${eur(a*n)}${s.kf?' + Kabinenfest':''}`;
+  const amt=$('#amt');if(amt&&!s.touched&&document.activeElement!==amt)amt.value=String(a).replace('.',',');
+}
+
+/* ---------- Zahltag ---------- */
+async function startZahltag(){
+  if(!isKW()){toast('Nur der Kassenwart kann den Zahltag starten');return}
+  if(zOpen()){toast('Es läuft schon ein Zahltag');return}
+  const now=Date.now(),due={},entryIds=[];
+  for(const p of sortedPlayers(true)){const b=balance(p.id),a=toPay(b);if(a>0){due[p.id]=a;for(const e of S.entries)if(e.playerId===p.id&&!e.paid)entryIds.push(e.id)}}
+  const z={active:true,runId:'z'+now.toString(36),startedAt:new Date(now).toISOString(),endsAt:new Date(now+7*DAY).toISOString(),due,entryIds,startedBy:S.uid};
+  try{await S.db.doc('zahltag/'+z.runId).set(z);toast(`Zahltag gestartet – ${Object.keys(due).length} Personen haben 7 Tage Zeit`)}catch(e){toast(errMsg(e))}
+}
+let penBusy=false,penLast=0;
+async function checkPenalties(){
+  const z=zt();if(!z||z.penaltiesApplied||penBusy||!S.sb||S.status!=='ready'||Date.now()<Date.parse(z.endsAt)||Date.now()-penLast<60000)return;
+  penBusy=true;penLast=Date.now();
+  try{const {data,error}=await S.sb.rpc('apply_late_fees');if(!error&&data)toast(`Zahltag abgelaufen: ${data}× automatisch ${eur(LATE_FEE)} Zahlungsverzug eingetragen`)}catch(e){}finally{penBusy=false}
+}
+setInterval(()=>{if(zt()){render();checkPenalties()}},60000);
+
+/* ---------- Schreiben ---------- */
+let toastT;
+function toast(msg,undo){const t=$('#toast');t.innerHTML=`<span>${esc(msg)}</span>${undo?'<button data-act="undo">Rückgängig</button>':''}`;t.hidden=false;S.undo=undo||null;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true;S.undo=null},undo?7000:3500)}
+function errMsg(e){const c=e&&e.code;return c==='invalid_argument'?'Keine Berechtigung zum Speichern.':c==='quota_exceeded'?'Speicher voll – bitte alte Einträge löschen.':'Speichern fehlgeschlagen. Bitte noch einmal versuchen.'}
+async function submitFine(){
+  const s=S.sheet;if(!s||!S.db)return;s.busy=true;updateSubmit();
+  const a=Math.round(fineAmount(s)*100)/100,f=s.fine;const now=new Date().toISOString();const col=S.db.collection('entries');
+  try{
+    const refs=await Promise.all([...s.sel].map(pid=>{const r=col.doc();return r.set({playerId:pid,fineId:f.id||null,title:f.title,amount:a,qty:f.per?s.qty:null,unit:f.per?(f.unit||'Stück'):null,
+      col:f.id?(f.col||COL_BY_FINE[f.id]||'strafen'):(s.col||'strafen'),kabinenfest:!!s.kf,kfDone:false,note:s.note.trim(),date:s.date||today(),createdAt:now,createdBy:S.uid||null,paid:false,paidAt:null}).then(()=>r)}));
+    const n=refs.length;closeSheet();
+    toast(`${f.title}: ${n===1?esc(pById([...s.sel][0])?.name||''):n+' Personen'} eingetragen`,async()=>{await Promise.all(refs.map(r=>r.delete()));toast('Rückgängig gemacht')});
+  }catch(e){s.busy=false;updateSubmit();toast(errMsg(e))}
+}
+async function setEntry(id,patch){try{await S.db.doc('entries/'+id).update(patch)}catch(e){toast(errMsg(e))}}
+
+/* ---------- Events ---------- */
+document.addEventListener('click',async ev=>{
+  const el=ev.target.closest('[data-act]');if(!el)return;const act=el.dataset.act,id=el.dataset.id;
+  if(act==='scrim'&&ev.target!==el)return;
+  switch(act){
+    case 'tab':S.tab=el.dataset.k;try{localStorage.setItem('tab',S.tab)}catch(e){}$('#view').innerHTML='';render();scrollTo(0,0);break;
+    case 'fine':{const f=S.fines.find(x=>x.id===id);if(f)openSheet({type:'fine',fine:f,sel:new Set(S.preselect?[S.preselect]:[]),qty:f.per&&!f.base?1:0,touched:false,amount:0,kf:!!f.kabinenfest,note:'',date:today()});S.preselect=null;break}
+    case 'free':openSheet({type:'fine',fine:{id:null,title:'Sonstiges',base:0,per:0,hint:'Freier Betrag, z. B. Würfelergebnis oder Beitrag, der nicht im Katalog steht. Beschreibe ihn in der Notiz.'},sel:new Set(S.preselect?[S.preselect]:[]),qty:0,touched:true,amount:0,kf:false,note:'',date:today(),col:'strafen'});S.preselect=null;break;
+    case 'kview':S.kview=el.dataset.k;render();break;
+    case 'month':{const ps=periods();let i=S.month==='saison'?ps.length:ps.indexOf(S.month);i+=Number(el.dataset.d);S.month=i>=ps.length?'saison':ps[Math.max(0,i)];render();break}
+    case 'editBill':{const b=id?S.bills.find(x=>x.id===id):{kind:el.dataset.k||'ausgabe',date:today()};if(b)openSheet({type:'bill',bill:{...b},sel:new Set(),split:false,per:''});break}
+    case 'billpick':{const s=S.sheet;s.sel.has(id)?s.sel.delete(id):s.sel.add(id);el.setAttribute('aria-pressed',s.sel.has(id));
+      if(!s.perTouched&&s.sel.size){s.per=String(Math.round(num($('#ba').value)/s.sel.size*100)/100).replace('.',',');$('#bpp').value=s.per}updateSplit();break}
+    case 'saveBill':saveBill();break;
+    case 'editSettings':openSheet({type:'settings'});break;
+    case 'saveSettings':{const ib=$('#siban').value.replace(/\s/g,'').toUpperCase();
+      if(ib&&!ibanOk(ib)){toast('Die IBAN ist ungültig – bitte prüfen');break}
+      const d={...S.settings,iban:ib||null,owner:$('#sowner').value.trim()||null,paypal:$('#spp').value.trim()||null,payNote:$('#snote').value.trim()||null};
+      try{await S.db.doc('settings/kasse').set(d);closeSheet();toast('Gespeichert')}catch(e){toast(errMsg(e))}break}
+    case 'linkMe':{try{await S.db.doc('links/'+S.uid).set({playerId:id,at:new Date().toISOString()});toast('Verknüpft – du bist '+(pById(id)?.name||''))}catch(e){toast(errMsg(e))}break}
+    case 'kwConfirm':{try{await S.db.doc('settings/kasse').set({...S.settings,kassenwartPlayer:kwPid(),kassenwartUid:id});toast('Kassenwart bestätigt')}catch(e){toast(errMsg(e))}break}
+    case 'kwReset':{const d={...S.settings};delete d.kassenwartUid;try{await S.db.doc('settings/kasse').set(d);toast('Kassenwart zurückgesetzt')}catch(e){toast(errMsg(e))}break}
+    case 'startZahltag':startZahltag();break;
+    case 'logout':await S.sb.auth.signOut();location.reload();break;
+    case 'approve':{const m=S.members.find(x=>x.user_id===id);if(!m)break;const {error}=await S.sb.from('members').update({approved:!m.approved}).eq('user_id',id);toast(error?error.message:(m.approved?'Gesperrt':'Freigeschaltet'));break}
+    case 'delMember':if(S.confirmDel!=='m'+id){S.confirmDel='m'+id;render();break}S.confirmDel=null;{const {error}=await S.sb.from('members').delete().eq('user_id',id);toast(error?error.message:'Entfernt')}break;
+    case 'endZahltag':if(!S.confirmEnd){S.confirmEnd=true;render();setTimeout(()=>{S.confirmEnd=false;render()},5000);break}
+      S.confirmEnd=false;try{await S.db.doc('zahltag/'+zt().runId).update({active:false,cancelledAt:new Date().toISOString()});toast('Zahltag beendet – keine Strafen')}catch(e){toast(errMsg(e))}break;
+    case 'ppOpened':S.ppOpened=id;setTimeout(()=>{if(S.sheet)renderSheet(false)},400);break;
+    case 'selfPaid':{if(S.confirmPaid!==id){S.confirmPaid=id;renderSheet(false);break}
+      S.confirmPaid=null;const now=new Date().toISOString();const open=S.entries.filter(e=>e.playerId===id&&!e.paid);
+      if(id===myPid()&&!S.canWrite){const {data,error}=await S.sb.rpc('mark_self_paid');if(error){toast('Konnte nicht speichern: '+error.message);break}toast(`Danke! ${data} Einträge als bezahlt vermerkt`);break}
+      try{await Promise.all(open.map(e=>S.db.doc('entries/'+e.id).update({paid:true,paidAt:now,paidVia:'gemeldet',reportedBy:S.uid||null})));toast(`Danke! ${open.length} Einträge als bezahlt vermerkt`)}catch(e){toast(errMsg(e))}break}
+    case 'copyTxt':{const v=el.dataset.v;try{await navigator.clipboard.writeText(v);toast('Kopiert')}catch(e){toast(v)}break}
+    case 'copyPP':{const t=ppTarget();if(!t)break;try{await navigator.clipboard.writeText(t.v);toast('PayPal-Adresse kopiert')}catch(e){toast(t.v)}break}
+    case 'delBill':if(S.confirmDel==='bill'){const b=S.sheet.bill;try{const linked=S.entries.filter(e=>e.billId===b.id);await Promise.all(linked.map(e=>S.db.doc('entries/'+e.id).delete()));await S.db.doc('bills/'+b.id).delete();closeSheet();toast(linked.length?`Rechnung und ${linked.length} umgelegte Einträge gelöscht`:'Rechnung gelöscht')}catch(e){toast(errMsg(e))}}
+      else{S.confirmDel='bill';el.textContent=S.entries.some(e=>e.billId===S.sheet.bill.id)?'Inkl. umgelegter Einträge löschen?':'Wirklich löschen?'}break;
+    case 'refund':{const b=S.bills.find(x=>x.id===id);if(b)try{await S.db.doc('bills/'+id).update({refunded:!b.refunded})}catch(e){toast(errMsg(e))}break}
+    case 'copyMonth':{const o=S._lastOverview;if(!o)break;
+      const lines=o.rows.filter(r=>r.aus||r.gut).map(r=>`${r.p.name}: ${eur(r.sum)}${r.gut?` (Ausgaben ${eur(r.aus)} − Gutschrift ${eur(r.gut)})`:''}`);
+      const txt=`Mannschaftskasse – ${monthName(S.month)}\n\n${lines.join('\n')}\n\nEinnahmen: ${eur(o.einnahmen)}\nAusgaben: ${eur(o.ausgaben)}\nSondereinzahlungen: ${eur(o.sonderein)}\nNetto: ${eur(o.netto)}`;
+      try{await navigator.clipboard.writeText(txt);toast('Kopiert – jetzt in die Gruppe einfügen')}catch(e){toast('Kopieren nicht möglich in dieser Ansicht')}break}
+    case 'pick':{const s=S.sheet;s.sel.has(id)?s.sel.delete(id):s.sel.add(id);el.setAttribute('aria-pressed',s.sel.has(id));updateSubmit();break}
+    case 'qty':{const s=S.sheet;s.qty=Math.max(0,(s.qty||0)+Number(el.dataset.d));$('#qty').value=s.qty;s.touched=false;updateSubmit();break}
+    case 'submitFine':submitFine();break;
+    case 'close':case 'scrim':closeSheet();break;
+    case 'person':openSheet({type:'person',id});break;
+    case 'addFor':S.preselect=id;closeSheet();S.tab='erfassen';$('#view').innerHTML='';render();toast('Strafe antippen – '+(pById(id)?.name||'')+' ist vorausgewählt');break;
+    case 'paid':{const e=S.entries.find(x=>x.id===id);if(e)setEntry(id,{paid:!e.paid,paidAt:e.paid?null:new Date().toISOString(),paidVia:e.paid?null:(isKW()?'kassenwart':'manuell')});break}
+    case 'kf':{const e=S.entries.find(x=>x.id===id);if(e)setEntry(id,{kfDone:!e.kfDone});break}
+    case 'del':if(S.confirmDel===id){S.confirmDel=null;try{await S.db.doc('entries/'+id).delete();toast('Eintrag gelöscht')}catch(e){toast(errMsg(e))}}else{S.confirmDel=id;render();if(S.sheet)renderSheet(false)}break;
+    case 'payAll':{const now=new Date().toISOString();const open=S.entries.filter(e=>e.playerId===id&&!e.paid);try{await Promise.all(open.map(e=>S.db.doc('entries/'+e.id).update({paid:true,paidAt:now})));toast(`${open.length} Einträge als bezahlt markiert`)}catch(e){toast(errMsg(e))}break}
+    case 'filter':S.filter=el.dataset.k;render();break;
+    case 'copy':{const lines=sortedPlayers(true).map(p=>({p,b:balance(p.id)})).filter(x=>x.b.open>0||x.b.kf).sort((a,b)=>b.b.open-a.b.open)
+        .map(({p,b})=>`${p.name}: ${eur(b.open)}${b.kf?` (+${b.kf}× Kabinenfest)`:''}`);
+      const txt=`Dragons Strafenkasse – offen (Stand ${dDE(today())})\n\n`+(lines.join('\n')||'Alles bezahlt 🎉')+`\n\nGesamt offen: ${eur(totals().open)}`;
+      try{await navigator.clipboard.writeText(txt);toast('Kopiert – jetzt in die Gruppe einfügen')}catch(e){openSheet({type:'text'});const r=$('#sheetRoot');r.innerHTML=`<div class="scrim" data-act="scrim"><div class="sheet"><div class="sheet-h pad"><div class="t"><h2>Text zum Kopieren</h2></div><button class="x" data-act="close" aria-label="Schließen">×</button></div><div class="sheet-b pad"><textarea id="cp" rows="14" style="width:100%;font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink)">${esc(txt)}</textarea></div></div></div>`;$('#cp').select()}break}
+    case 'undo':{const u=S.undo;$('#toast').hidden=true;S.undo=null;if(u)try{await u()}catch(e){toast(errMsg(e))}break}
+    case 'editFine':{const f=id?S.fines.find(x=>x.id===id):{title:'',cat:'',base:0,per:0,unit:'',order:(S.fines.length+1)*10};openSheet({type:'editFine',fine:{...f}});break}
+    case 'saveFine':{const f=S.sheet.fine;const d={title:$('#ft').value.trim(),cat:$('#fc').value.trim()||'Sonstiges',base:num($('#fb').value),per:num($('#fp').value),unit:$('#fu').value.trim()||null,
+        kabinenfest:$('#fk').checked,wuerfeln:$('#fw').checked,hint:$('#fh').value.trim()||null,order:num($('#fo').value)};
+      if(!d.title){toast('Bitte eine Bezeichnung eingeben');break}
+      try{await S.db.doc('fines/'+(f.id||('f'+Date.now().toString(36)))).set(d);closeSheet();toast('Gespeichert')}catch(e){toast(errMsg(e))}break}
+    case 'delFine':if(S.confirmDel==='fine'){try{await S.db.doc('fines/'+S.sheet.fine.id).delete();closeSheet();toast('Strafe gelöscht – bestehende Einträge bleiben')}catch(e){toast(errMsg(e))}}else{S.confirmDel='fine';el.textContent='Wirklich löschen?'}break;
+    case 'editPlayer':{const p=id?pById(id):{name:'',role:'Spieler',number:null,active:true};openSheet({type:'editPlayer',player:{...p}});break}
+    case 'savePlayer':{const p=S.sheet.player;const no=$('#pno').value.trim();const d={...p,name:$('#pn').value.trim(),role:$('#pr').value.trim()||'Spieler',number:no===''?null:num(no),active:$('#pa').checked};delete d.id;
+      if(!d.name){toast('Bitte einen Namen eingeben');break}
+      try{await S.db.doc('players/'+(p.id||('x'+Date.now().toString(36)))).set(d);closeSheet();toast('Gespeichert')}catch(e){toast(errMsg(e))}break}
+  }
+});
+document.addEventListener('input',ev=>{
+  const t=ev.target,s=S.sheet;
+  if(t.id==='q'){S.q=t.value;$('#finelist').innerHTML=fineList();return}
+  if(s&&s.type==='bill'){
+    if(t.id==='bs'){s.split=t.checked;$('#splitbox').hidden=!t.checked;updateSplit()}
+    else if(t.id==='bpp'){s.per=t.value;s.perTouched=true;updateSplit()}
+    else if(t.id==='ba'&&!s.perTouched&&s.sel.size){s.per=String(Math.round(num(t.value)/s.sel.size*100)/100).replace('.',',');$('#bpp').value=s.per;updateSplit()}
+    return}
+  if(s&&s.type==='fine'&&t.id==='colsel'){s.col=t.value;return}
+  if(!s||s.type!=='fine')return;
+  if(t.id==='amt'){s.touched=true;s.amount=t.value;updateSubmit()}
+  else if(t.id==='qty'){s.qty=Math.max(0,parseInt(t.value)||0);s.touched=false;updateSubmit()}
+  else if(t.id==='nt')s.note=t.value;
+  else if(t.id==='dt')s.date=t.value;
+  else if(t.id==='kfc'){s.kf=t.checked;updateSubmit()}
+});
+document.addEventListener('change',async ev=>{const t=ev.target;
+  if(t.dataset&&t.dataset.act==='role'){const id=t.dataset.id,role=t.value;
+    if(role==='kassenwart')for(const m of S.members)if(m.role==='kassenwart'&&m.user_id!==id)await S.sb.from('members').update({role:'member'}).eq('user_id',m.user_id);
+    const {error}=await S.sb.from('members').update({role}).eq('user_id',id);toast(error?error.message:(role==='kassenwart'?'Neuer Kassenwart gesetzt':'Rolle geändert'));return}
+  const s=S.sheet;if(!s)return;
+  if(s.type==='fine'&&t.id==='kfc'){s.kf=t.checked;updateSubmit()}
+  if(s.type==='fine'&&t.id==='colsel')s.col=t.value;
+  if(s.type==='bill'&&t.id==='bs'){s.split=t.checked;$('#splitbox').hidden=!t.checked;updateSplit()}});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.sheet)closeSheet()});
+
+/* ---------- Start ---------- */
+render();
+/* ---------- Supabase-Anbindung ---------- */
+function makeDb(sb){
+  const subs={};
+  const norm=e=>({code:/row-level security|permission|42501/i.test(String(e.message)+String(e.code))?'invalid_argument':'unavailable',message:e.message});
+  const toDoc=(id,data)=>({id,exists:data!=null,data:()=>data??undefined,metadata:{fromCache:false,hasPendingWrites:false}});
+  function table(t){
+    if(subs[t])return subs[t];
+    const st=subs[t]={rows:new Map(),ls:new Set(),loaded:false};
+    const emit=e=>{for(const f of st.ls)f(e)};
+    const load=async()=>{const all=[];for(let from=0;;from+=1000){const {data,error}=await sb.from(t).select('id,data').range(from,from+999);if(error){emit(error);return}all.push(...data);if(data.length<1000)break}
+      st.rows=new Map(all.map(r=>[r.id,r.data]));st.loaded=true;emit()};
+    let tm;const reload=()=>{clearTimeout(tm);tm=setTimeout(load,200)};
+    sb.channel('rt-'+t).on('postgres_changes',{event:'*',schema:'public',table:t},pl=>{
+      if(pl.eventType==='DELETE')st.rows.delete(pl.old.id);else st.rows.set(pl.new.id,pl.new.data);if(st.loaded)emit()}).subscribe(x=>{if(x==='SUBSCRIBED'&&st.loaded)reload()});
+    load();
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')reload()});
+    return st;
+  }
+  const local=(t,id,d)=>{const st=subs[t];if(st){if(d===null)st.rows.delete(id);else st.rows.set(id,d);for(const f of st.ls)f()}};
+  function docRef(t,id){id=id||(Date.now().toString(36)+Math.random().toString(36).slice(2,10));
+    return{id,path:t+'/'+id,
+      async get(){const {data,error}=await sb.from(t).select('data').eq('id',id).maybeSingle();if(error)throw norm(error);return toDoc(id,data?data.data:null)},
+      async set(d){const {error}=await sb.from(t).upsert({id,data:d,updated_at:new Date().toISOString()});if(error)throw norm(error);local(t,id,d)},
+      async update(pt){const {error}=await sb.rpc('doc_patch',{t,doc_id:id,patch:pt});if(error)throw norm(error);const st=subs[t];if(st&&st.rows.has(id))local(t,id,{...st.rows.get(id),...pt})},
+      async delete(){const {error}=await sb.from(t).delete().eq('id',id);if(error)throw norm(error);local(t,id,null)},
+      onSnapshot(next,err){const st=table(t);const f=e=>{if(e){err&&err(norm(e));return}if(st.loaded)next(toDoc(id,st.rows.get(id)??null))};st.ls.add(f);if(st.loaded)f();return()=>st.ls.delete(f)}}}
+  function coll(t){return{orderBy(){return this},doc(id){return docRef(t,id)},async add(d){const r=docRef(t);await r.set(d);return r},
+    onSnapshot(next,err){const st=table(t);const f=e=>{if(e){err&&err(norm(e));return}if(!st.loaded)return;const docs=[...st.rows].map(([id,d])=>toDoc(id,d));next({docs,size:docs.length,empty:!docs.length,metadata:{fromCache:false,hasPendingWrites:false}})};st.ls.add(f);if(st.loaded)f();return()=>st.ls.delete(f)}}}
+  return{collection:coll,doc(p){const [t,id]=p.split('/');return docRef(t,id)}};
+}
+
+/* ---------- Anmeldung ---------- */
+function authScreen(mode,msg){
+  S.status='auth';$('#tabs').innerHTML='';$('#kOpen').textContent='–';
+  const v=$('#view');const err=msg?`<div class="banner">${esc(msg)}</div>`:'';
+  if(mode==='login'||mode==='signup')v.innerHTML=`<div class="auth">${err}<h2>${mode==='login'?'Anmelden':'Konto erstellen'}</h2>
+    <form id="authForm" class="fields" data-mode="${mode}">
+      <div class="field"><label for="aMail">E-Mail</label><input id="aMail" type="email" autocomplete="email" required></div>
+      <div class="field"><label for="aPw">Passwort${mode==='signup'?' (mind. 8 Zeichen)':''}</label><input id="aPw" type="password" autocomplete="${mode==='login'?'current-password':'new-password'}" minlength="${mode==='signup'?8:1}" required></div>
+      <button class="btn primary" type="submit">${mode==='login'?'Anmelden':'Konto erstellen'}</button></form>
+    <div class="toolbar">${mode==='login'?`<button class="btn" data-act="authMode" data-k="signup">Neu hier? Konto erstellen</button><button class="btn" data-act="authReset">Passwort vergessen</button>`:`<button class="btn" data-act="authMode" data-k="login">Ich habe schon ein Konto</button>`}</div></div>`;
+  else if(mode==='newpw')v.innerHTML=`<div class="auth">${err}<h2>Neues Passwort</h2><form id="pwForm" class="fields"><div class="field"><label for="nPw">Neues Passwort (mind. 8 Zeichen)</label><input id="nPw" type="password" autocomplete="new-password" minlength="8" required></div><button class="btn primary" type="submit">Speichern</button></form></div>`;
+  else if(mode==='link')v.innerHTML=`<div class="auth">${err}<h2>Wer bist du?</h2><p class="note">Tippe auf deinen Namen. Der Admin schaltet dich danach frei.</p><div class="grid">${sortedPlayers(true).map(p=>`<button class="pick" data-act="claim" data-id="${esc(p.id)}">${p.role==='Spieler'&&p.number!=null?`<span class="no">${p.number}</span>`:''}${avatar(p)}<b>${esc(p.name.split(' ')[0])}</b><span class="note" style="font-size:11px;margin-top:-4px">${esc(p.role==='Spieler'?p.name.split(' ').slice(1).join(' '):p.role)}</span></button>`).join('')}</div><div class="toolbar"><button class="btn" data-act="logout">Abmelden</button></div></div>`;
+  else if(mode==='pending')v.innerHTML=`<div class="auth">${err}<h2>Fast geschafft</h2><p>Dein Konto ist angelegt und mit <b>${esc(pById(S.me&&S.me.player_id)?.name||'dir')}</b> verknüpft. Sobald der Admin dich freischaltet, siehst du hier die Kasse.</p><div class="toolbar"><button class="btn primary" data-act="recheck">Neu prüfen</button><button class="btn" data-act="logout">Abmelden</button></div></div>`;
+  else if(mode==='checkmail')v.innerHTML=`<div class="auth"><h2>E-Mail bestätigen</h2><p>Wir haben dir eine E-Mail geschickt. Tippe auf den Link darin, dann geht es hier weiter.</p><div class="toolbar"><button class="btn" data-act="authMode" data-k="login">Zur Anmeldung</button></div></div>`;
+}
+document.addEventListener('submit',async ev=>{
+  const f=ev.target;if(f.id!=='authForm'&&f.id!=='pwForm')return;ev.preventDefault();const sb=S.sb;
+  const btn=f.querySelector('button[type=submit]');btn.disabled=true;
+  try{
+    if(f.id==='pwForm'){const {error}=await sb.auth.updateUser({password:$('#nPw').value});if(error)throw error;history.replaceState(null,'',location.pathname);return boot()}
+    const email=$('#aMail').value.trim(),password=$('#aPw').value;
+    if(f.dataset.mode==='login'){const {error}=await sb.auth.signInWithPassword({email,password});if(error)throw error;return boot()}
+    const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname}});if(error)throw error;
+    if(!data.session)return authScreen('checkmail');return boot();
+  }catch(e){btn.disabled=false;const m=String(e.message||e);
+    authScreen(f.id==='pwForm'?'newpw':f.dataset.mode,/Invalid login/i.test(m)?'E-Mail oder Passwort stimmt nicht.':/already registered/i.test(m)?'Für diese E-Mail gibt es schon ein Konto – melde dich an.':/Email not confirmed/i.test(m)?'Bitte bestätige zuerst deine E-Mail (Link im Postfach).':m)}
+});
+document.addEventListener('click',async ev=>{
+  const el=ev.target.closest('[data-act]');if(!el)return;const a=el.dataset.act;
+  if(a==='authMode')authScreen(el.dataset.k);
+  else if(a==='authReset'){const email=($('#aMail')||{}).value;if(!email){authScreen('login','Gib zuerst deine E-Mail ein, dann tippe auf „Passwort vergessen“.');return}
+    const {error}=await S.sb.auth.resetPasswordForEmail(email.trim(),{redirectTo:location.origin+location.pathname});authScreen('login',error?error.message:'Wir haben dir einen Link zum Zurücksetzen geschickt.')}
+  else if(a==='claim'){const {data:{user}}=await S.sb.auth.getUser();const {error}=await S.sb.from('members').insert({user_id:user.id,email:user.email,player_id:el.dataset.id});if(error){authScreen('link',error.message);return}boot()}
+  else if(a==='recheck')boot();
+});
+
+let started=false;
+async function boot(){
+  const sb=S.sb;
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){authScreen('login');return}
+  S.uid=session.user.id;S.email=session.user.email;
+  const {data:me,error}=await sb.from('members').select('*').eq('user_id',S.uid).maybeSingle();
+  if(error){authScreen('login','Verbindung fehlgeschlagen: '+error.message);return}
+  if(!me||!me.approved){const {data:pl}=await sb.from('players').select('id,data');S.players=(pl||[]).map(r=>({id:r.id,...r.data}));S.me=me||null;authScreen(me?'pending':'link');return}
+  S.me=me;S.canEdit=me.role==='admin';S.canWrite=me.role==='admin'||me.role==='kassenwart';
+  if(started){render();return}started=true;S.status='loading';
+  const db=makeDb(sb);S.db=db;$('#view').innerHTML='';render();
+  const timer=setTimeout(()=>{S.stale=true;if(S.status==='loading')S.status='ready';render()},10000);
+  const done=k=>{S.got[k]=1;if(S.got.p&&S.got.f&&S.got.e&&S.got.b){S.status='ready';S.stale=false;clearTimeout(timer)}render()};
+  const fail=()=>{clearTimeout(timer);S.stale=true;S.status='ready';render()};
+  db.collection('players').onSnapshot(s=>{S.players=s.docs.map(d=>({id:d.id,...d.data()}));done('p')},fail);
+  db.collection('fines').onSnapshot(s=>{S.fines=s.docs.map(d=>({id:d.id,...d.data()}));done('f')},fail);
+  db.collection('entries').onSnapshot(s=>{S.entries=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));done('e')},fail);
+  db.collection('bills').onSnapshot(s=>{S.bills=s.docs.map(d=>({id:d.id,...d.data()}));done('b')},fail);
+  db.doc('settings/kasse').onSnapshot(d=>{S.settings=d.exists?d.data():{};render()},()=>{});
+  db.collection('zahltag').onSnapshot(s=>{S.zahltags=s.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{});
+  const loadMembers=async()=>{const {data}=await sb.from('members').select('*');S.members=data||[];const mine=S.members.find(m=>m.user_id===S.uid);
+    if(mine&&(mine.role!==S.me.role||!mine.approved)){if(!mine.approved)return location.reload();S.me=mine;S.canEdit=mine.role==='admin';S.canWrite=mine.role!=='member'}render()};
+  loadMembers();sb.channel('rt-members').on('postgres_changes',{event:'*',schema:'public',table:'members'},loadMembers).subscribe();
+}
+(function init(){
+  const C=window.KASSE_CONFIG||{};
+  if(!window.supabase||!C.url||!C.key){S.status='nodb';render();return}
+  S.sb=window.supabase.createClient(C.url,C.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  S.sb.auth.onAuthStateChange((ev)=>{if(ev==='PASSWORD_RECOVERY')setTimeout(()=>authScreen('newpw'),0);if(ev==='SIGNED_OUT'&&started)location.reload()});
+  if(/type=recovery/.test(location.hash))return;
+  boot();
+})();
+})();
+</script>
+</body>
+</html>

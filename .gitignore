@@ -1,0 +1,3 @@
+# Echte Kassendaten (IBAN, Beträge) gehören NICHT ins öffentliche Repo
+supabase/seed.sql
+.DS_Store
