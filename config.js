@@ -1,4 +1,4 @@
-// Supabase-Projekt der Dragons Strafenkasse.
+// Supabase-Projekt der Dragons Kasse.
 // Der publishable key ist absichtlich öffentlich – geschützt wird über Login + Row-Level-Security.
 window.KASSE_CONFIG = {
   url: "https://ezgvbwxyyryuurgaczoq.supabase.co",

@@ -1,4 +1,4 @@
-# Dragons Strafenkasse
+# Dragons Kasse
 
 Mannschaftskasse der TSG Münster Dragons (1. Herren): Strafen eintragen, Monatsübersicht,
 Rechnungen, Zahltag mit PayPal/Überweisung und automatischer Verzugsstrafe.

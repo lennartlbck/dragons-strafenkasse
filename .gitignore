@@ -1,3 +1,6 @@
 # Echte Kassendaten (IBAN, Beträge) gehören NICHT ins öffentliche Repo
 supabase/seed.sql
+supabase/seed-*.sql
 .DS_Store
+dev/
+.claude/
