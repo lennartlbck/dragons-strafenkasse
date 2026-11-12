@@ -137,7 +137,7 @@ button.stat:active{background:var(--surface-2)}
 .person .n i{display:block;font-style:normal;color:var(--muted);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .person .n .tag{margin-top:4px}
 .amt{flex:none;font:700 20px/1 var(--f-display);text-align:right}
-.amt.pos{color:var(--owe)} .amt.zero{color:var(--muted);font-weight:600}
+.amt.pos{color:var(--owe)} .amt.neg{color:var(--good)} .amt.zero{color:var(--muted);font-weight:600}
 
 /* Einträge */
 .row{display:flex;align-items:center;gap:8px;background:var(--surface);padding:8px 6px 8px 8px;min-height:62px}
@@ -178,6 +178,45 @@ button.stat:active{background:var(--surface-2)}
 .mc-row b.in{color:var(--good)} .mc-row b.out{color:var(--danger)}
 .payall{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;margin-bottom:12px;padding:10px 14px;text-align:left;background:var(--good-soft);border:1.5px solid var(--good);border-radius:var(--r);color:var(--ink);transition:transform .12s var(--ease)}
 .payall:active{transform:scale(.99)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.rpt{display:none}
+@media print{
+  body.printing>*:not(#printRoot){display:none!important}
+  body.printing{background:#fff!important;color:#000!important}
+  body.printing #printRoot,body.printing .rpt{display:block!important}
+  .rpt{font:12px/1.4 system-ui,-apple-system,sans-serif;color:#000;padding:0}
+  .rpt h1{font-size:22px;margin:0} .rpt .sub{margin:2px 0 14px;font-size:14px;color:#444}
+  .rpt h2{font-size:13px;margin:16px 0 6px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #999;padding-bottom:3px}
+  .rpt table{width:100%;border-collapse:collapse;margin:0 0 4px} .rpt th{text-align:left;font-size:11px;color:#444;padding:3px 6px;border-bottom:1px solid #bbb}
+  .rpt td{padding:3px 6px;border-bottom:1px solid #e3e3e3} .rpt td.r,.rpt th:not(:first-child){text-align:right}
+  .rpt tr.t td{font-weight:700;border-top:1.5px solid #000;border-bottom:0}
+  .rpt table.kp td{border:1px solid #bbb;padding:8px;text-align:left} .rpt table.kp span{display:block;font-size:10px;color:#555;text-transform:uppercase} .rpt table.kp b{font-size:16px}
+  .rpt .note{margin:6px 0;color:#333} .rpt .foot{margin-top:18px;font-size:10px;color:#666}
+  .rpt tr{break-inside:avoid}
+  @page{margin:14mm}
+}
+.stcard{margin:14px 0;padding:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.stcard h3{margin:0 0 2px;font:700 18px/1.2 var(--f-display)} .stcard .note{margin:0 0 10px}
+.stbars{display:grid;gap:10px;margin-top:10px}
+.strow{display:grid;grid-template-columns:30px minmax(0,1fr) auto;grid-template-areas:"md nm vl" ". bar bar";align-items:center;column-gap:8px;row-gap:4px}
+.strow .md{grid-area:md;font-size:20px;text-align:center} .strow .rk{font-size:14px;font-weight:700;color:var(--muted)}
+.strow .nm{grid-area:nm;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.strow .vl{grid-area:vl;font-weight:700} .strow .bar{grid-area:bar;height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.strow .bar i{display:block;height:100%;border-radius:99px;background:var(--brand)}
+.strow.mine .nm{color:var(--brand)}
+.sub-h{margin:18px 2px 8px;font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.two.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.kres{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 0 14px;padding:10px 14px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line)}
+.kres b{font-size:1.1rem}
+.linkbtn{display:block;margin:16px auto 4px;background:none;border:0;color:var(--brand);font:inherit;font-weight:600;text-decoration:underline;min-height:44px}
+.payall.kasse{background:var(--surface);border-color:var(--line-strong)} .payall.kasse .pa-ic{background:var(--brand);color:#fff}
+.stat.backup{display:grid;gap:12px;padding:14px} .stat.backup p{margin:0;font-size:.92rem;color:var(--muted)} .stat.backup p b{display:inline;font:inherit;font-weight:700;white-space:normal;color:var(--ink)}
+.stat.backup.warn{border-color:var(--owe)}
+.credbox{margin-bottom:12px;padding:10px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.credbox div{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:3px 0;font-size:.92rem;color:var(--muted)}
+.credbox div b{color:var(--ink);font-weight:600}
+.credbox .sum{margin-top:4px;padding-top:7px;border-top:1px solid var(--line);color:var(--ink);font-weight:600}
+.credbox .sum b{font-size:1.05rem;font-weight:700} .credbox .sum b.pos{color:var(--owe)} .credbox .sum b.neg{color:var(--good)}
 .payall .pa-ic{flex:none;width:36px;height:36px;border-radius:50%;background:var(--good);color:var(--on-good);display:grid;place-items:center}
 .payall .pa-ic svg{width:20px;height:20px}
 .payall .pa-t{flex:1;min-width:0}
@@ -422,7 +461,7 @@ const num=v=>{const n=parseFloat(String(v).replace(',','.'));return isFinite(n)?
 const CAT_ORDER=['Beiträge & Getränke','Pünktlichkeit & Anwesenheit','Spiel & Training','Handy & Verhalten','Kleidung & Eigentum','Ämter','Sonderstrafen','Kasse'];
 
 const S={players:[],fines:[],entries:[],bills:[],got:{p:0,f:0,e:0,b:0},db:null,uid:null,canWrite:null,canEdit:false,
-  settings:{},fees:{},mOpen:{},bClosed:{},receipts:[],rcUrls:{},favs:[],ksort:'nr',links:[],prof:{},zahltags:[],members:[],me:null,tab:'erfassen',q:'',status:'loading',filter:'open',sheet:null,stale:false,month:today().slice(0,7),kview:'personen'};
+  settings:{},mOpen:{},bClosed:{},receipts:[],rcUrls:{},favs:[],ksort:'nr',smode:'saison',links:[],prof:{},zahltags:[],members:[],me:null,tab:'erfassen',q:'',status:'loading',sheet:null,stale:false,month:today().slice(0,7),kview:'personen'};
 const COLS=[['beitrag','Monatsbeitrag'],['strafen','Strafen'],['fussball','Fußball'],['bier','Bier'],['sonder','Sonderausgaben']];
 const COL_BY_FINE={f01:'beitrag',f02:'bier',f03:'bier',f26:'fussball'};
 const colOf=e=>e.col||COL_BY_FINE[e.fineId]||(e.billId?'sonder':'strafen');
@@ -468,7 +507,58 @@ function sortedPlayers(all){
 }
 function balance(pid){let open=0,paid=0,kf=0,credit=0,rep=0;for(const e of S.entries){if(e.playerId!==pid)continue;
   if(e.paid)paid+=e.amount||0;else{open+=e.amount||0;if(e.reported)rep++} if(e.kabinenfest&&!e.kfDone)kf++;}
-  for(const b of S.bills)if(b.kind!=='einzahlung'&&b.paidBy===pid&&!b.refunded)credit+=b.amount||0;return{open,paid,kf,credit,rep}}
+  credit=r2(credMap()[pid]||0);open=r2(open);return{open,paid,kf,credit,rep,net:r2(open-credit)}}
+const r2=x=>Math.round(x*100)/100;
+// Guthaben aus ausgelegten Rechnungen/Gutschriften: was davon noch nicht erstattet oder mit Strafen verrechnet ist
+// ACHTUNG: spiegelt credit_left()/consume_credit() in supabase/schema.sql – Regeländerungen immer an beiden Stellen machen
+const credLeft=b=>r2((b.amount||0)-(b.credited||0));
+let _cm={src:null,m:{}};
+function credMap(){if(_cm.src!==S.bills){const m={};for(const b of S.bills){if(b.kind==='einzahlung'||!b.paidBy||b.refunded)continue;const l=credLeft(b);if(l>0)m[b.paidBy]=(m[b.paidBy]||0)+l}_cm={src:S.bills,m}}return _cm.m}
+// Bezahlt Einträge über die Datenbank und verrechnet dabei vorhandenes Guthaben (auch Teilbeträge).
+// Automatisch verrechnet wird sonst nur beim Start des Zahltags (apply_credit_all in schema.sql).
+async function payEntries(pid,ids,via){if(!ids.length)return{n:0,used:0};
+  const {data,error}=await S.sb.rpc('pay_entries',{pid,ids,via});if(error)throw error;
+  try{await S.db.refresh('entries','bills')}catch(e){}
+  return data||{n:0,used:0}}
+const sumAmt=es=>r2(es.reduce((a,e)=>a+(e.amount||0),0));
+const netTxt=n=>n>0?eur(n):n<0?'+ '+eur(-n):eur(0);
+// ---------- Backup ----------
+const BACKUP_TABLES=['players','fines','entries','bills','settings','zahltag','fees','receipts','members','kasse_intern'];
+const daysSince=iso=>iso?Math.floor((Date.now()-Date.parse(iso))/DAY):null;
+async function makeBackup(){
+  const out={app:'Dragons Kasse',format:1,exportedAt:new Date().toISOString(),tables:{}},counts={};
+  for(const t of BACKUP_TABLES){const all=[];
+    for(let from=0;;from+=1000){const {data,error}=await S.sb.from(t).select(t==='members'?'*':'id,data,updated_at').order(t==='members'?'user_id':'id').range(from,from+999);
+      if(error)throw error;all.push(...(data||[]));if(!data||data.length<1000)break}
+    out.tables[t]=all;counts[t]=all.length}
+  const blob=new Blob([JSON.stringify(out,null,1)],{type:'application/json'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=`dragons-kasse-backup-${today()}.json`;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
+  // die Datei ist schon gespeichert: scheitert nur der Zeitstempel, ist das kein fehlgeschlagenes Backup
+  try{await S.db.doc('kasse_intern/backup').set({lastAt:out.exportedAt,by:pById(myPid())?.name||S.email||null,counts})}catch(e){counts.noStamp=true}
+  return counts}
+// Protokoll für Änderungen, die den Kassenstand verschieben (bezahlte Einträge gelöscht/geöffnet, Rechnung gelöscht).
+// Liegt in kasse_intern (nur Kassenwart/Admin) und erscheint im Kassenstand unter „Änderungen seit dem letzten Abgleich“.
+async function logChange(text,amount){
+  try{const it={at:new Date().toISOString(),by:pById(myPid())?.name||S.email||null,text,amount:amount==null?null:r2(amount)};
+    await S.db.doc('kasse_intern/protokoll').set({items:[it,...((S.klog||{}).items||[])].slice(0,200)})}catch(e){}
+}
+// ---------- Kassenstand ----------
+// Soll = Startbestand + Zahlungen der Spieler (ohne den mit Guthaben verrechneten Teil) + Sondereinzahlungen
+//        − Ausgaben aus der Kasse − Erstattungen an Spieler (jeweils ab dem Startdatum)
+function kasseSoll(){
+  const st=(S.kstand||{}).start;if(!st||!st.date)return null;const d0=st.date,day=x=>String(x||'').slice(0,10);
+  let pay=0,ein=0,aus=0,erst=0;
+  for(const e of S.entries)if(e.paid&&day(e.paidAt||e.date)>=d0)pay+=(e.amount||0)-(e.creditUsed||0);
+  for(const b of S.bills){
+    if(b.kind==='einzahlung'){if(day(b.date)>=d0)ein+=b.amount||0;continue}
+    if(isCost(b)&&!b.paidBy&&day(b.date)>=d0)aus+=b.amount||0;
+    if(b.paidBy&&b.refunded&&!b.verrechnet&&day(b.refundedAt||b.date)>=d0)erst+=credLeft(b)}
+  pay=r2(pay);ein=r2(ein);aus=r2(aus);erst=r2(erst);
+  return{start:r2(st.amount||0),date:d0,pay,ein,aus,erst,soll:r2((st.amount||0)+pay+ein-aus-erst)}}
+const kasseIst=()=>r2(['kk','kp','kb'].reduce((a,id)=>a+num($('#'+id)?.value||0),0));
+function kasseDiffHtml(ist,soll){const d=r2(ist-soll);
+  return d===0?`<span class="tag ok">passt genau</span>`:`<span class="tag ${d>0?'ok':'owe'}">${d>0?'+ ':'− '}${eur(Math.abs(d))} ${d>0?'mehr als erwartet':'fehlen'}</span>`}
 function totals(){let open=0,paid=0,kf=0;for(const e of S.entries){if(e.paid)paid+=e.amount||0;else open+=e.amount||0;if(e.kabinenfest&&!e.kfDone)kf++}return{open,paid,kf}}
 function priceLabel(f){const p=[];if(f.base)p.push(eur(f.base));if(f.per)p.push((f.base?'+ ':'')+eur(f.per)+' / '+(f.unit||'Stück'));
   if(f.kabinenfest)p.push((p.length?'+ ':'')+'Kabinenfest');if(f.wuerfeln)p.push((p.length?'+ ':'')+'Würfeln');return p.join(' ')||'Betrag frei'}
@@ -555,6 +645,28 @@ const canEnter=f=>S.canWrite===true||(!!S.onlyDecke&&!!f&&f.id===DECKE_FINE);
 const kwPid=()=>S.settings.kassenwartPlayer||KW_DEFAULT;
 const isKW=()=>!!S.me&&(S.me.role==='kassenwart'||S.me.role==='admin'); // Admin darf alles, was der Kassenwart darf
 const zt=()=>{const z=[...S.zahltags].sort((a,b)=>String(b.startedAt).localeCompare(String(a.startedAt)))[0];return z&&z.active&&z.endsAt?z:null};
+// Rückblick auf einen Zahltag: wer hat bezahlt (rechtzeitig / zu spät), wer noch nicht, welche Verzugsstrafen sind angefallen
+const zAll=()=>[...S.zahltags].filter(z=>z.endsAt).sort((a,b)=>String(b.startedAt).localeCompare(String(a.startedAt)));
+function zReview(z){
+  const end=Date.parse(z.endsAt),ids=new Set(z.entryIds||[]),rows=[];let due=0,paid=0,open=0,late=0,fees=0,feesOpen=0;
+  const lateFees=S.entries.filter(e=>e.auto&&/^verzug-/.test(e.id)&&e.id.split('-')[1]===z.runId);
+  for(const pid of Object.keys(z.due||{})){
+    const es=S.entries.filter(e=>ids.has(e.id)&&e.playerId===pid),dueAmt=r2(z.due[pid]||0);
+    const rest=r2(es.filter(e=>!e.paid).reduce((a,e)=>a+(e.amount||0),0));
+    const lateEs=es.filter(e=>e.paid&&Date.parse(e.reportedAt||e.paidAt||0)>end);
+    const fe=lateFees.find(e=>e.playerId===pid);
+    const st=rest>0?'open':(lateEs.length||(fe&&fe.paid))?'late':'ok';
+    // Betrag, der nach Verrechnung mit Guthaben tatsächlich zu zahlen war, aber nur soweit noch offen
+    const bal=balance(pid);
+    rows.push({pid,p:pById(pid),due:dueAmt,rest:r2(rest+(fe&&!fe.paid?fe.amount||0:0)),st,fee:fe||null,net:bal.net});
+    due+=dueAmt;if(st==='open'){open+=rest}else if(st==='late')late+=dueAmt;else paid+=dueAmt;
+    if(fe){fees+=fe.amount||0;if(!fe.paid)feesOpen+=fe.amount||0}
+  }
+  const erlassen=Math.max(0,(z.penaltiesCount||0)-lateFees.length);
+  rows.sort((a,b)=>({open:0,late:1,ok:2}[a.st]-{open:0,late:1,ok:2}[b.st])||b.rest-a.rest||(a.p?.number??999)-(b.p?.number??999));
+  return{rows,due:r2(due),open:r2(open),late:r2(late),paid:r2(paid),fees:r2(fees),feesOpen:r2(feesOpen),erlassen,
+         n:{open:rows.filter(r=>r.st==='open').length,late:rows.filter(r=>r.st==='late').length,ok:rows.filter(r=>r.st==='ok').length},over:Date.now()>=end}
+}
 const zOpen=()=>{const z=zt();return !!z&&Date.now()<Date.parse(z.endsAt)};
 function leftTxt(ms){if(ms<=0)return 'abgelaufen';const d=Math.floor(ms/DAY),h=Math.floor(ms%DAY/36e5),m=Math.ceil(ms%36e5/6e4);
   return d?`noch ${d} ${d===1?'Tag':'Tage'}${h?' '+h+' Std.':''}`:h?`noch ${h} Std.`:`noch ${m} Min.`}
@@ -596,17 +708,18 @@ function confirmCard(){
   return `<button class="payall wait" data-act="openConfirm"><span class="pa-ic">${ICONS.clock}</span><span class="pa-t"><b>Zahlungen bestätigen</b><small>${ids.length} ${ids.length===1?'Spieler hat':'Spieler haben'} bezahlt gemeldet · ${eur(sum)}</small></span>${I('chevR').replace('class="ico"','class="ico chev"')}</button>`;
 }
 function kwCard(){
-  const open=zOpen(),ready=!!(S.settings.paypal||S.settings.iban);
+  const open=zOpen(),ready=!!(S.settings.paypal||S.settings.iban),zl=zAll();
   return `<div class="kwcard"><div><b>Kassenwart</b> <span>${open?`Zahltag läuft bis ${esc(dtDE(zt().endsAt))}.`:'Starte den Zahltag – er schließt sich nach genau 7 Tagen von selbst.'}</span></div>
     ${open?`<button class="btn danger" data-act="endZahltag">${S.confirmEnd?'Wirklich beenden? (ohne Strafen)':'Zahltag vorzeitig beenden'}</button>`
-    :`<button class="btn primary" data-act="startZahltag" ${ready&&S.canWrite!==false?'':'disabled'}>Zahltag starten (7 Tage)</button>`}</div>`;
+    :`<button class="btn primary" data-act="startZahltag" ${ready&&S.canWrite!==false?'':'disabled'}>Zahltag starten (7 Tage)</button>`}
+    ${zl.length?`<button class="btn block" data-act="openZR" data-id="${esc(zl[0].runId||zl[0].id)}">${open?'Zwischenstand ansehen':'Rückblick auf den letzten Zahltag'}</button>`:''}</div>`;
 }
 function meLine(){
   if(!S.me)return '';const p=pById(myPid());
   return `<p class="me">Angemeldet als <b>${esc(p?p.name:S.email||'')}</b>${S.me.role!=='member'?`<span class="tag">${esc(roleName(S.me.role))}</span>`:''}<button class="chipbtn" data-act="logout">${I('logout')}Abmelden</button></p>`;
 }
 
-function kontenSeg(){return `<div class="toolbar" style="margin-top:0"><div class="seg full" role="group" aria-label="Ansicht">${[['personen','Personen'],['verlauf','Verlauf']].map(([k,l])=>`<button data-act="kview" data-k="${k}" aria-pressed="${S.kview===k}">${l}</button>`).join('')}</div></div>`}
+function kontenSeg(){return `<div class="toolbar" style="margin-top:0"><div class="seg full" role="group" aria-label="Ansicht">${[['personen','Personen'],['verlauf','Verlauf'],['statistik','Statistik']].map(([k,l])=>`<button data-act="kview" data-k="${k}" aria-pressed="${S.kview===k}">${l}</button>`).join('')}</div></div>`}
 
 /* ---------- Übersicht (wie die MaKa-Tabelle) ---------- */
 function periods(){
@@ -615,11 +728,8 @@ function periods(){
   for(const b of S.bills)if(b.date)set.add(b.date.slice(0,7));
   return [...set].sort();
 }
-function uebersicht(){
-  if(S.status==='loading')return {top:'',bottom:''};
-  const ps=periods(),m=S.month;const idx=m==='saison'?ps.length:ps.indexOf(m);
-  let h=`<div class="monthbar"><button class="iconbtn round" data-act="month" data-d="-1" aria-label="Vorheriger Monat" ${idx<=0?'disabled':''}>${I('chevL')}</button><h2>${esc(monthName(m))}</h2><button class="iconbtn round" data-act="month" data-d="1" aria-label="Nächster Monat" ${m==='saison'?'disabled':''}>${I('chevR')}</button></div>`;
-  // Personen-Zeilen
+// Zahlen für eine Monats- oder Saisonübersicht (Übersicht, PDF und Excel nutzen dieselbe Rechnung)
+function reportData(m){
   const rows=[];const tot={beitrag:0,strafen:0,fussball:0,bier:0,sonder:0,aus:0,gut:0,sum:0};
   const ent=S.entries.filter(e=>inPeriod(e.date,m)),bills=S.bills.filter(b=>inPeriod(b.date,m));
   for(const p of sortedPlayers(true)){
@@ -633,6 +743,13 @@ function uebersicht(){
   }
   const einnahmen=tot.aus,ausgaben=bills.filter(isCost).reduce((s,b)=>s+(b.amount||0),0),
         sonderein=bills.filter(b=>b.kind==='einzahlung').reduce((s,b)=>s+(b.amount||0),0),netto=einnahmen-ausgaben+sonderein;
+  return{rows,tot,ent,bills,einnahmen,ausgaben,sonderein,netto};
+}
+function uebersicht(){
+  if(S.status==='loading')return {top:'',bottom:''};
+  const ps=periods(),m=S.month;const idx=m==='saison'?ps.length:ps.indexOf(m);
+  let h=`<div class="monthbar"><button class="iconbtn round" data-act="month" data-d="-1" aria-label="Vorheriger Monat" ${idx<=0?'disabled':''}>${I('chevL')}</button><h2>${esc(monthName(m))}</h2><button class="iconbtn round" data-act="month" data-d="1" aria-label="Nächster Monat" ${m==='saison'?'disabled':''}>${I('chevR')}</button></div>`;
+  const {rows,tot,ent,bills,einnahmen,ausgaben,sonderein,netto}=reportData(m);
   h+=`<div class="kpis"><div class="kpi in"><span>Einnahmen</span><b class="num">${eur(einnahmen)}</b></div><div class="kpi out"><span>Ausgaben</span><b class="num">${eur(ausgaben)}</b></div><div class="kpi"><span>Sondereinzahlungen</span><b class="num">${eur(sonderein)}</b></div><div class="kpi net"><span>Netto</span><b class="num">${eur(netto)}</b></div></div>`;
   const top=h;h='';
   // Kostenliste
@@ -710,7 +827,7 @@ function rechnungen(){
     const p=b.paidBy?pById(b.paidBy):null;const ein=b.kind==='einzahlung';
     const gs=b.kind==='gutschrift';const meta=[dDE(b.date)];if(gs)meta.push('Gutschrift für '+(p?p.name:'?'));else if(!ein)meta.push(p?'ausgelegt von '+p.name:'aus der Kasse');if(b.splitIds?.length)meta.push('umgelegt auf '+b.splitIds.length+' × '+eur(b.perPerson));if(b.note)meta.push(b.note);
     const canW=S.canWrite!==false;
-    const tags=(ein?'<span class="tag ok">Sondereinzahlung</span>':gs?'<span class="tag">nur Gutschrift</span>':'')+(p&&canW?`<button class="chipbtn ${b.refunded?'on':''}" data-act="refund" data-id="${esc(b.id)}" aria-pressed="${!!b.refunded}">${b.refunded?I('check')+'Erstattet':'Erstattet?'}</button>`:(p&&b.refunded?'<span class="tag ok">erstattet</span>':''));
+    const tags=(ein?'<span class="tag ok">Sondereinzahlung</span>':gs?'<span class="tag">nur Gutschrift</span>':'')+(p&&b.verrechnet?'<span class="tag ok">mit Strafen verrechnet</span>':p&&b.credited>0?`<span class="tag ok">${eur(b.credited)} verrechnet · Rest ${eur(credLeft(b))}</span>`:'')+(p&&b.verrechnet?'':p&&canW?`<button class="chipbtn ${b.refunded?'on':''}" data-act="refund" data-id="${esc(b.id)}" aria-pressed="${!!b.refunded}">${b.refunded?I('check')+'Erstattet':'Erstattet?'}</button>`:(p&&b.refunded?'<span class="tag ok">erstattet</span>':''));
     const inner=`${p?avatar(p):`<span class="av">${ein?ICONS.plus:ICONS.euro}</span>`}<div class="m"><b>${esc(b.title||b.cat)}</b><i>${esc((b.title&&b.cat&&b.title!==b.cat?b.cat+' · ':'')+meta.join(' · '))}</i>${tags||b.receiptId?`<div class="tags">${tags}${b.receiptId?'<span class="tag">Beleg</span>':''}</div>`:''}</div><div class="r"><strong class="num" style="${ein?'color:var(--good)':''}">${ein?'+ ':''}${eur(b.amount)}</strong></div>`;
     h+=canW?`<div class="row tap" role="button" tabindex="0" data-act="editBill" data-id="${esc(b.id)}" aria-label="${esc((b.title||b.cat)+' bearbeiten')}">${inner}${I('chevR').replace('class="ico"','class="ico chev"')}</div>`:`<div class="row">${inner}</div>`;
   }
@@ -737,62 +854,115 @@ function kontenList(){
   const ps=sortedPlayers(false).map(p=>({p,b:balance(p.id)}));
   if(!ps.length)return `<div class="empty">Noch keine Personen im Kader.</div>`;
   const num=x=>x.p.number??999;
-  if(S.ksort==='high')ps.sort((a,b)=>b.b.open-a.b.open||num(a)-num(b));
-  else if(S.ksort==='low')ps.sort((a,b)=>a.b.open-b.b.open||num(a)-num(b));
-  return `<div class="people">`+ps.map(({p,b})=>`<button class="person" data-act="person" data-id="${esc(p.id)}">${avatar(p)}<span class="n"><b>${esc(p.name)}${drg(p.id)}</b><i>${esc(pLabel(p))}${b.credit?' · Guthaben '+eur(b.credit):''}</i>${b.rep?`<span class="tag owe">Zahlung gemeldet</span>`:''}${b.kf?`<span class="tag kf">${b.kf}× Kabinenfest</span>`:''}</span><span class="amt num ${b.open>0?'pos':'zero'}">${eur(b.open)}</span></button>`).join('')+`</div>`;
+  if(S.ksort==='high')ps.sort((a,b)=>b.b.net-a.b.net||num(a)-num(b));
+  else if(S.ksort==='low')ps.sort((a,b)=>a.b.net-b.b.net||num(a)-num(b));
+  return `<div class="people">`+ps.map(({p,b})=>`<button class="person" data-act="person" data-id="${esc(p.id)}">${avatar(p)}<span class="n"><b>${esc(p.name)}${drg(p.id)}</b><i>${b.credit?`Strafen ${eur(b.open)} − Guthaben ${eur(b.credit)}`:esc(pLabel(p))}</i>${b.net<0?`<span class="tag ok">bekommt ${eur(-b.net)}</span>`:''}${b.rep?`<span class="tag owe">Zahlung gemeldet</span>`:''}${b.kf?`<span class="tag kf">${b.kf}× Kabinenfest</span>`:''}</span><span class="amt num ${b.net>0?'pos':b.net<0?'neg':'zero'}">${netTxt(b.net)}</span></button>`).join('')+`</div>`;
 }
 function sortBar(){return `<div class="sortbar"><span class="k">Sortieren</span><div class="seg" role="group" aria-label="Sortierung der Konten">${[['nr','Nummer'],['high','Höchster'],['low','Niedrigster']].map(([k,l])=>`<button data-act="ksort" data-k="${k}" aria-pressed="${S.ksort===k}">${l}</button>`).join('')}</div></div>`}
 function uebersichtAll(){
   if(S.status==='loading')return `<div class="empty">Lade Übersicht …</div>`;
   const ou=uebersicht();
-  return kontenStats()+`<h2 class="section-h">Monatsübersicht</h2>`+ou.top+kontenCopy()+`<h2 class="section-h">Konten</h2>`+kontenSeg()+(S.kview==='verlauf'?verlauf():sortBar()+kontenList())+ou.bottom;
+  return kontenStats()+`<h2 class="section-h">Monatsübersicht</h2>`+ou.top+kontenCopy()+`<h2 class="section-h">Konten</h2>`+kontenSeg()+(S.kview==='verlauf'?verlauf():S.kview==='statistik'?statistik():sortBar()+kontenList())+ou.bottom;
 }
-function entryRow(e,withPerson){
-  const p=pById(e.playerId),canW=S.canWrite!==false;
+function entryRow(e,withPerson,readOnly){
+  const p=pById(e.playerId),canW=!readOnly&&S.canWrite!==false;
   const meta=[dDE(e.date)];if(e.qty&&e.unit)meta.push(e.qty+' '+e.unit);if(e.note)meta.push(e.note);
   const tags=(e.kabinenfest?(canW?`<button class="chipbtn ${e.kfDone?'on':''}" data-act="kf" data-id="${esc(e.id)}" aria-pressed="${!!e.kfDone}">${e.kfDone?I('check')+'Kabinenfest erledigt':'Kabinenfest offen'}</button>`:`<span class="tag ${e.kfDone?'ok':'kf'}">Kabinenfest${e.kfDone?' erledigt':''}</span>`):'')
-    +(e.reported&&!e.paid?'<span class="tag owe">Zahlung gemeldet</span>':'')+(e.paid&&e.paidVia==='gemeldet'?'<span class="tag">selbst gemeldet</span>':'')+(e.paid&&e.paidVia==='bestaetigt'?'<span class="tag ok">bestätigt</span>':'')+(e.spieltag?'<span class="tag owe">Spieltag ×2</span>':'')+(e.auto?'<span class="tag kf">automatisch</span>':'')+(e.autoFee?'<span class="tag">automatisch</span>':'');
+    +(e.reported&&!e.paid?'<span class="tag owe">Zahlung gemeldet</span>':'')+(e.paid&&e.paidVia==='gemeldet'?'<span class="tag">selbst gemeldet</span>':'')+(e.paid&&e.paidVia==='bestaetigt'?'<span class="tag ok">bestätigt</span>':'')+(e.paid&&e.paidVia==='guthaben'?'<span class="tag ok">mit Guthaben bezahlt</span>':'')+(e.spieltag?'<span class="tag owe">Spieltag ×2</span>':'')+(e.auto?'<span class="tag kf">automatisch</span>':'')+(e.autoFee?'<span class="tag">automatisch</span>':'');
   const lead=canW?`<button class="tick" data-act="paid" data-id="${esc(e.id)}" aria-pressed="${!!e.paid}" aria-label="${e.paid?'Als offen markieren':'Als bezahlt markieren'}"><span>${ICONS.check}</span></button>`:(withPerson?avatar(p):'');
   const del=canW?(S.confirmDel===e.id?`<button class="iconbtn warn" data-act="del" data-id="${esc(e.id)}">Löschen?</button>`:`<button class="iconbtn" data-act="del" data-id="${esc(e.id)}" aria-label="Eintrag löschen">${I('trash')}</button>`):'';
   const title=withPerson?(p?.name||'Unbekannt'):e.title, sub=(withPerson?e.title+' · ':'')+meta.join(' · ');
   return `<div class="row ${e.paid?'paid':''}">${lead}<div class="m${canW?' editable':''}" ${canW?`data-act="editEntry" data-id="${esc(e.id)}" role="button" tabindex="0" aria-label="${esc(e.title+' bearbeiten')}"`:''}><b>${esc(title)}</b><i>${esc(sub)}</i>${e.history&&e.history.length?'<span class="edtag">bearbeitet</span>':''}${tags?`<div class="tags">${tags}</div>`:''}</div><div class="r"><strong class="num">${eur(e.amount)}</strong></div>${del}</div>`;
 }
+/* ---------- Monatsabschluss (PDF / Excel) ---------- */
+const csvCell=v=>{const t=String(v??'');return /[;"\n\r]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t};
+const csvText=v=>{const t=String(v??'');return /^[=+\-@\t\r]/.test(t)?"'"+t:t}
+const csvNum=n=>(Math.round((Number(n)||0)*100)/100).toFixed(2).replace('.',',');
+function reportMonths(){return ['saison',...periods().slice().reverse()]}
+function reportCsv(m){
+  const d=reportData(m),L=[],row=(...c)=>L.push(c.map(csvCell).join(';'));
+  row('Dragons Kasse – Monatsabschluss',csvText(monthName(m)));row('Erstellt am',dDE(today()));L.push('');
+  row('Kennzahlen');row('Einnahmen',csvNum(d.einnahmen));row('Ausgaben',csvNum(d.ausgaben));row('Sondereinzahlungen',csvNum(d.sonderein));row('Netto',csvNum(d.netto));L.push('');
+  row('Personen');row('Nr.','Name','Beitrag','Strafen','Fußball','Bier','Sonderausgaben','Summe','Gutschrift','Offen');
+  d.rows.filter(r=>r.aus||r.gut||r.open).forEach(r=>row(r.p.number??'',csvText(r.p.name),csvNum(r.beitrag),csvNum(r.strafen),csvNum(r.fussball),csvNum(r.bier),csvNum(r.sonder),csvNum(r.aus),csvNum(r.gut),csvNum(r.open)));
+  row('','Gesamt',csvNum(d.tot.beitrag),csvNum(d.tot.strafen),csvNum(d.tot.fussball),csvNum(d.tot.bier),csvNum(d.tot.sonder),csvNum(d.tot.aus),csvNum(d.tot.gut),csvNum(d.rows.reduce((a,r)=>a+r.open,0)));L.push('');
+  row('Rechnungen und Einzahlungen');row('Datum','Art','Kategorie','Titel','Bezahlt von','Betrag');
+  [...d.bills].sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(b=>{const p=b.paidBy?pById(b.paidBy):null;
+    row(dDE(b.date),b.kind==='einzahlung'?'Einzahlung':b.kind==='gutschrift'?'Gutschrift':'Ausgabe',csvText(b.cat||''),csvText(b.title||''),csvText(p?p.name:(b.kind==='einzahlung'?'':'Kasse')),csvNum(b.amount))});
+  return '﻿'+L.join('\r\n')+'\r\n';
+}
+function downloadFile(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}
+function reportHtml(m){
+  const d=reportData(m),k=kasseSoll(),by=pById(myPid())?.name||S.email||'';
+  const byCat={};for(const b of d.bills)if(isCost(b))byCat[b.cat||'Sonstiges']=(byCat[b.cat||'Sonstiges']||0)+(b.amount||0);
+  const cats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  const td=(v,c='')=>`<td class="${c}">${v}</td>`,n=v=>eur(v);
+  const bl=[...d.bills].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  return `<div class="rpt"><h1>Dragons Kasse</h1><p class="sub">Monatsabschluss · ${esc(monthName(m))}</p>
+    <table class="kp"><tr><td><span>Einnahmen</span><b>${n(d.einnahmen)}</b></td><td><span>Ausgaben</span><b>${n(d.ausgaben)}</b></td><td><span>Sondereinzahlungen</span><b>${n(d.sonderein)}</b></td><td><span>Netto</span><b>${n(d.netto)}</b></td></tr></table>
+    ${k?`<p class="note">Kassenstand laut App (Soll): <b>${n(k.soll)}</b> – Startbestand ${n(k.start)} am ${esc(dDE(k.date))}.</p>`:''}
+    <h2>Einnahmen nach Art</h2><table><tr><th>Beitrag</th><th>Strafen</th><th>Fußball</th><th>Bier</th><th>Sonder</th><th>Gesamt</th></tr><tr>${[d.tot.beitrag,d.tot.strafen,d.tot.fussball,d.tot.bier,d.tot.sonder,d.tot.aus].map(v=>td(n(v),'r')).join('')}</tr></table>
+    <h2>Ausgaben nach Kategorie</h2>${cats.length?`<table>${cats.map(([c,v])=>`<tr>${td(esc(c))}${td(n(v),'r')}</tr>`).join('')}<tr class="t">${td('Gesamt')}${td(n(d.ausgaben),'r')}</tr></table>`:'<p class="note">Keine Ausgaben.</p>'}
+    <h2>Rechnungen und Einzahlungen</h2>${bl.length?`<table><tr><th>Datum</th><th>Titel</th><th>Kategorie</th><th>Bezahlt von</th><th>Betrag</th></tr>${bl.map(b=>{const p=b.paidBy?pById(b.paidBy):null;return `<tr>${td(esc(dDE(b.date)))}${td(esc(b.title||b.cat||''))}${td(esc(b.cat||''))}${td(esc(p?p.name:(b.kind==='einzahlung'?'–':'Kasse')))}${td((b.kind==='einzahlung'?'+ ':'')+n(b.amount),'r')}</tr>`}).join('')}</table>`:'<p class="note">Keine Rechnungen.</p>'}
+    <h2>Personen</h2><table><tr><th>Name</th><th>Beitrag</th><th>Strafen</th><th>Fußball</th><th>Bier</th><th>Sonder</th><th>Gutschrift</th><th>Offen</th></tr>${d.rows.filter(r=>r.aus||r.gut||r.open).map(r=>`<tr>${td(esc((r.p.number!=null?'#'+r.p.number+' ':'')+r.p.name))}${[r.beitrag,r.strafen,r.fussball,r.bier,r.sonder].map(v=>td(v?n(v):'–','r')).join('')}${td(r.gut?n(r.gut):'–','r')}${td(r.open?n(r.open):'–','r')}</tr>`).join('')}<tr class="t">${td('Gesamt')}${[d.tot.beitrag,d.tot.strafen,d.tot.fussball,d.tot.bier,d.tot.sonder,d.tot.gut,d.rows.reduce((a,r)=>a+r.open,0)].map(v=>td(n(v),'r')).join('')}</tr></table>
+    <p class="foot">Erstellt am ${esc(dDE(today()))}${by?' von '+esc(by):''} · TSG Münster Dragons, 1. Herren</p></div>`;
+}
+function printReport(m){
+  let root=document.getElementById('printRoot');if(!root){root=document.createElement('div');root.id='printRoot';document.body.appendChild(root)}
+  root.innerHTML=reportHtml(m);document.body.classList.add('printing');
+  const done=()=>{document.body.classList.remove('printing');root.innerHTML='';window.removeEventListener('afterprint',done)};
+  window.addEventListener('afterprint',done);
+  const old=document.title;document.title=`Dragons Kasse ${monthName(m)}`;
+  setTimeout(()=>{try{window.print()}catch(e){done();toast('Drucken ist hier nicht möglich')}document.title=old},50);
+}
+/* ---------- Saison-Statistik ---------- */
+const MONEY_COLS=['strafen','fussball','bier'];
+const byVal=(a,b)=>b.v-a.v||(pById(a.id).number??999)-(pById(b.id).number??999);
+// Wettbewerbs-Rang (Gleichstand teilt sich den Platz); mit n nur die ersten n Plätze
+function rankTop(l,n){let rk=0,prev=null;l.forEach((x,i)=>{if(x.v!==prev){rk=i+1;prev=x.v}x.rk=rk});return n?l.filter(x=>x.rk<=n):l}
+// Summe aus Strafen, Fußball und Bier je Spieler in einem Monat (ohne Teams)
+function monthTotals(mon){const t={};for(const e of S.entries){const p=pById(e.playerId);if(!p||p.team||String(e.date||'').slice(0,7)!==mon||!MONEY_COLS.includes(colOf(e)))continue;t[e.playerId]=(t[e.playerId]||0)+(e.amount||0)}return t}
+const topIds=t=>{const mx=Math.max(0,...Object.values(t));return mx>0?Object.keys(t).filter(i=>t[i]===mx):[]};
+function statistik(){
+  const mo=S.smode==='monat'?curMonth():'saison',me=myPid();
+  const isP=e=>{const p=pById(e.playerId);return !!p&&!p.team};
+  const ent=S.entries.filter(e=>inPeriod(e.date,mo)&&isP(e)&&(e.amount||0)>0);
+  const per={};for(const e of ent){const c=colOf(e);if(!MONEY_COLS.includes(c))continue;const r=per[e.playerId]??={strafen:0,fussball:0,bier:0};r[c]+=e.amount||0}
+  const rankBy=(get,n=5)=>rankTop(Object.entries(per).map(([id,r])=>({id,v:r2(get(r))})).filter(x=>x.v>0).sort(byVal),n);
+  const medal=r=>r===1?'🥇':r===2?'🥈':r===3?'🥉':`<span class="rk">${r}.</span>`;
+  const bars=(list,fmt)=>{if(!list.length)return `<p class="note" style="margin:6px 4px">Noch keine Daten.</p>`;const mx=list[0].v;
+    return `<div class="stbars">`+list.map(x=>{const p=pById(x.id);return `<div class="strow ${x.id===me?'mine':''}"><span class="md">${medal(x.rk)}</span><span class="nm">${esc(p.name)}${drg(x.id)}${x.id===me?' <span class="tag ok">du</span>':''}</span><span class="vl num">${fmt(x.v)}</span><span class="bar"><i style="width:${Math.max(4,x.v/mx*100)}%"></i></span></div>`}).join('')+`</div>`};
+  const card=(t,sub,body)=>`<div class="stcard"><h3>${t}</h3>${sub?`<p class="note">${sub}</p>`:''}${body}</div>`;
+  // Kabinenfeste
+  const kf={};for(const e of S.entries)if(e.kabinenfest&&inPeriod(e.date,mo)&&isP(e))kf[e.playerId]=(kf[e.playerId]||0)+1;
+  const kfl=rankTop(Object.entries(kf).map(([id,v])=>({id,v})).sort(byVal),5);
+  // Drachen-Titel: wer hat in einem abgeschlossenen Monat am meisten gezahlt
+  const titles={};if(mo==='saison')for(const m of periods().filter(m=>m<curMonth()))for(const id of topIds(monthTotals(m)))titles[id]=(titles[id]||0)+1;
+  const tl=rankTop(Object.entries(titles).map(([id,v])=>({id,v})).sort(byVal));
+  const money=ent.filter(e=>MONEY_COLS.includes(colOf(e)));
+  let h=`<div class="toolbar" style="margin-top:0"><div class="seg full" role="group" aria-label="Zeitraum">${[['saison','Saison 26/27'],['monat',monthName(curMonth())]].map(([k,l])=>`<button data-act="smode" data-k="${k}" aria-pressed="${S.smode===k}">${esc(l)}</button>`).join('')}</div></div>`;
+  if(!money.length&&!kfl.length)return h+`<div class="empty">Für diesen Zeitraum gibt es noch keine Strafen.</div>`;
+  h+=card('Größte Zahler','Strafen, Fußball und Bier zusammen – der Erste wird im nächsten Monat zum 🐲',bars(rankBy(r=>r.strafen+r.fussball+r.bier),eur));
+  h+=card('Meiste Strafen','Nur Spalte „Strafen“',bars(rankBy(r=>r.strafen),eur));
+  h+=card('Fußball an der Decke',null,bars(rankBy(r=>r.fussball),eur));
+  h+=card('Bier',null,bars(rankBy(r=>r.bier),eur));
+  if(kfl.length)h+=card('Kabinenfeste','Wer wie oft eines aufgebrummt bekommen hat',bars(kfl,v=>v+'×'));
+  if(mo==='saison'&&tl.length)h+=card('Drachen-Titel','Monate, in denen jemand am meisten gezahlt hat',bars(tl.filter(x=>x.rk<=5),v=>v+'×'));
+  return h;
+}
 function verlauf(){
   if(S.status==='loading')return `<div class="empty">Lade Verlauf …</div>`;
-  const f=S.filter;const list=S.entries.filter(e=>f==='all'||(f==='open'?!e.paid:e.paid));
-  let h=`<div class="toolbar"><div class="seg full" role="group" aria-label="Filter">${[['open','Offen'],['paid','Bezahlt'],['all','Alle']].map(([k,l])=>`<button data-act="filter" data-k="${k}" aria-pressed="${f===k}">${l}</button>`).join('')}</div></div>`;
-  if(!list.length)return h+`<div class="empty">${S.entries.length?'Keine Einträge in diesem Filter.':'Noch keine Strafen eingetragen. Tippe unter „Eintragen“ auf eine Strafe und wähle die Person.'}</div>`;
-  return h+`<div class="rows">`+list.slice(0,300).map(e=>entryRow(e,true)).join('')+`</div>`;
+  const list=S.entries;
+  if(!list.length)return `<div class="empty">Noch keine Strafen eingetragen. Tippe unter „Eintragen“ auf eine Strafe und wähle die Person.</div>`;
+  return `<div class="rows">`+list.slice(0,300).map(e=>entryRow(e,true,true)).join('')+`</div>`;
 }
 const curMonth=()=>today().slice(0,7);
 /* Drache des Monats: wer im Vormonat am meisten (Strafen, Fußball, Bier) bezahlt hat, trägt im aktuellen Monat 🐲 hinter dem Namen. Bei Gleichstand alle. */
 let _drg={src:null,cm:null,v:new Set()};
 function dragons(){const cm=curMonth(),y=+cm.slice(0,4),m=+cm.slice(5,7),pm=m===1?`${y-1}-12`:`${y}-${String(m-1).padStart(2,'0')}`;
   if(_drg.src===S.entries&&_drg.cm===cm)return _drg;
-  const tot={};for(const e of S.entries){if(String(e.date||'').slice(0,7)!==pm||!['strafen','fussball','bier'].includes(e.col)||!pById(e.playerId)||pById(e.playerId).team)continue;tot[e.playerId]=(tot[e.playerId]||0)+(e.amount||0)}
-  const mx=Math.max(0,...Object.values(tot));_drg={src:S.entries,cm,pm,v:new Set(mx>0?Object.keys(tot).filter(i=>tot[i]===mx):[])};return _drg}
+  _drg={src:S.entries,cm,pm,v:new Set(topIds(monthTotals(pm)))};return _drg}
 const drg=id=>dragons().v.has(id)?' <span class="drg" role="img" aria-label="Drache des Monats" title="Drache des Monats">🐲</span>':'';
-const feeDef=()=>S.fees.default&&S.fees.default.amount!=null?num(S.fees.default.amount):10;
-const feeOver=p=>!!(S.fees[p.id]&&S.fees[p.id].amount!=null);
-const feeFor=p=>feeOver(p)?num(S.fees[p.id].amount):(p.role==='Spieler'?feeDef():0);
-function feeSection(){
-  const start=(S.fees.default&&S.fees.default.startMonth)||curMonth();
-  let h=`<h2 class="section-h">Monatsbeitrag</h2><div class="stat" style="display:grid;gap:12px;padding:14px">
-    <div><span class="k">Standard pro Person</span><div class="num" style="font:700 26px/1.2 var(--f-display)">${eur(feeDef())}</div></div>
-    <div><span class="k">Automatisch eingetragen</span><div style="font-weight:600;margin-top:2px">am 1. jedes Monats, ab ${esc(monthName(start))}</div></div>
-    <button class="btn block" data-act="editFeeDef">Standard &amp; Startmonat ändern</button></div>
-    <p class="note" style="margin:10px 4px">Abweichender Betrag für eine Person: unten antippen. Die Änderung gilt auch für den laufenden Monat, solange er noch nicht bezahlt ist.</p>`;
-  const ps=sortedPlayers(false);
-  h+=ps.length?`<div class="people">`+ps.map(p=>{const f=feeFor(p);return `<button class="person" data-act="editFee" data-id="${esc(p.id)}">${avatar(p)}<span class="n"><b>${esc(p.name)}${drg(p.id)}</b><i>${esc(pLabel(p))}</i>${feeOver(p)?`<span class="tag owe">abweichend</span>`:''}</span><span class="amt num ${f>0?'':'zero'}">${f>0?eur(f):'kein Beitrag'}</span></button>`}).join('')+`</div>`:`<div class="empty">Noch keine Personen.</div>`;
-  return h;
-}
-let feeBusy=false;
-async function ensureFees(){if(!S.sb||feeBusy)return;feeBusy=true;try{await S.sb.rpc('ensure_monthly_fees')}catch(e){}finally{feeBusy=false}}
-async function syncFee(pid,amt){
-  const e=S.entries.find(x=>x.id==='beitrag-'+curMonth()+'-'+pid);
-  if(e&&!e.paid){if(amt>0)await S.db.doc('entries/'+e.id).update({amount:amt});else await S.db.doc('entries/'+e.id).delete()}
-  else if(!e)await ensureFees();
-}
 function verwalten(){
   if(S.status==='loading')return `<div class="empty">Lade …</div>`;
   return S.canEdit?verwaltenAdmin():'';
@@ -805,11 +975,22 @@ function verwaltenAdmin(){
     <div><span class="k">Überweisung</span><div style="font-weight:600;margin-top:2px" class="num">${st.iban?esc(fmtIban(st.iban))+(st.owner?' · '+esc(st.owner):''):'<span class="note">keine IBAN hinterlegt</span>'}</div></div>
     <div><span class="k">Zahltag</span><div style="margin-top:4px">${zOpen()?`<span class="tag ok">läuft bis ${esc(dtDE(z.endsAt))}</span>`:z?`<span class="tag">abgelaufen am ${esc(dtDE(z.endsAt))}</span>`:'<span class="tag">aus</span>'}</div></div>
     <div class="toolbar" style="margin:0"><button class="btn block" data-act="editSettings">Zahlungsdaten bearbeiten</button></div></div>`;
+  { const k=kasseSoll(),last=((S.kstand||{}).checks||[])[0];
+    h+=`<h2 class="section-h">Kassenstand</h2><button class="payall kasse" data-act="openKasse"><span class="pa-ic">${ICONS.euro}</span><span class="pa-t"><b>${k?'Soll heute '+eur(k.soll):'Kassenstand einrichten'}</b><small>${k?(last?`Letzter Abgleich ${esc(dDE(last.at.slice(0,10)))}: ${r2(last.ist-last.soll)===0?'passte genau':(last.ist>last.soll?'+ ':'− ')+eur(Math.abs(r2(last.ist-last.soll)))}`:'Noch kein Abgleich – jetzt mit Konto, PayPal und Bargeld vergleichen'):'Einmal den aktuellen Bestand eintragen – danach rechnet die App mit'}</small></span>${I('chevR').replace('class="ico"','class="ico chev"')}</button>`;
+    { const ms=reportMonths(),cur=ms.includes(S.rpm)?S.rpm:(periods().includes(curMonth())?curMonth():'saison');
+      h+=`<h2 class="section-h">Monatsabschluss</h2><div class="stat" style="display:grid;gap:12px;padding:14px"><p class="note" style="margin:0">Einnahmen, Ausgaben, Rechnungen und alle Personen für einen Monat – als PDF (Drucken → „Als PDF sichern“) oder als Tabelle für Excel.</p>
+        <div class="field" style="margin:0"><label for="rpm">Zeitraum</label><select id="rpm">${ms.map(m=>`<option value="${esc(m)}" ${m===cur?'selected':''}>${esc(monthName(m))}</option>`).join('')}</select></div>
+        <div class="split"><button class="btn primary" data-act="rpPdf">Als PDF</button><button class="btn" data-act="rpCsv">Für Excel</button></div></div>`; }
+    const bk=S.backup||{},ago=daysSince(bk.lastAt),warn=ago===null||ago>30;
+    h+=`<h2 class="section-h">Backup</h2><div class="stat backup ${warn?'warn':''}"><p>${ago===null?'<b>Noch kein Backup.</b> ':`Letztes Backup <b>${ago===0?'heute':ago===1?'gestern':'vor '+ago+' Tagen'}</b>${bk.by?' von '+esc(bk.by):''}. `}Der kostenlose Supabase-Tarif macht keine eigenen Sicherungen – lade am besten einmal im Monat ein Backup herunter und leg es z. B. in iCloud ab.</p>
+      <button class="btn block ${warn?'primary':''}" data-act="backup" ${S.busyBackup?'disabled':''}>${S.busyBackup?'Wird erstellt …':'Backup herunterladen'}</button></div>`; }
+  // Rollen von Admin und Kassenwart ändert nur der Admin (die Datenbank erzwingt das ebenfalls)
+  const isAdm=S.me&&S.me.role==='admin',locked=m=>!isAdm&&(m.role==='admin'||m.role==='kassenwart');
   const ms=[...S.members].sort((a,b)=>(a.approved?1:0)-(b.approved?1:0)||String(a.email).localeCompare(String(b.email)));
   h+=`<h2 class="section-h">Mitglieder &amp; Rollen</h2><p class="note" style="margin-top:-2px">Nur freigeschaltete Konten sehen die Kasse. Nur der <b>Kassenwart</b> kann den Zahltag starten; Kassenwart und Admins tragen Strafen und Rechnungen ein.</p>`;
   h+=ms.length?`<div class="rows">`+ms.map(m=>{const pp=pById(m.player_id);return `<div class="mrow">${avatar(pp)}<div class="m"><b>${esc(pp?pp.name:'– kein Spieler –')}</b><i>${esc(m.email||'')}${m.user_id===S.uid?' · du':''}</i></div><div class="r">${m.approved?`<span class="tag ok">freigeschaltet</span>`:`<span class="tag kf">wartet</span>`}</div>
-    <div class="acts"><select class="mini" data-act="role" data-id="${esc(m.user_id)}" aria-label="Rolle" ${m.user_id===S.uid?'disabled':''}>${ROLES.map(([k,l])=>`<option value="${k}" ${m.role===k?'selected':''}>${l}</option>`).join('')}</select>
-    ${m.user_id===S.uid?'':`<button class="mini ${m.approved?'':'on'}" data-act="approve" data-id="${esc(m.user_id)}">${m.approved?'Sperren':'Freischalten'}</button><button class="mini ${S.confirmDel==='m'+m.user_id?'warn':''}" data-act="delMember" data-id="${esc(m.user_id)}">${S.confirmDel==='m'+m.user_id?'Wirklich entfernen?':'Entfernen'}</button>`}</div></div>`}).join('')+`</div>`
+    <div class="acts"><select class="mini" data-act="role" data-id="${esc(m.user_id)}" aria-label="Rolle" ${m.user_id===S.uid||locked(m)?'disabled':''}>${ROLES.map(([k,l])=>`<option value="${k}" ${m.role===k?'selected':''} ${!isAdm&&(k==='admin'||k==='kassenwart')?'disabled':''}>${l}</option>`).join('')}</select>
+    ${m.user_id===S.uid||locked(m)?'':`<button class="mini ${m.approved?'':'on'}" data-act="approve" data-id="${esc(m.user_id)}">${m.approved?'Sperren':'Freischalten'}</button><button class="mini ${S.confirmDel==='m'+m.user_id?'warn':''}" data-act="delMember" data-id="${esc(m.user_id)}">${S.confirmDel==='m'+m.user_id?'Wirklich entfernen?':'Entfernen'}</button>`}</div></div>`}).join('')+`</div>`
     :`<div class="empty">Noch keine Mitglieder.</div>`;
   h+=`<h2 class="section-h">Strafenkatalog</h2><div class="toolbar"><button class="btn primary block" data-act="editFine" data-id="">${I('plus')}Neue Strafe</button></div>`;
   const fs=[...S.fines].sort((a,b)=>{const ia=CAT_ORDER.indexOf(a.cat),ib=CAT_ORDER.indexOf(b.cat);return (ia<0?99:ia)-(ib<0?99:ib)||(a.order??0)-(b.order??0)});
@@ -829,7 +1010,7 @@ const TEAM_ENT=[{id:'team-alt',name:'Team Alt',role:'Mannschaft',team:true},{id:
 const canSpieltag=f=>(f.cat||'')!=='Beiträge & Getränke'&&f.id!=='kf-manual';
 function renderSheet(refresh){
   const s=S.sheet,root=$('#sheetRoot');if(!s)return;
-  if(refresh&&(s.type==='fine'||s.type==='fee'||s.type==='feeDef'||s.type==='editFine'||s.type==='editPlayer'||s.type==='bill'||s.type==='settings'||s.type==='editEntry'||s.type==='receipt'))return; // Formulare nicht unter den Fingern neu bauen
+  if(refresh&&(s.type==='fine'||s.type==='editFine'||s.type==='editPlayer'||s.type==='bill'||s.type==='settings'||s.type==='editEntry'||s.type==='receipt'))return; // Formulare nicht unter den Fingern neu bauen
   const keepScroll=root.querySelector('.sheet-b')?.scrollTop||0;
   let head='',body='',foot='';
   if(s.type==='fine'&&countFine(s.fine)){
@@ -853,10 +1034,50 @@ function renderSheet(refresh){
   } else if(s.type==='person'){
     const p=pById(s.id);if(!p){closeSheet();return}
     const b=balance(p.id);const list=S.entries.filter(e=>e.playerId===p.id).sort((a,c)=>(a.paid?1:0)-(c.paid?1:0)||String(c.date).localeCompare(String(a.date)));
-    head=`<div style="display:flex;gap:12px;align-items:center">${avatar(p)}<div style="min-width:0"><h2>${esc(p.name)}${drg(p.id)}${myPid()===p.id?' <span class="tag ok">du</span>':''}</h2><p>${esc(pLabel(p))}${dragons().v.has(p.id)?' · Drache des Monats':''} · offen <b class="num" style="color:var(--owe)">${eur(b.open)}</b> · bezahlt ${eur(b.paid)}</p></div></div>`;
-    const payAllCard=isKW()?`<button class="payall ${b.open>0?'':'done'}" data-act="payAll" data-id="${esc(p.id)}" ${b.open>0?'':'disabled'}><span class="pa-ic">${ICONS.check}</span><span class="pa-t"><b>${S.confirmPayAll===p.id?'Wirklich alles bezahlt?':'Alles bezahlt'}</b><small>${b.open>0?(S.confirmPayAll===p.id?'Nochmal tippen: '+eur(b.open)+' als bezahlt markieren':eur(b.open)+' offen – alle Einträge als bezahlt markieren'):'Nichts offen'}</small></span></button>`:'';
-    body=payAllCard+payBox(p,b)+(list.length?monthGroups(p.id,list):`<div class="empty">Keine Einträge – sauber!</div>`);
+    head=`<div style="display:flex;gap:12px;align-items:center">${avatar(p)}<div style="min-width:0"><h2>${esc(p.name)}${drg(p.id)}${myPid()===p.id?' <span class="tag ok">du</span>':''}</h2><p>${esc(pLabel(p))}${dragons().v.has(p.id)?' · Drache des Monats':''} · ${b.net<0?`bekommt noch <b class="num" style="color:var(--good)">${eur(-b.net)}</b>`:`muss noch zahlen <b class="num" style="color:var(--owe)">${eur(b.net)}</b>`} · bezahlt ${eur(b.paid)}</p></div></div>`;
+    const viaCredit=b.open>0&&b.net<=0,pa=S.confirmPayAll===p.id;
+    const paSmall=b.open<=0?'Nichts offen':viaCredit?(pa?'Nochmal tippen: '+eur(b.open)+' mit Guthaben verrechnen':eur(b.open)+' offen – wird komplett mit dem Guthaben verrechnet'):b.credit?(pa?'Nochmal tippen: '+eur(b.net)+' erhalten, Rest mit Guthaben verrechnen':eur(b.net)+' zu zahlen – '+eur(b.credit)+' Guthaben wird verrechnet'):(pa?'Nochmal tippen: '+eur(b.open)+' als bezahlt markieren':eur(b.open)+' offen – alle Einträge als bezahlt markieren');
+    const payAllCard=isKW()?`<button class="payall ${b.open>0?'':'done'}" data-act="payAll" data-id="${esc(p.id)}" ${b.open>0?'':'disabled'}><span class="pa-ic">${ICONS.check}</span><span class="pa-t"><b>${pa?(viaCredit?'Wirklich verrechnen?':'Wirklich alles bezahlt?'):(viaCredit?'Mit Guthaben verrechnen':'Alles bezahlt')}</b><small>${paSmall}</small></span></button>`:'';
+    const credBox=b.credit?`<div class="credbox"><div><span>Offene Strafen</span><b class="num">${eur(b.open)}</b></div><div><span>Guthaben aus Rechnungen</span><b class="num">− ${eur(b.credit)}</b></div><div class="sum"><span>${b.net<0?'Bekommt noch':'Muss noch zahlen'}</span><b class="num ${b.net<0?'neg':'pos'}">${eur(Math.abs(b.net))}</b></div></div>`:'';
+    body=credBox+payAllCard+payBox(p,b)+(list.length?monthGroups(p.id,list):`<div class="empty">Keine Einträge – sauber!</div>`);
     if(S.canWrite!==false)foot=`<button class="btn" data-act="addFor" data-id="${esc(p.id)}">${I('plus')}Strafe</button>`;
+  } else if(s.type==='kasse'){
+    const k=kasseSoll(),ks=S.kstand||{},checks=ks.checks||[],lastAt=(checks[0]||{}).at||'',clog=((S.klog||{}).items||[]).filter(x=>x.at>lastAt).slice(0,10);
+    if(!k||s.editStart){
+      head=`<h2>Kassenstand einrichten</h2><p>Startpunkt für den Abgleich</p>`;
+      body=`<div class="hint" style="margin-bottom:14px">Trag ein, wie viel Geld <b>an diesem Tag</b> insgesamt in der Kasse war – Konto, PayPal und Bargeld zusammen. Ab diesem Datum rechnet die App alle Zahlungen, Ausgaben und Erstattungen mit.</div>
+        <div class="two"><div class="field"><label for="ksd">Datum</label><input id="ksd" type="date" value="${esc(ks.start?.date||today())}"></div><div class="field"><label for="ksa">Bestand (€)</label><input id="ksa" inputmode="decimal" value="${ks.start?String(ks.start.amount).replace('.',','):''}" placeholder="0,00"></div></div>`;
+      foot=`${k?'<button class="btn" data-act="kasseCancel">Abbrechen</button>':''}<button class="btn primary" data-act="kasseStart">Speichern</button>`;
+    } else {
+      head=`<h2>Kassenstand</h2><p>Soll und Ist vergleichen</p>`;
+      const line=(l,v,sign='')=>`<div><span>${l}</span><b class="num">${sign}${eur(v)}</b></div>`;
+      body=`<div class="credbox">${line('Startbestand am '+dDE(k.date),k.start)}${line('Zahlungen der Spieler',k.pay,'+ ')}${k.ein?line('Sondereinzahlungen',k.ein,'+ '):''}${line('Ausgaben aus der Kasse',k.aus,'− ')}${k.erst?line('Erstattungen an Spieler',k.erst,'− '):''}<div class="sum"><span>Soll heute</span><b class="num">${eur(k.soll)}</b></div></div>
+        <h3 class="sub-h">Was ist wirklich da?</h3>
+        <div class="two three"><div class="field"><label for="kk">Konto</label><input id="kk" inputmode="decimal" placeholder="0,00"></div><div class="field"><label for="kp">PayPal</label><input id="kp" inputmode="decimal" placeholder="0,00"></div><div class="field"><label for="kb">Bar</label><input id="kb" inputmode="decimal" placeholder="0,00"></div></div>
+        <div class="kres" id="kres"><span>Ist <b class="num" id="kist">${eur(0)}</b></span><span id="kdiff">${kasseDiffHtml(0,k.soll)}</span></div>
+        <div class="field"><label for="kn">Notiz (optional)</label><input id="kn" placeholder="z. B. 20 € Bierkasse noch nicht eingezahlt"></div>
+        ${clog.length?`<h3 class="sub-h">Änderungen seit dem letzten Abgleich</h3><div class="rows">${clog.map(x=>`<div class="row"><div class="m"><b>${esc(x.text)}</b><i>${esc(dtDE(x.at))}${x.by?' · '+esc(x.by):''}</i></div>${x.amount!=null?`<div class="r"><strong class="num">${eur(x.amount)}</strong></div>`:''}</div>`).join('')}</div><p class="note" style="margin:6px 4px 0">Solche Änderungen verschieben das Soll.</p>`:''}
+        ${checks.length?`<h3 class="sub-h">Bisherige Abgleiche</h3><div class="rows">`+checks.slice(0,12).map(c=>{const d=r2(c.ist-c.soll);return `<div class="row"><div class="m"><b>${esc(dDE(c.at.slice(0,10)))} · Ist ${eur(c.ist)}</b><i>Soll ${eur(c.soll)}${c.by?' · '+esc(c.by):''}${c.note?' · '+esc(c.note):''}</i></div><div class="r">${d===0?'<span class="tag ok">passt</span>':`<span class="tag ${d>0?'ok':'owe'}">${d>0?'+ ':'− '}${eur(Math.abs(d))}</span>`}</div></div>`}).join('')+`</div>`:''}
+        <button class="linkbtn" data-act="kasseEdit">Startbestand ändern</button>`;
+      foot=`<button class="btn primary" data-act="kasseSave">Abgleich speichern</button>`;
+    }
+  } else if(s.type==='zr'){
+    const all=zAll(),z=all.find(x=>(x.runId||x.id)===s.zid)||all[0];
+    if(!z){head=`<h2>Zahltag-Rückblick</h2>`;body=`<div class="empty">Noch kein Zahltag gestartet.</div>`}
+    else{
+      const r=zReview(z),live=!r.over&&z.active;
+      head=`<h2>Zahltag-Rückblick</h2><p>${esc(dDE(z.startedAt.slice(0,10)))} bis ${esc(dtDE(z.endsAt))}${live?' · läuft noch':z.active===false&&!r.over?' · vorzeitig beendet':''}</p>`;
+      const pick=all.length>1?`<div class="chips" role="group" aria-label="Zahltag wählen" style="margin-bottom:12px">`+all.slice(0,6).map(x=>`<button class="chipbtn ${x===z?'on':''}" data-act="zsel" data-id="${esc(x.runId||x.id)}" aria-pressed="${x===z}">${esc(dDE(x.startedAt.slice(0,10)))}</button>`).join('')+`</div>`:'';
+      const tile=(l,v,c)=>`<div class="kpi"><span>${l}</span><b class="num" ${c?`style="color:var(--${c})"`:''}>${v}</b></div>`;
+      const tag={open:'<span class="tag owe">offen</span>',late:'<span class="tag">zu spät bezahlt</span>',ok:'<span class="tag ok">rechtzeitig</span>'};
+      const line=x=>`<div class="row zrrow">${avatar(x.p)}<div class="m"><b>${esc(x.p?x.p.name:'Unbekannt')}${x.p?drg(x.p.id):''}</b><i>${x.st==='open'?`Noch offen ${eur(x.rest)}`:`${eur(x.due)} fällig`}${x.fee?` · Verzug ${eur(x.fee.amount)}${x.fee.paid?' bezahlt':''}`:''}</i><div class="tags">${tag[x.st]}${x.net<0&&x.st==='open'?'<span class="tag ok">hat Guthaben</span>':''}</div></div></div>`;
+      const sect=(k,t)=>{const l=r.rows.filter(x=>x.st===k);return l.length?`<h3 class="sub-h">${t} · ${l.length}</h3><div class="rows">${l.map(line).join('')}</div>`:''};
+      body=pick+`<div class="kpis">${tile('Fällig gesamt',eur(r.due))}${tile('Bezahlt',eur(r.paid+r.late),'good')}${tile('Noch offen',eur(r.open),r.open>0?'owe':'')}${tile('Verzugsstrafen',r.fees?eur(r.fees):(r.over?eur(0):'–'))}</div>
+        ${r.feesOpen?`<p class="note" style="margin:8px 4px 0">Davon noch offen: ${eur(r.feesOpen)} Verzugsstrafen.</p>`:''}
+        ${r.erlassen?`<p class="note" style="margin:8px 4px 0">${r.erlassen} Verzugsstrafe${r.erlassen===1?'':'n'} erlassen, weil rechtzeitig gemeldet wurde.</p>`:''}
+        ${r.rows.length?`${sect('open','Noch nicht bezahlt')}${sect('late','Nach der Frist bezahlt')}${sect('ok','Rechtzeitig bezahlt')}`:`<div class="empty">Zu diesem Zahltag gab es nichts zu zahlen.</div>`}`;
+      foot=r.n.open?`<button class="btn primary" data-act="zrCopy" data-id="${esc(z.runId||z.id)}">Offene für die Gruppe kopieren</button>`:'';
+    }
   } else if(s.type==='confirm'){
     const g=pendingPays(),ids=Object.keys(g).sort((a,c)=>(pById(a)?.number??999)-(pById(c)?.number??999));
     head=`<h2>Zahlungen bestätigen</h2><p>${ids.length?ids.length+' gemeldet – mit PayPal und Konto vergleichen':'Nichts zu bestätigen'}</p>`;
@@ -897,18 +1118,6 @@ function renderSheet(refresh){
     head=`<h2>Beleg von ${esc(p?p.name:'Unbekannt')}</h2><p>${esc(dDE(r.date)+(r.amount?' · '+eur(r.amount):'')+(r.status==='verbucht'?' · verbucht':''))}</p>`;
     body=`<img class="rbig" data-path="${esc(r.path)}" alt="Beleg">${r.note?`<p class="note" style="margin-top:12px">${esc(r.note)}</p>`:''}`;
     foot=`<div class="split">${canDel?`<button class="btn danger" data-act="delReceipt" data-id="${esc(r.id)}">${S.confirmDel==='rc'+r.id?'Wirklich löschen?':'Löschen'}</button>`:''}${S.canWrite===true&&r.status!=='verbucht'&&!s.back?`<button class="btn primary" data-act="receiptToBill" data-id="${esc(r.id)}">Als Rechnung eintragen</button>`:`<button class="btn" data-act="editBack">Zurück</button>`}</div>`;
-  } else if(s.type==='feeDef'){
-    head=`<h2>Monatsbeitrag Standard</h2><p>Gilt für alle Spieler ohne abweichenden Betrag</p>`;
-    body=`<div class="fields"><div class="two"><div class="field"><label for="fda">Betrag pro Monat (€)</label><input id="fda" inputmode="decimal" value="${String(feeDef()).replace('.',',')}"></div>
-      <div class="field"><label for="fdm">Beiträge ab Monat</label><input id="fdm" type="month" value="${esc((S.fees.default&&S.fees.default.startMonth)||curMonth())}"></div></div>
-      <div class="hint">Für jeden Monat ab dem Startmonat wird der Beitrag automatisch am 1. eingetragen, sobald jemand die App öffnet. Bereits eingetragene Monate bleiben unverändert.</div></div>`;
-    foot=`<button class="btn primary" data-act="saveFeeDef">Speichern</button>`;
-  } else if(s.type==='fee'){
-    const p=pById(s.id);if(!p){closeSheet();return}
-    head=`<div style="display:flex;gap:12px;align-items:center">${avatar(p)}<div style="min-width:0"><h2>${esc(p.name)}</h2><p>Monatsbeitrag</p></div></div>`;
-    body=`<div class="fields"><div class="field"><label for="fpa">Betrag pro Monat (€)</label><input id="fpa" inputmode="decimal" value="${String(feeFor(p)).replace('.',',')}"></div>
-      <div class="hint">Standard ist ${eur(feeDef())}. Bei 0 € wird kein Beitrag eingetragen.${feeOver(p)?'':' Aktuell gilt der Standard.'}</div></div>`;
-    foot=`<div class="split">${feeOver(p)?`<button class="btn" data-act="resetFee" data-id="${esc(p.id)}">Standard</button>`:''}<button class="btn primary" data-act="saveFee" data-id="${esc(p.id)}">Speichern</button></div>`;
   } else if(s.type==='settings'){
     const st=S.settings;
     head=`<h2>Zahlungsdaten &amp; Zahltag</h2><p>Wohin die Mannschaft bezahlt</p>`;
@@ -1023,8 +1232,9 @@ async function saveBill(){
   const s=S.sheet,b=s.bill,ein=b.kind==='einzahlung';
   const d={kind:b.kind,cat:ein?'Sondereinzahlung':((()=>{const v=$('#bc').value;return v==='__other'?$('#bco').value.trim():v})()||'Sonstiges'),title:$('#bt').value.trim()||null,amount:Math.round(num($('#ba').value)*100)/100,
     date:$('#bd').value||today(),paidBy:ein?null:($('#bp').value||null),note:$('#bn').value.trim()||null,
-    refunded:!!b.refunded,receiptId:b.receiptId||null,splitIds:b.splitIds||[],perPerson:b.perPerson||0,createdAt:b.createdAt||new Date().toISOString(),createdBy:b.createdBy||S.uid||null};
+    refunded:!!b.refunded,credited:b.credited||0,verrechnet:!!b.verrechnet,receiptId:b.receiptId||null,splitIds:b.splitIds||[],perPerson:b.perPerson||0,createdAt:b.createdAt||new Date().toISOString(),createdBy:b.createdBy||S.uid||null};
   if(!(d.amount>0)){toast('Bitte einen Betrag eingeben');return}
+  if(b.id&&(b.credited||0)>0&&(d.paidBy!==(b.paidBy||null)||d.amount<(b.credited||0))){toast(`Mit dieser Rechnung wurden schon ${eur(b.credited)} Strafen bezahlt – Person und Betrag lassen sich nicht mehr ändern. Öffne zuerst diese Strafen wieder.`);return}
   const split=!b.id&&!ein&&s.split;
   if(split){if(!s.sel.size){toast('Bitte auswählen, wer mitzahlt');return}d.splitIds=[...s.sel];d.perPerson=Math.round(num(s.per)*100)/100;if(!(d.perPerson>0)){toast('Bitte Betrag pro Person eingeben');return}}
   const btn=$('#billsave');if(btn)btn.disabled=true;
@@ -1051,10 +1261,12 @@ function updateSubmit(){
 async function startZahltag(){
   if(!isKW()){toast('Nur Kassenwart und Admin können den Zahltag starten');return}
   if(zOpen()){toast('Es läuft schon ein Zahltag');return}
+  // zuerst Guthaben verrechnen: Einträge, die das Guthaben komplett abdeckt, gelten danach als bezahlt
+  let credited=0;try{const {data,error}=await S.sb.rpc('apply_credit_all');if(error)throw error;credited=data||0;await S.db.refresh('entries','bills')}catch(e){toast('Guthaben konnte nicht verrechnet werden: '+(e.message||e));return}
   const now=Date.now(),due={},entryIds=[];
   for(const p of sortedPlayers(true)){const b=balance(p.id),a=toPay(b);if(a>0){due[p.id]=a;for(const e of S.entries)if(e.playerId===p.id&&!e.paid)entryIds.push(e.id)}}
   const z={active:true,runId:'z'+now.toString(36),startedAt:new Date(now).toISOString(),endsAt:new Date(now+7*DAY).toISOString(),due,entryIds,startedBy:S.uid};
-  try{await S.db.doc('zahltag/'+z.runId).set(z);toast(`Zahltag gestartet – ${Object.keys(due).length} Personen haben 7 Tage Zeit`)}catch(e){toast(errMsg(e))}
+  try{await S.db.doc('zahltag/'+z.runId).set(z);toast(`Zahltag gestartet – ${Object.keys(due).length} Personen haben 7 Tage Zeit${credited?` · ${credited} Einträge mit Guthaben verrechnet`:''}`)}catch(e){toast(errMsg(e))}
 }
 let penBusy=false,penLast=0;
 async function checkPenalties(){
@@ -1078,7 +1290,7 @@ async function liftPenalty(pid,justPaid){
 /* ---------- Schreiben ---------- */
 let toastT;
 function toast(msg,undo){const t=$('#toast');t.innerHTML=`<span>${esc(msg)}</span>${undo?'<button data-act="undo">Rückgängig</button>':''}`;t.hidden=false;S.undo=undo||null;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true;S.undo=null},undo?7000:3500)}
-function errMsg(e){const c=e&&e.code;return c==='invalid_argument'?'Keine Berechtigung zum Speichern.':c==='quota_exceeded'?'Speicher voll – bitte alte Einträge löschen.':'Speichern fehlgeschlagen. Bitte noch einmal versuchen.'}
+function errMsg(e){const c=e&&e.code;if(e&&/schon Strafen bezahlt/.test(String(e.message)))return String(e.message);return c==='invalid_argument'?'Keine Berechtigung zum Speichern.':c==='quota_exceeded'?'Speicher voll – bitte alte Einträge löschen.':'Speichern fehlgeschlagen. Bitte noch einmal versuchen.'}
 async function submitFine(){
   if(S.sheet&&S.sheet.fine&&countFine(S.sheet.fine))return submitDecke();
   const s=S.sheet;if(!s||!S.db)return;s.busy=true;updateSubmit();
@@ -1118,6 +1330,7 @@ document.addEventListener('click',async ev=>{
     case 'fav':{const i=S.favs.indexOf(id);if(i>=0)S.favs.splice(i,1);else S.favs.push(id);saveFavs();const fl=$('#finelist');if(fl)fl.innerHTML=fineList();break}
     case 'ksort':S.ksort=el.dataset.k;try{localStorage.setItem('ksort',S.ksort)}catch(e){}render();break;
     case 'kview':S.kview=el.dataset.k;render();break;
+    case 'smode':S.smode=el.dataset.k;render();break;
     case 'bmon':{S.bClosed[el.dataset.m]=!S.bClosed[el.dataset.m];render();break}
     case 'month':{const ps=periods();let i=S.month==='saison'?ps.length:ps.indexOf(S.month);i+=Number(el.dataset.d);S.month=i>=ps.length?'saison':ps[Math.max(0,i)];render();break}
     case 'editBill':{const b=id?S.bills.find(x=>x.id===id):{kind:el.dataset.k||'ausgabe',date:today()};if(b)openSheet({type:'bill',bill:{...b},sel:new Set(),split:false,per:''});break}
@@ -1127,15 +1340,27 @@ document.addEventListener('click',async ev=>{
     case 'openKf':openSheet({type:'kf',view:'liste'});break;
     case 'kfview':S.sheet.view=el.dataset.k;S.still=true;renderSheet(false);break;
     case 'addKf':closeSheet();openSheet({type:'fine',fine:{id:'kf-manual',title:'Kabinenfest',base:0,per:0,kabinenfest:true,hint:'Kabinenfest ohne Strafbetrag eintragen. Den Grund schreibst du in die Notiz.'},sel:new Set(),qty:0,touched:true,amount:0,spieltag:false,kf:true,note:'',date:today(),col:'strafen'});break;
-    case 'editFeeDef':openSheet({type:'feeDef'});break;
-    case 'editFee':openSheet({type:'fee',id});break;
-    case 'saveFeeDef':{const a=num($('#fda').value),m=$('#fdm').value||curMonth();
-      try{await S.db.doc('fees/default').set({amount:a,startMonth:m});closeSheet();toast('Gespeichert');ensureFees()}catch(e){toast(errMsg(e))}break}
-    case 'saveFee':{const a=Math.max(0,num($('#fpa').value));
-      try{await S.db.doc('fees/'+id).set({amount:a});await syncFee(id,a);closeSheet();toast('Gespeichert')}catch(e){toast(errMsg(e))}break}
-    case 'resetFee':{const p=pById(id);
-      try{await S.db.doc('fees/'+id).delete();await syncFee(id,p&&p.role==='Spieler'?feeDef():0);closeSheet();toast('Standardbetrag gilt wieder')}catch(e){toast(errMsg(e))}break}
     case 'editSettings':openSheet({type:'settings'});break;
+    case 'openZR':if(isKW())openSheet({type:'zr',zid:id});break;
+    case 'zsel':S.sheet.zid=id;renderSheet(false);break;
+    case 'zrCopy':{const z=zAll().find(x=>(x.runId||x.id)===id);if(!z)break;const r=zReview(z);
+      const lines=r.rows.filter(x=>x.st==='open').map(x=>`${x.p?x.p.name:'?'}: ${eur(x.rest)}`);
+      const txt=`Dragons Kasse – Zahltag bis ${dtDE(z.endsAt)}\n\nNoch nicht bezahlt:\n${lines.join('\n')}\n\nGesamt offen: ${eur(r.open)}`;
+      try{await navigator.clipboard.writeText(txt);toast('Kopiert – jetzt in die Gruppe einfügen')}catch(e){toast('Kopieren nicht möglich')}break}
+    case 'openKasse':if(isKW())openSheet({type:'kasse'});break;
+    case 'rpPdf':{if(!isKW())break;const m=$('#rpm')?.value||S.rpm||'saison';S.rpm=m;printReport(m);break}
+    case 'rpCsv':{if(!isKW())break;const m=$('#rpm')?.value||S.rpm||'saison';S.rpm=m;downloadFile(`dragons-kasse-${m==='saison'?'saison':m}.csv`,reportCsv(m),'text/csv;charset=utf-8');toast('Tabelle heruntergeladen – öffnet sich mit Excel');break}
+    case 'kasseEdit':S.sheet.editStart=true;renderSheet(false);break;
+    case 'kasseCancel':S.sheet.editStart=false;renderSheet(false);break;
+    case 'kasseStart':{if(!isKW())break;const date=$('#ksd').value,amount=r2(num($('#ksa').value));
+      if(!date){toast('Bitte ein Datum wählen');break}if(!/\d/.test($('#ksa').value)){toast('Bitte den Bestand eintragen');break}
+      try{await S.db.doc('kasse_intern/kassenstand').set({...(S.kstand||{}),start:{date,amount,setAt:new Date().toISOString(),by:pById(myPid())?.name||null}});S.sheet.editStart=false;renderSheet(false);toast('Startbestand gespeichert')}catch(e){toast(errMsg(e))}break}
+    case 'kasseSave':{if(!isKW())break;const k=kasseSoll();if(!k)break;
+      if(!['kk','kp','kb'].some(id=>/\d/.test($('#'+id).value))){toast('Bitte mindestens einen Betrag eintragen');break}
+      const c={at:new Date().toISOString(),soll:k.soll,ist:kasseIst(),konto:r2(num($('#kk').value)),paypal:r2(num($('#kp').value)),bar:r2(num($('#kb').value)),note:$('#kn').value.trim()||null,by:pById(myPid())?.name||null};
+      try{await S.db.doc('kasse_intern/kassenstand').set({...(S.kstand||{}),checks:[c,...((S.kstand||{}).checks||[])].slice(0,50)});renderSheet(false);const d=r2(c.ist-c.soll);toast(d===0?'Gespeichert – Kasse passt genau':`Gespeichert – ${d>0?'+ ':'− '}${eur(Math.abs(d))} Abweichung`)}catch(e){toast(errMsg(e))}break}
+    case 'backup':{if(!isKW()||S.busyBackup)break;S.busyBackup=true;render();
+      try{const c=await makeBackup();toast(`Backup gespeichert – ${c.entries} Einträge, ${c.bills} Rechnungen${c.noStamp?' (Zeitpunkt konnte nicht vermerkt werden)':''}`)}catch(e){toast('Backup fehlgeschlagen: '+(e.message||e))}finally{S.busyBackup=false;render()}break}
     case 'saveSettings':{const ib=$('#siban').value.replace(/\s/g,'').toUpperCase();
       if(ib&&!ibanOk(ib)){toast('Die IBAN ist ungültig – bitte prüfen');break}
       const d={...S.settings,iban:ib||null,owner:$('#sowner').value.trim()||null,paypal:$('#spp').value.trim()||null,payNote:$('#snote').value.trim()||null};
@@ -1154,7 +1379,7 @@ document.addEventListener('click',async ev=>{
       if(S.confirmPaid!==id){S.confirmPaid=id;renderSheet(false);break}
       S.confirmPaid=null;const now=new Date().toISOString();const open=S.entries.filter(e=>e.playerId===id&&!e.paid);
       try{
-        if(isKW()){await Promise.all(open.map(e=>S.db.doc('entries/'+e.id).update({paid:true,paidAt:now,paidVia:'kassenwart'})));toast(`${open.length} Einträge als bezahlt markiert`);break}
+        if(isKW()){const r=await payEntries(id,open.map(e=>e.id),'kassenwart');toast(`${r.n} Einträge als bezahlt markiert${r.used>0?` – ${eur(r.used)} mit Guthaben verrechnet`:''}`);break}
         if(!S.canWrite){const {data,error}=await S.sb.rpc('report_self_paid');if(error){toast('Konnte nicht speichern: '+error.message);break}toast(`Danke! ${data} Einträge gemeldet – der Kassenwart bestätigt die Zahlung.`);break}
         const todo=open.filter(e=>!e.reported);await Promise.all(todo.map(e=>S.db.doc('entries/'+e.id).update({reported:true,reportedAt:now,reportedBy:S.uid||null})));toast(`Danke! ${todo.length} Einträge gemeldet – der Kassenwart bestätigt die Zahlung.`)
       }catch(e){toast(errMsg(e))}break}
@@ -1164,8 +1389,8 @@ document.addEventListener('click',async ev=>{
         toast('Meldung zurückgenommen')}catch(e){toast(errMsg(e))}break}
     case 'openConfirm':if(isKW())openSheet({type:'confirm'});break;
     case 'confirmPay':{if(!isKW())break;const now=new Date().toISOString();const es=S.entries.filter(e=>e.playerId===id&&!e.paid&&e.reported);
-      try{await Promise.all(es.map(e=>S.db.doc('entries/'+e.id).update({paid:true,paidAt:now,paidVia:'bestaetigt'})));const lifted=await liftPenalty(id,new Set(es.map(e=>e.id)));
-        toast(`Zahlung von ${pById(id)?.name||''} bestätigt${lifted?' – Verzugsstrafe entfernt':''}`)}catch(e){toast(errMsg(e))}break}
+      try{const used=(await payEntries(id,es.map(e=>e.id),'bestaetigt')).used;const lifted=await liftPenalty(id,new Set(es.map(e=>e.id)));
+        toast(`Zahlung von ${pById(id)?.name||''} bestätigt${used?` – ${eur(used)} mit Guthaben verrechnet`:''}${lifted?' – Verzugsstrafe entfernt':''}`)}catch(e){toast(errMsg(e))}break}
     case 'rejectPay':{if(!isKW())break;const es=S.entries.filter(e=>e.playerId===id&&!e.paid&&e.reported);
       try{await Promise.all(es.map(e=>S.db.doc('entries/'+e.id).update({reported:false})));toast('Als nicht erhalten markiert – bleibt offen')}catch(e){toast(errMsg(e))}break}
     case 'copyTxt':{const v=el.dataset.v;try{await navigator.clipboard.writeText(v);toast('Kopiert')}catch(e){toast(v)}break}
@@ -1183,9 +1408,10 @@ document.addEventListener('click',async ev=>{
       if(S.confirmDel===k){try{await S.db.doc('receipts/'+id).delete();try{await S.sb.storage.from('belege').remove([r.path])}catch(e){}closeSheet();toast('Beleg gelöscht')}catch(e){toast(errMsg(e))}}
       else{S.confirmDel=k;renderSheet(false)}break}
     case 'receiptToBill':{const r=S.receipts.find(x=>x.id===id);if(!r)break;openSheet({type:'bill',bill:{kind:'ausgabe',date:r.date||today(),amount:r.amount||0,paidBy:r.playerId||null,note:r.note||null,receiptId:r.id},sel:new Set(),split:false,per:''});break}
-    case 'delBill':if(S.confirmDel==='bill'){const b=S.sheet.bill;try{const linked=S.entries.filter(e=>e.billId===b.id);await Promise.all(linked.map(e=>S.db.doc('entries/'+e.id).delete()));await S.db.doc('bills/'+b.id).delete();if(b.receiptId&&S.receipts.some(r=>r.id===b.receiptId)){try{await S.db.doc('receipts/'+b.receiptId).update({status:'neu',billId:null})}catch(_){}}closeSheet();toast(linked.length?`Rechnung und ${linked.length} umgelegte Einträge gelöscht`:'Rechnung gelöscht')}catch(e){toast(errMsg(e))}}
+    case 'delBill':if((S.sheet.bill.credited||0)>0){toast('Mit dieser Rechnung wurden schon Strafen bezahlt. Öffne zuerst diese Strafen wieder, dann kannst du sie löschen.');break}
+      if(S.confirmDel==='bill'){const b=S.sheet.bill;try{const linked=S.entries.filter(e=>e.billId===b.id);await Promise.all(linked.map(e=>S.db.doc('entries/'+e.id).delete()));await S.db.doc('bills/'+b.id).delete();logChange(`Rechnung gelöscht: ${b.title||b.cat||'Rechnung'}`,b.amount);if(b.receiptId&&S.receipts.some(r=>r.id===b.receiptId)){try{await S.db.doc('receipts/'+b.receiptId).update({status:'neu',billId:null})}catch(_){}}closeSheet();toast(linked.length?`Rechnung und ${linked.length} umgelegte Einträge gelöscht`:'Rechnung gelöscht')}catch(e){toast(errMsg(e))}}
       else{S.confirmDel='bill';el.textContent=S.entries.some(e=>e.billId===S.sheet.bill.id)?'Inkl. umgelegter Einträge löschen?':'Wirklich löschen?'}break;
-    case 'refund':{const b=S.bills.find(x=>x.id===id);if(b)try{await S.db.doc('bills/'+id).update({refunded:!b.refunded})}catch(e){toast(errMsg(e))}break}
+    case 'refund':{const b=S.bills.find(x=>x.id===id);if(b)try{await S.db.doc('bills/'+id).update({refunded:!b.refunded,refundedAt:b.refunded?null:new Date().toISOString()})}catch(e){toast(errMsg(e))}break}
     case 'copyMonth':{const o=S._lastOverview;if(!o)break;
       const lines=o.rows.filter(r=>r.aus||r.gut).map(r=>`${r.p.name}: ${eur(r.sum)}${r.gut?` (Ausgaben ${eur(r.aus)} − Gutschrift ${eur(r.gut)})`:''}`);
       const txt=`Mannschaftskasse – ${monthName(S.month)}\n\n${lines.join('\n')}\n\nEinnahmen: ${eur(o.einnahmen)}\nAusgaben: ${eur(o.ausgaben)}\nSondereinzahlungen: ${eur(o.sonderein)}\nNetto: ${eur(o.netto)}`;
@@ -1201,16 +1427,21 @@ document.addEventListener('click',async ev=>{
     case 'close':case 'scrim':closeSheet();break;
     case 'person':openSheet({type:'person',id});break;
     case 'addFor':S.preselect=id;closeSheet();S.tab='erfassen';$('#view').innerHTML='';render();toast('Strafe antippen – '+(pById(id)?.name||'')+' ist vorausgewählt');break;
-    case 'paid':{const e=S.entries.find(x=>x.id===id);if(e)setEntry(id,{paid:!e.paid,paidAt:e.paid?null:new Date().toISOString(),paidVia:e.paid?null:(isKW()?'kassenwart':'manuell')});break}
+    case 'paid':{const e=S.entries.find(x=>x.id===id);if(!e)break;
+      // wieder geöffnet: die Datenbank bucht verbrauchtes Guthaben zurück (wird beim nächsten Zahltag neu verrechnet)
+      if(e.paid){try{await S.db.doc('entries/'+id).update({paid:false,paidAt:null,paidVia:null});logChange(`Bezahlt-Haken entfernt: ${pById(e.playerId)?.name||'?'} – ${e.title}`,e.amount);toast(e.creditUsed>0?'Wieder offen – Guthaben zurückgebucht':'Wieder offen')}catch(err){toast(errMsg(err))}break}
+      setEntry(id,{paid:!e.paid,paidAt:e.paid?null:new Date().toISOString(),paidVia:e.paid?null:(isKW()?'kassenwart':'manuell')});break}
     case 'kf':{const e=S.entries.find(x=>x.id===id);if(e)setEntry(id,{kfDone:!e.kfDone});break}
-    case 'del':if(S.confirmDel===id){S.confirmDel=null;try{await S.db.doc('entries/'+id).delete();toast('Eintrag gelöscht')}catch(e){toast(errMsg(e))}}else{S.confirmDel=id;render();if(S.sheet)renderSheet(false)}break;
+    case 'del':if(S.confirmDel===id){S.confirmDel=null;const de=S.entries.find(x=>x.id===id);try{await S.db.doc('entries/'+id).delete();if(de&&de.paid)logChange(`Bezahlte Strafe gelöscht: ${pById(de.playerId)?.name||'?'} – ${de.title}`,de.amount);toast(de&&de.paid&&de.creditUsed>0?'Eintrag gelöscht – Guthaben zurückgebucht':'Eintrag gelöscht')}catch(e){toast(errMsg(e))}}else{S.confirmDel=id;render();if(S.sheet)renderSheet(false)}break;
     case 'payAll':{if(!isKW()){toast('Nur Kassenwart und Admin können das');break}
       if(S.confirmPayAll!==id){S.confirmPayAll=id;renderSheet(false);clearTimeout(S._pat);S._pat=setTimeout(()=>{S.confirmPayAll=null;if(S.sheet)renderSheet(false)},4000);break}
-      S.confirmPayAll=null;const now=new Date().toISOString();const open=S.entries.filter(e=>e.playerId===id&&!e.paid);try{await Promise.all(open.map(e=>S.db.doc('entries/'+e.id).update({paid:true,paidAt:now})));toast(`${open.length} Einträge als bezahlt markiert`)}catch(e){toast(errMsg(e))}break}
-    case 'filter':S.filter=el.dataset.k;render();break;
-    case 'copy':{const lines=sortedPlayers(true).map(p=>({p,b:balance(p.id)})).filter(x=>x.b.open>0||x.b.kf).sort((a,b)=>b.b.open-a.b.open)
-        .map(({p,b})=>`${p.name}: ${eur(b.open)}${b.kf?` (+${b.kf}× Kabinenfest)`:''}`);
-      const txt=`Dragons Kasse – offen (Stand ${dDE(today())})\n\n`+(lines.join('\n')||'Alles bezahlt 🎉')+`\n\nGesamt offen: ${eur(totals().open)}`;
+      S.confirmPayAll=null;const now=new Date().toISOString();const open=S.entries.filter(e=>e.playerId===id&&!e.paid);try{const r=await payEntries(id,open.map(e=>e.id),'kassenwart');toast(`${r.n} Einträge als bezahlt markiert${r.used>0?` – ${eur(r.used)} mit Guthaben verrechnet`:''}`)}catch(e){toast(errMsg(e))}break}
+    case 'copy':{const all=sortedPlayers(true).map(p=>({p,b:balance(p.id)}));
+      const lines=all.filter(x=>x.b.net>0||x.b.kf).sort((a,b)=>b.b.net-a.b.net)
+        .map(({p,b})=>`${p.name}: ${eur(Math.max(0,b.net))}${b.credit&&b.net>0?` (${eur(b.open)} − ${eur(b.credit)} Guthaben)`:''}${b.kf?` (+${b.kf}× Kabinenfest)`:''}`);
+      const gets=all.filter(x=>x.b.net<0).sort((a,b)=>a.b.net-b.b.net).map(({p,b})=>`${p.name}: ${eur(-b.net)}`);
+      const sumNet=r2(all.reduce((s,x)=>s+Math.max(0,x.b.net),0));
+      const txt=`Dragons Kasse – offen (Stand ${dDE(today())})\n\n`+(lines.join('\n')||'Alles bezahlt 🎉')+`\n\nGesamt noch zu zahlen: ${eur(sumNet)}`+(gets.length?`\n\nBekommen noch Geld:\n${gets.join('\n')}`:'');
       try{await navigator.clipboard.writeText(txt);toast('Kopiert – jetzt in die Gruppe einfügen')}catch(e){openSheet({type:'text'});const r=$('#sheetRoot');r.innerHTML=`<div class="scrim" data-act="scrim"><div class="sheet"><div class="sheet-h pad"><div class="t"><h2>Text zum Kopieren</h2></div><button class="iconbtn round" data-act="close" aria-label="Schließen">${I('x')}</button></div><div class="sheet-b pad"><textarea id="cp" rows="14" style="width:100%;font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink)">${esc(txt)}</textarea></div></div></div>`;$('#cp').select()}break}
     case 'undo':{const u=S.undo;$('#toast').hidden=true;S.undo=null;if(u)try{await u()}catch(e){toast(errMsg(e))}break}
     case 'editFine':{const f=id?S.fines.find(x=>x.id===id):{title:'',cat:'',base:0,per:0,unit:'',order:(S.fines.length+1)*10};openSheet({type:'editFine',fine:{...f}});break}
@@ -1229,6 +1460,8 @@ document.addEventListener('click',async ev=>{
 document.addEventListener('input',ev=>{
   const t=ev.target,s=S.sheet;
   if(t.id==='q'){S.q=t.value;$('#finelist').innerHTML=fineList();return}
+  if(t.id==='rpm'){S.rpm=t.value;return}
+  if(s&&s.type==='kasse'&&['kk','kp','kb'].includes(t.id)){const k=kasseSoll();if(k){const ist=kasseIst();$('#kist').textContent=eur(ist);$('#kdiff').innerHTML=kasseDiffHtml(ist,k.soll)}return}
   if(s&&s.type==='bill'){
     if(t.id==='bs'){s.split=t.checked;$('#splitbox').hidden=!t.checked;updateSplit()}
     else if(t.id==='bpp'){s.per=t.value;s.perTouched=true;updateSplit()}
@@ -1274,12 +1507,12 @@ function makeDb(sb){
     if(subs[t])return subs[t];
     const st=subs[t]={rows:new Map(),ls:new Set(),loaded:false};
     const emit=e=>{for(const f of st.ls)f(e)};
-    const load=async()=>{const all=[];for(let from=0;;from+=1000){const {data,error}=await sb.from(t).select('id,data').range(from,from+999);if(error){emit(error);return}all.push(...data);if(data.length<1000)break}
+    const load=async()=>{const all=[];for(let from=0;;from+=1000){const {data,error}=await sb.from(t).select('id,data').order('id').range(from,from+999);if(error){emit(error);return}all.push(...data);if(data.length<1000)break}
       st.rows=new Map(all.map(r=>[r.id,r.data]));st.loaded=true;emit()};
     let tm;const reload=()=>{clearTimeout(tm);tm=setTimeout(load,200)};
     sb.channel('rt-'+t).on('postgres_changes',{event:'*',schema:'public',table:t},pl=>{
       if(pl.eventType==='DELETE')st.rows.delete(pl.old.id);else st.rows.set(pl.new.id,pl.new.data);if(st.loaded)emit()}).subscribe(x=>{if(x==='SUBSCRIBED'&&st.loaded)reload()});
-    load();
+    st.load=load;load();
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')reload()});
     return st;
   }
@@ -1293,7 +1526,9 @@ function makeDb(sb){
       onSnapshot(next,err){const st=table(t);const f=e=>{if(e){err&&err(norm(e));return}if(st.loaded)next(toDoc(id,st.rows.get(id)??null))};st.ls.add(f);if(st.loaded)f();return()=>st.ls.delete(f)}}}
   function coll(t){return{orderBy(){return this},doc(id){return docRef(t,id)},async add(d){const r=docRef(t);await r.set(d);return r},
     onSnapshot(next,err){const st=table(t);const f=e=>{if(e){err&&err(norm(e));return}if(!st.loaded)return;const docs=[...st.rows].map(([id,d])=>toDoc(id,d));next({docs,size:docs.length,empty:!docs.length,metadata:{fromCache:false,hasPendingWrites:false}})};st.ls.add(f);if(st.loaded)f();return()=>st.ls.delete(f)}}}
-  return{collection:coll,doc(p){const [t,id]=p.split('/');return docRef(t,id)}};
+  // lädt Tabellen neu, z. B. nach einer serverseitigen Buchung (RPC), die den lokalen Zwischenspeicher nicht kennt
+  async function refresh(...ts){await Promise.all(ts.map(t=>subs[t]&&subs[t].load?subs[t].load():null))}
+  return{collection:coll,refresh,doc(p){const [t,id]=p.split('/');return docRef(t,id)}};
 }
 
 /* ---------- Anmeldung ---------- */
@@ -1350,14 +1585,18 @@ async function boot(){
   db.collection('players').onSnapshot(s=>{S.players=s.docs.map(d=>({id:d.id,...d.data()}));done('p')},fail);
   db.collection('fines').onSnapshot(s=>{S.fines=s.docs.map(d=>({id:d.id,...d.data()}));done('f')},fail);
   db.collection('entries').onSnapshot(s=>{S.entries=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));done('e')},fail);
-  db.collection('fees').onSnapshot(s=>{S.fees=Object.fromEntries(s.docs.map(d=>[d.id,d.data()]));render()},()=>{});
   db.collection('receipts').onSnapshot(s=>{S.receipts=s.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{});
   db.collection('bills').onSnapshot(s=>{S.bills=s.docs.map(d=>({id:d.id,...d.data()}));done('b')},fail);
   db.doc('settings/kasse').onSnapshot(d=>{S.settings=d.exists?d.data():{};render()},()=>{});
+  if(isKW()){
+  db.doc('kasse_intern/kassenstand').onSnapshot(d=>{S.kstand=d.exists?d.data():{};render();if(S.sheet&&S.sheet.type==='kasse'&&!document.activeElement?.closest?.('.sheet input'))renderSheet(false)},()=>{});
+  db.doc('kasse_intern/backup').onSnapshot(d=>{S.backup=d.exists?d.data():{};render()},()=>{});
+  db.doc('kasse_intern/protokoll').onSnapshot(d=>{S.klog=d.exists?d.data():{};if(S.sheet&&S.sheet.type==='kasse')renderSheet(false)},()=>{});
+  }
   db.collection('zahltag').onSnapshot(s=>{S.zahltags=s.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{});
   const loadMembers=async()=>{const {data}=await sb.from('members').select('*');S.members=data||[];const mine=S.members.find(m=>m.user_id===S.uid);
     if(mine&&(mine.role!==S.me.role||!mine.approved)){if(!mine.approved)return location.reload();S.me=mine;setPerms(mine.role)}render()};
-  ensureFees();setInterval(ensureFees,36e5);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')ensureFees()});
+
   loadMembers();sb.channel('rt-members').on('postgres_changes',{event:'*',schema:'public',table:'members'},loadMembers).subscribe();
 }
 (function init(){
