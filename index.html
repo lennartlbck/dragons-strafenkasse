@@ -652,12 +652,12 @@ function zReview(z){
   const lateFees=S.entries.filter(e=>e.auto&&/^verzug-/.test(e.id)&&e.id.split('-')[1]===z.runId);
   for(const pid of Object.keys(z.due||{})){
     const es=S.entries.filter(e=>ids.has(e.id)&&e.playerId===pid),dueAmt=r2(z.due[pid]||0);
-    const rest=r2(es.filter(e=>!e.paid).reduce((a,e)=>a+(e.amount||0),0));
+    // noch offen = offene Zahltag-Einträge, aber höchstens das, was nach Abzug des Guthabens wirklich zu zahlen ist
+    const bal=balance(pid);
+    const rest=r2(Math.min(es.filter(e=>!e.paid).reduce((a,e)=>a+(e.amount||0),0),Math.max(0,bal.net)));
     const lateEs=es.filter(e=>e.paid&&Date.parse(e.reportedAt||e.paidAt||0)>end);
     const fe=lateFees.find(e=>e.playerId===pid);
     const st=rest>0?'open':(lateEs.length||(fe&&fe.paid))?'late':'ok';
-    // Betrag, der nach Verrechnung mit Guthaben tatsächlich zu zahlen war, aber nur soweit noch offen
-    const bal=balance(pid);
     rows.push({pid,p:pById(pid),due:dueAmt,rest:r2(rest+(fe&&!fe.paid?fe.amount||0:0)),st,fee:fe||null,net:bal.net});
     due+=dueAmt;if(st==='open'){open+=rest}else if(st==='late')late+=dueAmt;else paid+=dueAmt;
     if(fe){fees+=fe.amount||0;if(!fe.paid)feesOpen+=fe.amount||0}
