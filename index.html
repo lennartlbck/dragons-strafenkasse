@@ -244,8 +244,6 @@ button.stat:active{background:var(--surface-2)}
 .grip svg{width:20px;height:20px}
 .pos{font:700 15px var(--f-display);color:var(--muted);min-width:16px;text-align:center;flex:none}
 .kfrow.dragging{background:var(--surface);box-shadow:0 8px 24px rgba(10,20,50,.22);position:relative;z-index:2;border-radius:12px}
-.weekrow .wk{flex:none;width:76px}.weekrow .wk b{display:block;font:700 18px/1.1 var(--f-display)}.weekrow .wk i{display:block;font-style:normal;font-size:12px;color:var(--muted)}
-.weekrow.now{background:color-mix(in srgb,var(--brand,#1d3fc4) 8%,transparent)}
 .drg{font-size:.9em;white-space:nowrap}
 .m.editable{cursor:pointer}
 .edtag{display:inline-block;margin-top:2px;font-size:11px;color:var(--muted);font-weight:600}
@@ -312,7 +310,92 @@ button.stat:active{background:var(--surface-2)}
 .kpi b{display:block;font:700 24px/1.2 var(--f-display);white-space:nowrap}
 .kpi.in b{color:var(--good)}
 .kpi.out b{color:var(--danger)}
+.kpis.three{grid-template-columns:repeat(3,minmax(0,1fr))}
 .kpi.net{background:var(--brand);border-color:var(--brand);color:#fff}
+/* Menü, Döner, Fußball */
+.ltrow{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ltrow .ltitle{min-width:0}
+.menubtn{color:var(--ink)}
+.menubtn .ico{width:22px;height:22px}
+.menulist{display:grid;gap:8px}
+.menuitem{display:flex;align-items:center;gap:14px;width:100%;height:76px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);text-align:left;color:var(--ink);transition:background .1s}
+.menuitem:active{background:var(--surface-2)}
+.menuitem .mi-ic{flex:none;width:46px;height:46px;border-radius:12px;background:var(--brand-soft);display:grid;place-items:center;font-size:24px}
+.menuitem .mi-t{flex:1;min-width:0}
+.menuitem b{display:block;font-size:17px}
+.menuitem small{display:block;color:var(--muted);font-size:13.5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.menuitem .ico{color:var(--muted)}
+.row .m i.wrap{white-space:normal;overflow:visible;color:var(--ink-2)}
+.score{display:flex;align-items:stretch;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.score .sc-t{flex:1;text-align:center;min-width:0}
+.score .sc-t span{display:block;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.score .sc-t b{display:block;font:700 44px/1.1 var(--f-display);color:var(--ink-2)}
+.score .sc-t.win b,.score .sc-t.win span{color:var(--brand)}
+.score .sc-x{align-self:center;font:700 32px var(--f-display);color:var(--muted)}
+.stepper output{min-width:44px;text-align:center;font:700 24px var(--f-display)}
+.stepper.sm{gap:6px;flex:none}
+.stepper.sm button{width:40px;height:40px}
+.stepper.sm output{min-width:28px;font-size:20px}
+.fbaddbtn{width:100%;margin-top:8px}
+.pushk{cursor:pointer}
+.tapw{cursor:pointer}
+.cal-d.tapw:active,.cal-kw.tapw:active{background:var(--surface-2)}
+.gbnext{display:grid;gap:8px}
+.gbn{display:flex;align-items:center;gap:12px;padding:14px;border-radius:var(--r);background:var(--brand);color:#fff}
+.gbn .av{width:52px;height:52px;border:2px solid rgba(255,255,255,.6)}
+.gbn .m{flex:1;min-width:0}
+.gbn small{display:block;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.85}
+.gbn b{display:block;font:700 22px/1.15 var(--f-display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gbn i{display:block;font-style:normal;font-size:14px;opacity:.9}
+.gbic{font-size:32px}
+.gbrow .gbd{flex:none;width:56px}
+.gbrow .gbd b{font:700 18px var(--f-display)}
+.gbrow.now{background:var(--brand-soft)}
+.two .btn{align-self:end}
+.btn.paypal.off{opacity:.45;pointer-events:none}
+.calnav{display:flex;align-items:center;justify-content:space-between;margin:2px 0 10px}
+.calnav b{font:700 20px var(--f-display);text-transform:uppercase;letter-spacing:.02em}
+.cal{display:grid;grid-template-columns:34px repeat(7,minmax(0,1fr));gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:8px 6px}
+.cal-h{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);text-align:center;padding-bottom:4px}
+.cal-kw{font-size:10.5px;font-weight:600;color:var(--muted);display:grid;place-items:center;white-space:nowrap}
+.cal-kw.has{color:var(--brand)}
+.cal-d{height:34px;display:grid;place-items:center;font-size:14px;font-weight:600;border-radius:8px}
+.cal-d.out{color:var(--muted);opacity:.45;font-weight:500}
+.cal-d.has{background:var(--brand-soft)}
+.cal-d.has.now{background:color-mix(in srgb,var(--brand) 22%,transparent)}
+.cal-d.today span{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--brand);color:#fff}
+.cal-host{grid-column:2/-1;display:flex;align-items:center;gap:8px;background:var(--brand-soft);border-radius:10px;padding:5px 8px;margin:0 0 6px;min-width:0}
+.cal-host.now{background:color-mix(in srgb,var(--brand) 22%,transparent)}
+.cal-host .av{width:30px;height:30px;font-size:12px}
+.cal-host div{min-width:0}
+.cal-host b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-host i{display:block;font-style:normal;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.switch{appearance:none;-webkit-appearance:none;flex:none;width:51px;height:31px;border-radius:99px;background:var(--line-strong);position:relative;transition:background .2s;cursor:pointer;margin:0 4px}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.2);transition:transform .2s}
+.switch:checked{background:var(--good)}
+.switch:checked::after{transform:translateX(20px)}
+.switch:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+.pick:disabled{opacity:.45}
+.gamerow .m b .gw{color:var(--brand)}
+.gamerow .m i{margin-top:2px}
+.gamerow .gt{display:inline-block;min-width:34px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.fields+.score{margin-top:14px}
+.fbnew{width:100%;margin-top:10px}
+.series{display:flex;flex-wrap:wrap;gap:6px}
+.sch{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;min-width:52px;padding:6px 8px;border-radius:10px;background:var(--surface);border:1px solid var(--line)}
+.sch{cursor:pointer;transition:transform .1s}
+.sch:active{transform:scale(.95)}
+.sch b{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.sch small{font:700 15px var(--f-display);color:var(--ink-2)}
+.sch.jung{background:var(--brand-soft);border-color:transparent}
+.sch.jung b{color:var(--brand)}
+.sch.alt{background:var(--owe-soft);border-color:transparent}
+.sch.alt b{color:var(--owe)}
+.streak{margin:10px 4px 0;font-size:15px;color:var(--ink-2)}
+.goalrow{align-items:flex-start}
+.goalrow .m b{margin-top:10px}
+.gsteps{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px}
+.gsteps small{display:block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
 .kpi.net span{color:#fff;opacity:.85}
 
 /* Übersicht: Karten auf dem Handy, Tabelle ab Tablet */
@@ -461,7 +544,7 @@ const num=v=>{const n=parseFloat(String(v).replace(',','.'));return isFinite(n)?
 const CAT_ORDER=['Beiträge & Getränke','Pünktlichkeit & Anwesenheit','Spiel & Training','Handy & Verhalten','Kleidung & Eigentum','Ämter','Sonderstrafen','Kasse'];
 
 const S={players:[],fines:[],entries:[],bills:[],got:{p:0,f:0,e:0,b:0},db:null,uid:null,canWrite:null,canEdit:false,
-  settings:{},mOpen:{},bClosed:{},receipts:[],rcUrls:{},favs:[],ksort:'nr',smode:'saison',links:[],prof:{},zahltags:[],members:[],me:null,tab:'erfassen',q:'',status:'loading',sheet:null,stale:false,month:today().slice(0,7),kview:'personen'};
+  settings:{},mOpen:{},bClosed:{},receipts:[],rcUrls:{},favs:[],ksort:'nr',smode:'saison',links:[],prof:{},zahltags:[],doener:[],fussball:[],geburt:{},wash:{},gb:{},gbDone:{},members:[],me:null,tab:'erfassen',q:'',status:'loading',sheet:null,stale:false,month:today().slice(0,7),kview:'personen'};
 const COLS=[['beitrag','Monatsbeitrag'],['strafen','Strafen'],['fussball','Fußball'],['bier','Bier'],['sonder','Sonderausgaben']];
 const COL_BY_FINE={f01:'beitrag',f02:'bier',f03:'bier',f26:'fussball'};
 const colOf=e=>e.col||COL_BY_FINE[e.fineId]||(e.billId?'sonder':'strafen');
@@ -479,6 +562,7 @@ const ICONS={
  uebersicht:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M9.5 9.5V20"/></svg>',
  rechnungen:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
  verlauf:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
+ menu:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
  minus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg>',
  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
@@ -523,7 +607,7 @@ async function payEntries(pid,ids,via){if(!ids.length)return{n:0,used:0};
 const sumAmt=es=>r2(es.reduce((a,e)=>a+(e.amount||0),0));
 const netTxt=n=>n>0?eur(n):n<0?'+ '+eur(-n):eur(0);
 // ---------- Backup ----------
-const BACKUP_TABLES=['players','fines','entries','bills','settings','zahltag','fees','receipts','members','kasse_intern'];
+const BACKUP_TABLES=['players','fines','entries','bills','settings','zahltag','fees','receipts','members','kasse_intern','fussball','doener','geburt','trikotwash','geburtstage'];
 const daysSince=iso=>iso?Math.floor((Date.now()-Date.parse(iso))/DAY):null;
 async function makeBackup(){
   const out={app:'Dragons Kasse',format:1,exportedAt:new Date().toISOString(),tables:{}},counts={};
@@ -592,10 +676,12 @@ function render(){
     $('#bn').innerHTML=statusBanner();
     $('#finelist').innerHTML=fineList();
   } else{const sx=v.querySelector('.tablewrap')?.scrollLeft||0;
-    v.innerHTML=`<h1 class="ltitle">${TITLES[S.tab]}</h1>`+statusBanner()+(S.tab==='uebersicht'?zahltagBanner():'')+(S.tab==='uebersicht'?uebersichtAll():S.tab==='rechnungen'?rechnungen():verwalten());
-    const tw=v.querySelector('.tablewrap');if(tw)tw.scrollLeft=sx;}
+    const title=`<h1 class="ltitle">${TITLES[S.tab]}</h1>`;
+    const html=(S.tab==='uebersicht'?`<div class="ltrow">${title}<button class="iconbtn round menubtn" data-act="openMenu" aria-label="Menü: Döner, Fußball, Kabinenfest, Trikots und Benachrichtigungen" aria-haspopup="dialog">${I('menu')}</button></div>`:title)+statusBanner()+(S.tab==='uebersicht'?zahltagBanner():'')+(S.tab==='uebersicht'?uebersichtAll():S.tab==='rechnungen'?rechnungen():verwalten());
+    // nur neu aufbauen, wenn sich wirklich etwas geändert hat (sonst ruckelt die Seite bei jeder Server-Meldung)
+    if(v.__html!==html||!v.__node||v.firstElementChild!==v.__node){v.innerHTML=html;v.__html=html;v.__node=v.firstElementChild;const tw=v.querySelector('.tablewrap');if(tw)tw.scrollLeft=sx}}
   if(S.sheet)renderSheet(true);
-  checkPenalties();hydrateImgs();
+  checkPenalties();hydrateImgs();gbKfCheck();
 }
 function loadingOr(html,what){
   if(S.status==='loading')return `<div class="empty">Lade ${what} …</div>`;
@@ -621,12 +707,12 @@ function fineList(){
   return h;
 }
 /* ---------- Bezahlen per PayPal ---------- */
-function ppTarget(){let v=String(S.settings.paypal||'').trim();if(!v)return null;
+function ppTarget(raw){let v=String(raw===undefined?S.settings.paypal||'':raw||'').trim();if(!v)return null;
   if(v.includes('@')&&!/paypal\.me/i.test(v))return{type:'mail',v};
   v=v.replace(/^https?:\/\//i,'').replace(/^(www\.)?paypal\.me\//i,'').split(/[/?#]/)[0];return v?{type:'me',v}:null}
-function paypalUrl(amount,name){const t=ppTarget();if(!t)return null;const a=(Math.round(amount*100)/100).toFixed(2);
+function paypalUrl(amount,name,target,item){const t=target===undefined?ppTarget():target;if(!t)return null;const a=(Math.round(amount*100)/100).toFixed(2);
   if(t.type==='me')return `https://www.paypal.me/${encodeURIComponent(t.v)}/${a}EUR`;
-  return `https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=${encodeURIComponent(t.v)}&amount=${a}&currency_code=EUR&no_shipping=1&item_name=${encodeURIComponent('Mannschaftskasse Dragons – '+name)}`}
+  return `https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=${encodeURIComponent(t.v)}&amount=${a}&currency_code=EUR&no_shipping=1&item_name=${encodeURIComponent(item||'Mannschaftskasse Dragons – '+name)}`}
 const ibanOk=v=>{if(!/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(v))return false;const r=(v.slice(4)+v.slice(0,4)).replace(/[A-Z]/g,c=>c.charCodeAt(0)-55);let m=0;for(const ch of r)m=(m*10+ +ch)%97;return m===1};
 const fmtIban=v=>String(v).replace(/\s/g,'').replace(/(.{4})/g,'$1 ').trim();
 const purpose=p=>'Mannschaftskasse Dragons '+p.name;
@@ -835,17 +921,91 @@ function rechnungen(){
 }
 
 const kfList=()=>S.entries.filter(e=>e.kabinenfest&&!e.kfDone).sort((a,c)=>(a.kfOrder??1e9)-(c.kfOrder??1e9)||String(a.date).localeCompare(String(c.date))||String(a.createdAt||'').localeCompare(String(c.createdAt||'')));
-function kfWeek(i){const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7)+7*i);const e=new Date(d);e.setDate(e.getDate()+6);
-  const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const n=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-n);const kw=Math.ceil(((t-Date.UTC(t.getUTCFullYear(),0,1))/864e5+1)/7);
-  const f=x=>`${String(x.getDate()).padStart(2,'0')}.${String(x.getMonth()+1).padStart(2,'0')}.`;return{kw,range:f(d)+' – '+f(e)}}
+// Kalender: Jede Woche (Mo–So) ist ein Kabinenfest dran, in der Reihenfolge der Liste „Offen“
+const isoD=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function monOf(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate(),12);x.setDate(x.getDate()-((x.getDay()+6)%7));return x}
+// Planung: Kabinenfeste mit fest gewählter Woche (kfWeek = Montag) stehen in dieser Woche.
+// Alle übrigen füllen der Reihe nach (Liste „Offen“) die freien Wochen ab dieser Woche.
+// „Heute“ immer nach deutscher Zeit (wie Döner und Geburtstage), auch auf Handys mit anderer Zeitzone
+const bToday=()=>{const b=berlinNow().date;return new Date(+b.slice(0,4),+b.slice(5,7)-1,+b.slice(8,10),12)};
+const kfFixed=e=>!!(e.kfWeek&&e.kfWeek>=isoD(monOf(bToday())));
+const kfQueue=()=>kfList().filter(e=>!kfFixed(e));
+function kfSchedule(){const l=kfList(),fixed=l.filter(kfFixed),queue=l.filter(e=>!kfFixed(e));
+  const taken=new Set(fixed.map(e=>e.kfWeek)),out=fixed.map(e=>({e,mon:e.kfWeek}));let d=monOf(bToday());
+  for(const e of queue){while(taken.has(isoD(d))){d=new Date(d);d.setDate(d.getDate()+7)}const m=isoD(d);out.push({e,mon:m});taken.add(m);d=new Date(d);d.setDate(d.getDate()+7)}
+  return out.sort((a,b)=>a.mon.localeCompare(b.mon))}
+function kfWeekMap(){const m={};for(const x of kfSchedule())(m[x.mon]??=[]).push(x.e);return m}
+const kfThisWeek=()=>kfWeekMap()[isoD(monOf(bToday()))]||[];
+const kfWho=e=>pById(e.playerId)||TEAM_ENT.find(t=>t.id===e.playerId)||null;
+function kwRange(mon){const d=new Date(mon+'T12:00:00'),e=new Date(d);e.setDate(e.getDate()+6);const f=x=>`${String(x.getDate()).padStart(2,'0')}.${String(x.getMonth()+1).padStart(2,'0')}.`;return{kw:isoKw(d),range:f(d)+' – '+f(e)}}
+function isoKw(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const n=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-n);return Math.ceil(((t-Date.UTC(t.getUTCFullYear(),0,1))/864e5+1)/7)}
+function kfCalendar(s){const now=bToday(),cur=s.cal||{y:now.getFullYear(),m:now.getMonth()},map=kfWeekMap(),todayIso=isoD(now),thisMon=isoD(monOf(now)),canW=S.canWrite===true;
+  const first=new Date(cur.y,cur.m,1,12);let d=monOf(first);const last=new Date(cur.y,cur.m+1,0,12);
+  let h=`<div class="calnav"><button class="iconbtn round" data-act="kfcal" data-d="-1" aria-label="Vorheriger Monat">${I('chevL')}</button><b>${MONTHS[cur.m]} ${cur.y}</b><button class="iconbtn round" data-act="kfcal" data-d="1" aria-label="Nächster Monat">${I('chevR')}</button></div>
+    <div class="cal" role="grid" aria-label="Kabinenfest-Kalender ${MONTHS[cur.m]} ${cur.y}"><div class="cal-h"></div>${['Mo','Di','Mi','Do','Fr','Sa','So'].map(x=>`<div class="cal-h">${x}</div>`).join('')}`;
+  while(d<=last){const wk=isoD(d),es=map[wk]||[],has=es.length>0,isNow=wk===thisMon,add=canW&&wk>=thisMon,kw=isoKw(d);
+    const tap=add?` data-act="kfAddWeek" data-id="${wk}" role="button" tabindex="0" aria-label="Kabinenfest in KW ${kw} hinzufügen"`:'';
+    h+=`<div class="cal-kw ${has?'has':''} ${add?'tapw':''}"${tap}>KW ${kw}</div>`;
+    for(let i=0;i<7;i++){const x=new Date(d);x.setDate(x.getDate()+i);const iso=isoD(x);h+=`<div class="cal-d ${x.getMonth()!==cur.m?'out':''} ${has?'has':''} ${isNow&&has?'now':''} ${iso===todayIso?'today':''} ${add?'tapw':''}" role="gridcell" ${add?`data-act="kfAddWeek" data-id="${wk}"`:''} ${iso===todayIso?'aria-current="date"':''}><span>${x.getDate()}</span></div>`}
+    for(const e of es){const p=kfWho(e);h+=`<div class="cal-host ${isNow?'now':''}">${p&&p.team?`<span class="av">${p.id==='team-alt'?'A':'J'}</span>`:avatar(p)}<div><b>${esc(p?p.name:'Unbekannt')}${p&&!p.team?drg(p.id):''}</b><i>${isNow?'Diese Woche · ':''}${e.kfWeek?'fest eingeplant · ':''}${esc(e.kfWeek&&e.note&&!/^Eingeplant für KW/.test(e.note)?e.note:e.title)}</i></div></div>`}
+    d=new Date(d);d.setDate(d.getDate()+7)}
+  h+=`</div><p class="note" style="margin:10px 4px 0">${canW?'Tippe auf eine Woche, um dort ein Kabinenfest einzutragen. ':''}Ohne feste Woche verteilen sich die Kabinenfeste der Reihe nach auf die freien Wochen (Reihenfolge unter „Offen“).</p>`;
+  return h}
+function kfWeekAddSheet(s){const r=kwRange(s.mon),es=kfWeekMap()[s.mon]||[];
+  const head=`<h2>Kabinenfest in KW ${r.kw}</h2><p>${r.range}</p>`;
+  let body=es.length?`<div class="hint" style="margin-bottom:12px">In dieser Woche schon eingeplant: ${es.map(e=>esc(kfWho(e)?.name||'Unbekannt')).join(', ')}</div>`:'';
+  body+=`<h3 class="section-h">Wer?</h3><div class="grid">`+TEAM_ENT.concat(sortedPlayers(false)).map(p=>p.team?`<button class="pick teampick" data-act="kfwPick" data-id="${esc(p.id)}" aria-pressed="${s.pid===p.id}"><span class="av teamav">${p.id==='team-alt'?'A':'J'}</span><b>${esc(p.name)}</b><small>Mannschaft</small><span class="ok">${ICONS.check}</span></button>`:`<button class="pick" data-act="kfwPick" data-id="${esc(p.id)}" aria-pressed="${s.pid===p.id}">${p.role==='Spieler'&&p.number!=null?`<span class="no">${p.number}</span>`:''}${avatar(p)}<b>${esc(p.name.split(' ')[0])}</b><small>${esc(p.role==='Spieler'?p.name.split(' ').slice(1).join(' '):p.role)}</small><span class="ok">${ICONS.check}</span></button>`).join('')+`</div>`;
+  body+=`<div class="fields" style="margin-top:12px"><div class="field"><label for="kfwn">Grund (optional)</label><input id="kfwn" maxlength="120" value="${esc(s.note||'')}" placeholder="z. B. Aufstieg, neuer Job …"></div></div>`;
+  return{head,body,foot:`<div class="split"><button class="btn" data-act="kfwBack">Abbrechen</button><button class="btn primary" data-act="kfwSave" ${s.pid?'':'disabled'}>Eintragen</button></div>`}}
+/* ---------- Geburtstage ---------- */
+// Tag und Monat (MM-TT) für alle sichtbar; das volle Geburtsdatum mit Jahr bleibt bei „Trikots“ (nur Kassenwart/Admin).
+const validMd=v=>/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(v||'');
+const isLeap=y=>y%4===0&&(y%100!==0||y%400===0);
+// Tage bis zum nächsten Geburtstag (deutsche Zeit); 29.02. wird in Nicht-Schaltjahren am 28.02. gefeiert
+function gbNext(md){const b=berlinNow(),y=+b.date.slice(0,4),t=b.date.slice(5);const eff=yy=>md==='02-29'&&!isLeap(yy)?'02-28':md;
+  const yy=t<=eff(y)?y:y+1,m=eff(yy);
+  const target=Date.UTC(yy,+m.slice(0,2)-1,+m.slice(3)),today=Date.UTC(y,+t.slice(0,2)-1,+t.slice(3));return{days:Math.round((target-today)/864e5),year:yy}}
+function gbList(){const all=S.players.filter(p=>p.active!==false);const withB=[],without=[];
+  for(const p of all){const md=S.gb[p.id];if(validMd(md))withB.push({p,md,...gbNext(md)});else without.push(p)}
+  withB.sort((a,b)=>a.days-b.days||a.p.name.localeCompare(b.p.name));return{withB,without}}
+const gbDays=n=>n===0?'🎉 Heute!':n===1?'morgen':`in ${n} Tagen`;
+const mdDE=md=>md.slice(3)+'.'+md.slice(0,2)+'.';
+function gbSheet(){const {withB,without}=gbList(),kw=isKW();
+  const next=withB.filter(x=>x.days===withB[0]?.days);
+  let body='';
+  if(next.length)body+=`<div class="gbnext">${next.map(x=>`<div class="gbn">${avatar(x.p)}<div class="m"><small>${x.days===0?'Heute Geburtstag':'Nächster Geburtstag'}</small><b>${esc(x.p.name)}</b><i>${esc(mdDE(x.md))} · ${gbDays(x.days)}</i></div><span class="gbic" aria-hidden="true">🎂</span></div>`).join('')}</div>`;
+  else body+=`<div class="empty">Noch keine Geburtstage eingetragen.</div>`;
+  const row=(x,first)=>`<div class="row gbrow ${first?'now':''} ${kw?'tap':''}" ${kw?`data-act="gbEdit" data-id="${esc(x.p.id)}" role="button" tabindex="0"`:''}><div class="gbd"><b>${esc(mdDE(x.md))}</b></div>${avatar(x.p)}<div class="m"><b>${esc(x.p.name)}</b><i>${gbDays(x.days)}</i></div>${kw?I('chevR'):''}</div>`;
+  if(withB.length)body+=`<h3 class="sub-h">Reihenfolge ab heute</h3><div class="rows">${withB.map((x,i)=>row(x,x.days===withB[0].days)).join('')}</div>`;
+  if(kw&&without.length)body+=`<h3 class="sub-h">Ohne Geburtstag · ${without.length}</h3><div class="rows">${without.map(p=>`<div class="row tap" data-act="gbEdit" data-id="${esc(p.id)}" role="button" tabindex="0">${avatar(p)}<div class="m"><b>${esc(p.name)}</b><i>Geburtstag eintragen</i></div>${I('chevR')}</div>`).join('')}</div>`;
+  body+=`<p class="note" style="margin:10px 4px 0">Am Geburtstag gibt es um 9 Uhr eine Benachrichtigung, und das Geburtstagskind bekommt automatisch ein Kabinenfest eingetragen.</p>`;
+  return{head:`<h2>Geburtstage</h2>`,body,foot:kw?`<button class="btn primary" data-act="gbAdd">${I('plus')}Geburtstag hinzufügen</button>`:''}}
+// Person auswählen (wie beim Strafen-Eintragen), danach Tag und Monat wählen
+function gbPickSheet(){const ps=S.players.filter(p=>p.active!==false).sort((a,b)=>(validMd(S.gb[a.id])?1:0)-(validMd(S.gb[b.id])?1:0)||(a.number??999)-(b.number??999)||a.name.localeCompare(b.name));
+  return{head:`<h2>Geburtstag hinzufügen</h2><p>Für wen?</p>`,body:`<div class="grid">`+ps.map(p=>{const md=S.gb[p.id];return `<button class="pick" data-act="gbPick" data-id="${esc(p.id)}">${p.role==='Spieler'&&p.number!=null?`<span class="no">${p.number}</span>`:''}${avatar(p)}<b>${esc(p.name.split(' ')[0])}</b><small>${validMd(md)?'🎂 '+esc(mdDE(md)):esc(p.role==='Spieler'?p.name.split(' ').slice(1).join(' '):p.role)}</small></button>`}).join('')+`</div><p class="note" style="margin:10px 4px 0">Personen ohne Geburtstag stehen vorne.</p>`,foot:''}}
+function gbEditSheet(s){const p=pById(s.id);if(!p||!isKW())return gbSheet();const md=S.gb[p.id]||'';
+  const dd=validMd(md)?+md.slice(3):'',mm=validMd(md)?+md.slice(0,2):'';
+  return{head:`<div style="display:flex;gap:12px;align-items:center">${avatar(p)}<div><h2>${esc(p.name)}</h2><p>Geburtstag</p></div></div>`,
+    body:`<div class="two"><div class="field"><label for="gbt">Tag</label><select id="gbt"><option value="">–</option>${Array.from({length:31},(_,i)=>`<option ${dd===i+1?'selected':''}>${i+1}</option>`).join('')}</select></div><div class="field"><label for="gbm">Monat</label><select id="gbm"><option value="">–</option>${MONTHS.map((m,i)=>`<option value="${i+1}" ${mm===i+1?'selected':''}>${m}</option>`).join('')}</select></div></div>`,
+    foot:`<div class="split">${md?`<button class="btn danger" data-act="gbDel" data-id="${esc(p.id)}">Entfernen</button>`:`<button class="btn" data-act="gbBack">Abbrechen</button>`}<button class="btn primary" data-act="gbSave" data-id="${esc(p.id)}">Speichern</button></div>`}}
+// Am Geburtstag automatisch ein Kabinenfest (feste ID je Person und Jahr). Läuft auf dem Server stündlich mit (push_tick);
+// hier zusätzlich, wenn Kassenwart/Admin die App öffnet – falls der Zeitplan einmal nicht läuft.
+// Merker kasse_intern/gb_done: einmal angelegt, wird es nie neu erzeugt – auch nicht, wenn es gelöscht wurde.
+async function gbKfCheck(){if(!isKW()||S.status!=='ready'||!S.got.e||!S.gbLoaded||!S.gbDoneLoaded||S._gbBusy||(S._gbFailAt&&Date.now()-S._gbFailAt<300000))return;
+  const b=berlinNow(),md=b.date.slice(5),y=b.date.slice(0,4);
+  const due=Object.entries(S.gb).filter(([pid,v])=>v===md||(v==='02-29'&&md==='02-28'&&!isLeap(+y))).map(([pid])=>pid)
+    .filter(pid=>{const p=pById(pid);return p&&p.active!==false&&!S.gbDone[pid+'-'+y]&&!S.entries.some(e=>e.id==='kf-gb-'+pid+'-'+y)});
+  if(!due.length)return;S._gbBusy=true;
+  try{for(const pid of due){
+      await S.db.doc('entries/kf-gb-'+pid+'-'+y).set({playerId:pid,fineId:'kf-manual',title:'Geburtstag',amount:0,qty:null,unit:null,col:'strafen',spieltag:false,kabinenfest:true,kfDone:false,note:'Geburtstag am '+dDE(b.date),date:b.date,createdAt:new Date().toISOString(),createdBy:S.uid||null,paid:false,paidAt:null,auto:'geburtstag'});
+      S.gbDone={...S.gbDone,[pid+'-'+y]:true};await S.db.doc('kasse_intern/gb_done').set(S.gbDone)}
+    S._gbFailAt=0}
+  catch(e){S._gbFailAt=Date.now()} // nicht bei jeder Aktualisierung neu versuchen, erst nach 5 Minuten
+  S._gbBusy=false}
 async function kfSave(ids){
   const jobs=[];ids.forEach((id,i)=>{const e=S.entries.find(x=>x.id===id);if(e&&e.kfOrder!==i*10){const prev=e.kfOrder;e.kfOrder=i*10;jobs.push(S.db.doc('entries/'+id).update({kfOrder:i*10}).catch(err=>{e.kfOrder=prev;throw err}))}});
   const r=await Promise.allSettled(jobs),bad=r.find(x=>x.status==='rejected');
   if(bad){toast(errMsg(bad.reason));if(S.sheet&&S.sheet.type==='kf')renderSheet(false)}
-}
-function kontenStats(){
-  const t=totals(),now=kfList()[0];
-  return meLine()+`<div class="stats one"><button class="stat kf" data-act="openKf" aria-label="Offene Kabinenfeste anzeigen${now?', diese Woche '+(pById(now.playerId)?.name||''):''}"><div class="kfl"><span>Kabinenfeste</span><b class="num">${t.kf}</b></div>${now?`<div class="kfnow">${avatar(pById(now.playerId))}<div><small>Diese Woche</small><strong>${esc(pById(now.playerId)?.name||'Unbekannt')}</strong></div></div>`:''}${I('chevR').replace('class="ico"','class="ico chev"')}</button></div>`;
 }
 function kontenCopy(){
   return `<div class="toolbar"><button class="btn block" data-act="copy">Offene Beträge für die Gruppe kopieren</button></div>`;
@@ -862,7 +1022,7 @@ function sortBar(){return `<div class="sortbar"><span class="k">Sortieren</span>
 function uebersichtAll(){
   if(S.status==='loading')return `<div class="empty">Lade Übersicht …</div>`;
   const ou=uebersicht();
-  return kontenStats()+`<h2 class="section-h">Monatsübersicht</h2>`+ou.top+kontenCopy()+`<h2 class="section-h">Konten</h2>`+kontenSeg()+(S.kview==='verlauf'?verlauf():S.kview==='statistik'?statistik():sortBar()+kontenList())+ou.bottom;
+  return meLine()+`<h2 class="section-h">Monatsübersicht</h2>`+ou.top+kontenCopy()+`<h2 class="section-h">Konten</h2>`+kontenSeg()+(S.kview==='verlauf'?verlauf():S.kview==='statistik'?statistik():sortBar()+kontenList())+ou.bottom;
 }
 function entryRow(e,withPerson,readOnly){
   const p=pById(e.playerId),canW=!readOnly&&S.canWrite!==false;
@@ -1002,7 +1162,184 @@ function verwaltenAdmin(){
 }
 
 /* ---------- Sheets ---------- */
-function openSheet(s){S.sheet=s;S.confirmDel=null;S.confirmPayAll=null;document.body.classList.add('locked');renderSheet(false)}
+/* ---------- Menü: Döner & Fußball ---------- */
+// Uhrzeit immer in deutscher Zeit, damit der Bestellschluss auch auf Handys mit anderer Zeitzone stimmt (die Datenbank prüft genauso)
+function berlinNow(){const p={};for(const x of new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23',weekday:'short'}).formatToParts(new Date()))p[x.type]=x.value;
+  return{date:`${p.year}-${p.month}-${p.day}`,h:+p.hour,wd:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(p.weekday)}}
+const addDays=(d,n)=>{const x=new Date(d+'T12:00:00Z');x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)};
+// Bestellt wird für den nächsten Dienstag (am Dienstag selbst für heute). Dienstag ab 18 Uhr ist die Liste zu. Ab Mittwoch gilt die nächste Woche, alte Bestellungen werden gelöscht.
+function doenerWeek(){const n=berlinNow();return{tue:addDays(n.date,(2-n.wd+7)%7),open:!(n.wd===2&&n.h>=18)}}
+const doenerList=w=>S.doener.filter(d=>d.week===w).sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+const fbGames=()=>S.fussball.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.createdAt).localeCompare(String(a.createdAt)));
+const TEAMS=[['jung','Team Jung'],['alt','Team Alt']];
+const teamName=k=>k==='jung'?'Team Jung':'Team Alt',otherTeam=k=>k==='jung'?'alt':'jung';
+// Punkte: normales Tor 1, Kopfball 2, Eigentor des Gegners 1
+const FB_WIN=5;
+const fbPts=(x,team)=>(x.goals||[]).filter(t=>t.team===team).reduce((a,t)=>a+(t.n||0)+2*(t.k||0),0)+((x.og||{})[team]||0);
+// Runden: Wer zuerst 5 Spiele gewinnt, gewinnt die Runde. Danach geht es wieder bei 0:0 los und das Verlierer-Team bekommt ein Kabinenfest.
+function fbRounds(){const asc=fbGames().reverse(),rounds=[];let cur={jung:0,alt:0},games=[];
+  for(const x of asc){const w=x.jung>x.alt?'jung':x.alt>x.jung?'alt':null;games.push(x);if(!w)continue;cur[w]++;
+    if(cur[w]>=FB_WIN){rounds.push({no:rounds.length+1,winner:w,loser:otherTeam(w),w:cur[w],l:cur[otherTeam(w)],endId:x.id,date:x.date,games});cur={jung:0,alt:0};games=[]}}
+  return{rounds,cur,games}}
+function fbStats(){const st={tore:{}};
+  for(const x of fbGames())for(const t of x.goals||[]){const o=st.tore[t.pid]??={n:0,k:0,games:new Set()};o.n+=t.n||0;o.k+=t.k||0;if((t.n||0)+(t.k||0))o.games.add(x.id)}
+  st.ranking=Object.entries(st.tore).map(([pid,o])=>({p:pById(pid),pid,n:o.n,k:o.k,pts:o.n+2*o.k,games:o.games.size})).filter(x=>x.pts>0)
+    .sort((a,b)=>b.pts-a.pts||b.k-a.k||a.games-b.games||String(a.p?.name).localeCompare(String(b.p?.name)));
+  return st}
+const goalTxt=(n,k)=>[n?n+' '+(n===1?'Tor':'Tore'):'',k?k+' '+(k===1?'Kopfball':'Kopfbälle'):''].filter(Boolean).join(' + ');
+function scorerTxt(x,team){const l=(x.goals||[]).filter(t=>t.team===team&&((t.n||0)+(t.k||0))).map(t=>(pById(t.pid)?.name.split(' ')[0]||'?')+' ('+goalTxt(t.n||0,t.k||0)+')');
+  const og=(x.og||{})[team]||0;if(og)l.push(og+' '+(og===1?'Eigentor':'Eigentore'));return l.join(', ')}
+function scoreBoard(a,b,label){const w=a>b?'jung':b>a?'alt':'';
+  return `<div class="score" ${label?`aria-label="${esc(label)}"`:''}><div class="sc-t ${w==='jung'?'win':''}"><span>Team Jung</span><b class="num">${a}</b></div><span class="sc-x">:</span><div class="sc-t ${w==='alt'?'win':''}"><span>Team Alt</span><b class="num">${b}</b></div></div>`}
+function gameRow(x,kw){const sj=scorerTxt(x,'jung'),sa=scorerTxt(x,'alt');
+  return `<div class="row gamerow ${kw?'tap':''}" ${kw?`data-act="fbEdit" data-id="${esc(x.id)}" role="button" tabindex="0"`:''}><div class="m"><b>${esc(dDE(x.date))} · <span class="${x.jung>x.alt?'gw':''}">Jung ${x.jung}</span> : <span class="${x.alt>x.jung?'gw':''}">${x.alt} Alt</span></b>
+    <i class="wrap"><span class="gt">Jung</span> ${esc(sj||'–')}</i><i class="wrap"><span class="gt">Alt</span> ${esc(sa||'–')}</i></div>${kw?I('chevR'):''}</div>`}
+// Serie: die Spiele einer Runde als Kette (älteste links) plus Siege in Folge
+const fbWinner=x=>x.jung>x.alt?'jung':x.alt>x.jung?'alt':null;
+// Serie: die Spiele einer Runde als Kette (älteste links). Antippen öffnet das Spiel (Kassenwart/Admin: zum Bearbeiten).
+function seriesChips(games){return `<div class="series" role="list">`+games.map(x=>{const w=fbWinner(x);return `<button class="sch ${w||''}" role="listitem" data-act="fbGame" data-id="${esc(x.id)}" aria-label="${esc(dDE(x.date))}: Jung ${x.jung}, Alt ${x.alt}${w?', Sieg '+teamName(w):''}"><b>${w==='jung'?'Jung':w==='alt'?'Alt':'–'}</b><small class="num">${x.jung}:${x.alt}</small></button>`}).join('')+`</div>`}
+function streak(){const g=fbGames();let w=null,n=0;for(const x of g){const v=fbWinner(x);if(!v)break;if(w===null)w=v;if(v!==w)break;n++}return{w,n}}
+// Torserie: in wie vielen Spielen hintereinander (vom letzten Spiel rückwärts) hat ein Spieler getroffen?
+function scorerStreaks(){const g=fbGames(),out={};if(!g.length)return out;
+  const hit=(x,pid)=>(x.goals||[]).some(t=>t.pid===pid&&(t.n||0)+(t.k||0)>0);
+  for(const t of g[0].goals||[]){if(!((t.n||0)+(t.k||0))||out[t.pid])continue;let n=0;for(const x of g){if(!hit(x,t.pid))break;n++}if(n>=2)out[t.pid]=n}
+  return out}
+function fussballSheet(){
+  const st=fbStats(),r=fbRounds(),kw=isKW(),sk=streak(),ss=scorerStreaks();
+  const hot=Object.entries(ss).sort((a,b)=>b[1]-a[1]);
+  let body=`<h3 class="sub-h" style="margin-top:0">Runde ${r.rounds.length+1} · Siege</h3>${scoreBoard(r.cur.jung,r.cur.alt,'Siege in dieser Runde: Team Jung '+r.cur.jung+', Team Alt '+r.cur.alt)}`+(kw?`<button class="btn primary fbnew" data-act="fbNew">${I('plus')}Neues Spiel eintragen</button>`:'');
+  body+=`<h3 class="sub-h">Momentane Serie</h3>`+(r.games.length?seriesChips(r.games):`<div class="empty">In dieser Runde wurde noch nicht gespielt.</div>`)+
+    (sk.n?`<p class="streak">${sk.n>=2?'🔥 ':''}<b>${teamName(sk.w)}</b> hat ${sk.n===1?'das letzte Spiel':'die letzten '+sk.n+' Spiele'} gewonnen</p>`:'')+
+    hot.map(([pid,n])=>`<p class="streak">⚽ <b>${esc(pById(pid)?.name.split(' ')[0]||'?')}</b> trifft seit ${n} Spielen in Folge</p>`).join('');
+  if(r.rounds.length)body+=`<h3 class="sub-h">Bisherige Runden</h3><div class="rows">`+r.rounds.slice().reverse().map(x=>`<div class="row tap" data-act="fbRound" data-id="${x.no}" role="button" tabindex="0"><div class="m"><b>Runde ${x.no} · ${teamName(x.winner)} gewinnt ${x.w} : ${x.l}</b><i class="wrap">${esc(dDE(x.games[0].date))} bis ${esc(dDE(x.date))} · Kabinenfest für ${teamName(x.loser)}</i></div>${I('chevR')}</div>`).join('')+`</div>`;
+  body+=`<h3 class="sub-h">Torschützen</h3>`+(st.ranking.length?`<div class="rows">`+st.ranking.map((x,i)=>`<div class="row"><span class="pos">${i+1}</span>${avatar(x.p)}<div class="m"><b>${esc(x.p?x.p.name:'Unbekannt')}</b><i>${esc(goalTxt(x.n,x.k))} · ${x.games} ${x.games===1?'Spiel':'Spiele'}</i>${ss[x.pid]?`<div class="tags"><span class="tag owe">🔥 ${ss[x.pid]} Spiele in Folge getroffen</span></div>`:''}</div><div class="r"><strong class="num">${x.pts} ${x.pts===1?'Punkt':'Punkte'}</strong></div></div>`).join('')+`</div>`:`<div class="empty">Noch keine Torschützen eingetragen.</div>`);
+  body+=`<p class="note" style="margin:10px 4px 0">Punkte: Tor 1 · Kopfball 2 · Eigentor 1 für das andere Team${r.games.length?' · Ein Spiel in der Serie antippen für Details':''}</p>`;
+  return{head:`<h2>Fußball</h2>`,body,foot:''}}
+function fbGameSheet(s){const x=S.fussball.find(g=>g.id===s.id);
+  if(!x)return{head:`<h2>Spiel</h2>`,body:`<div class="empty">Dieses Spiel gibt es nicht mehr.</div>`,foot:`<button class="btn" data-act="fbBack">Zurück</button>`};
+  return{head:`<h2>Spiel vom ${esc(dDE(x.date))}</h2>`,body:scoreBoard(x.jung,x.alt)+`<h3 class="sub-h">Torschützen</h3><div class="rows">${gameRow({...x,date:x.date},false)}</div>`,foot:`<button class="btn" data-act="fbBack">${I('chevL')}Zurück</button>`}}
+function fbRoundSheet(s){const x=fbRounds().rounds.find(r=>r.no===s.no),kw=isKW();
+  if(!x)return{head:`<h2>Runde ${s.no}</h2>`,body:`<div class="empty">Diese Runde gibt es nicht mehr.</div>`,foot:`<button class="btn" data-act="fbBack">Zurück</button>`};
+  const head=`<h2>Runde ${x.no}</h2><p>${esc(dDE(x.games[0].date))} bis ${esc(dDE(x.date))} · Kabinenfest für ${teamName(x.loser)}</p>`;
+  const body=`${scoreBoard(x.winner==='jung'?x.w:x.l,x.winner==='alt'?x.w:x.l,'Siege in Runde '+x.no)}<h3 class="sub-h">Serie</h3>${seriesChips(x.games)}
+    <h3 class="sub-h">Ergebnisse · ${x.games.length} ${x.games.length===1?'Spiel':'Spiele'}</h3><div class="rows">${x.games.slice().reverse().map(g=>gameRow(g,kw)).join('')}</div>`;
+  return{head,body,foot:`<button class="btn" data-act="fbBack">${I('chevL')}Zurück zur Übersicht</button>`}}
+function fbEditSheet(s){
+  const j=fbPts(s,'jung'),a=fbPts(s,'alt');
+  const head=`<h2>${s.id?'Spiel bearbeiten':'Spiel eintragen'}</h2><p>Das Ergebnis rechnet sich aus den Toren</p>`;
+  const st=(act,attrs,v,label)=>`<div class="stepper sm"><button data-act="${act}" ${attrs} data-d="-1" aria-label="${esc(label)} weniger">${I('minus')}</button><output class="num">${v}</output><button data-act="${act}" ${attrs} data-d="1" aria-label="${esc(label)} mehr">${I('plus')}</button></div>`;
+  let body=`<div class="fields"><div class="field"><label for="fbd">Datum</label><input id="fbd" type="date" value="${esc(s.date)}"></div></div>${scoreBoard(j,a)}`;
+  if(j===a&&(j||a))body+=`<p class="note" style="margin:8px 4px 0;color:var(--danger)">Unentschieden gibt es nicht – ein Team muss vorne liegen.</p>`;
+  for(const [k,l] of TEAMS){const gs=s.goals.filter(t=>t.team===k),used=new Set(gs.map(t=>t.pid));
+    body+=`<h3 class="sub-h">${l} · ${fbPts(s,k)} ${fbPts(s,k)===1?'Punkt':'Punkte'}</h3><div class="rows">`+gs.map(t=>{const p=pById(t.pid),nm=p?p.name:'Unbekannt';
+      return `<div class="row goalrow">${avatar(p)}<div class="m"><b>${esc(nm)}</b><div class="gsteps"><div><small>Tor · 1</small>${st('fbGoal',`data-team="${k}" data-id="${esc(t.pid)}" data-kind="n"`,t.n||0,'Tore von '+nm)}</div><div><small>Kopfball · 2</small>${st('fbGoal',`data-team="${k}" data-id="${esc(t.pid)}" data-kind="k"`,t.k||0,'Kopfbälle von '+nm)}</div></div></div></div>`}).join('')+
+      `<div class="row goalrow"><span class="av">ET</span><div class="m"><b>Eigentore vom Gegner</b><div class="gsteps"><div><small>je 1 Punkt</small>${st('fbOg',`data-team="${k}"`,(s.og||{})[k]||0,'Eigentore für '+l)}</div></div></div></div></div>`+
+      `<button class="btn fbaddbtn" data-act="fbPickOpen" data-team="${k}">${I('plus')}Torschützen für ${l}</button>`}
+  const foot=`<div class="split">${s.id?`<button class="btn danger" data-act="fbDel">${S.confirmDel==='fb'?'Wirklich löschen?':'Löschen'}</button>`:`<button class="btn" data-act="fbBack">Abbrechen</button>`}<button class="btn primary" data-act="fbSave">Speichern</button></div>`;
+  return{head,body,foot}}
+function doenerSheet(s){
+  const w=doenerWeek(),list=doenerList(w.tue),me=myPid(),mine=list.find(d=>d.pid===me);
+  const head=`<h2>Döner</h2><p>Bestellung für Dienstag, ${esc(dDE(w.tue).slice(0,6))} · ${w.open?'bis 18 Uhr eintragen':'Bestellschluss vorbei'}</p>`;
+  let body='',foot='';
+  if(!w.open)body+=`<div class="hint" style="margin-bottom:14px">Bestellschluss war heute um 18 Uhr. Morgen wird die Liste gelöscht, dann kannst du dich für nächsten Dienstag eintragen.</div>`;
+  else if(me)body+=`<div class="fields"><div class="field"><label for="dtext">${mine?'Deine Bestellung':'Was möchtest du?'}</label><textarea id="dtext" rows="2" maxlength="200" placeholder="z. B. Döner mit allem, scharf, ohne Zwiebeln">${esc(s.draft??mine?.text??'')}</textarea></div></div>`;
+  const dt=ppTarget(S.settings.doenerPaypal);
+  if(mine&&dt){const amt=num(s.pay);body+=`<div class="paybox" style="margin-top:14px"><div class="pay-h"><span>Döner bezahlen</span></div><div class="field"><label for="dpay">Betrag (€)</label><input id="dpay" inputmode="decimal" value="${esc(s.pay||'')}" placeholder="z. B. 7,50"></div>
+    <a class="btn paypal ${amt>0?'':'off'}" id="dpaylink" ${amt>0?`href="${esc(paypalUrl(amt,'',dt,'Döner Dragons – '+(pById(me)?.name||'')))}" target="_blank" rel="noopener"`:'aria-disabled="true"'}>Mit PayPal bezahlen${amt>0?' · '+eur(amt):''}</a>
+    <div class="pp-addr"><span>An: <b>${esc(dt.v)}</b></span><button class="mini" data-act="copyTxt" data-v="${esc(dt.v)}">Kopieren</button></div></div>`}
+  body+=`<h3 class="sub-h">Bestellungen · ${list.length}</h3>`+(list.length?`<div class="rows">`+list.map(d=>{const p=pById(d.pid),canDel=d.pid===me&&w.open; // jeder löscht nur seine eigene Bestellung
+    return `<div class="row">${avatar(p)}<div class="m"><b>${esc(p?p.name:'Unbekannt')}${d.pid===me?' <span class="tag ok">du</span>':''}</b><i class="wrap">${esc(d.text)}</i></div>${canDel?`<button class="iconbtn ${S.confirmDel==='dn'+d.id?'warn':''}" data-act="delDoener" data-id="${esc(d.id)}" aria-label="Bestellung von ${esc(p?p.name:'')} löschen">${S.confirmDel==='dn'+d.id?'Löschen?':I('trash')}</button>`:''}</div>`}).join('')+`</div>`:`<div class="empty">Noch niemand eingetragen.</div>`);
+  const btns=[];
+  if(list.length)btns.push(`<button class="btn" data-act="copyDoener">Liste kopieren</button>`);
+  if(w.open&&me)btns.push(`<button class="btn primary" data-act="saveDoener">${mine?'Ändern':'Eintragen'}</button>`);
+  if(btns.length)foot=btns.length>1?`<div class="split">${btns.join('')}</div>`:btns[0];
+  return{head,body,foot}}
+// Torschützen auswählen wie beim Strafen-Eintragen: Kacheln mit Bild, mehrere antippen, dann hinzufügen
+function fbPickSheet(s){const e=s.back,l=teamName(s.team),used=new Set(e.goals.filter(t=>t.team===s.team).map(t=>t.pid));
+  const head=`<h2>Torschützen ${l}</h2><p>Antippen, wer getroffen hat</p>`;
+  const body=`<div class="grid">`+sortedPlayers(false).map(p=>{const on=used.has(p.id)||s.sel.has(p.id);return `<button class="pick" data-act="fbPick" data-id="${esc(p.id)}" aria-pressed="${on}" ${used.has(p.id)?'disabled':''}>${p.role==='Spieler'&&p.number!=null?`<span class="no">${p.number}</span>`:''}${avatar(p)}<b>${esc(p.name.split(' ')[0])}</b><small>${esc(p.role==='Spieler'?p.name.split(' ').slice(1).join(' '):p.role)}</small><span class="ok">${ICONS.check}</span></button>`}).join('')+`</div>`;
+  const n=s.sel.size;
+  return{head,body,foot:`<div class="split"><button class="btn" data-act="fbPickBack">Zurück</button><button class="btn primary" data-act="fbPickDone" ${n?'':'disabled'}>${n?n+' hinzufügen':'Spieler wählen'}</button></div>`}}
+/* ---------- Push-Benachrichtigungen (Web Push, kostenlos) ---------- */
+const PUSH_KINDS=[['strafe','Neue Strafen','Wenn für dich etwas eingetragen wird'],['zahltag','Zahltag','Beim Start und einen Tag vor dem Ende, falls noch etwas offen ist'],['doener','Döner','Dienstag um 17 Uhr, falls du noch nicht bestellt hast'],['fussball','Fußball','Neue Spiele und das Ende einer Runde'],['geburtstag','Geburtstage','Glückwünsche an dich und wer heute Geburtstag hat'],['meldung','Gemeldete Zahlungen','Wenn jemand „Ich habe bezahlt“ meldet']];
+const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+const pushSupported=()=>'serviceWorker' in navigator&&!!window.PushManager&&!!window.Notification;
+function swReg(){if(!('serviceWorker' in navigator))return Promise.resolve(null);return S.swp??=navigator.serviceWorker.register('sw.js').catch(()=>null)}
+function b64uToU8(v){v=v.replace(/-/g,'+').replace(/_/g,'/');const b=atob(v+'==='.slice((v.length+3)%4));return Uint8Array.from(b,c=>c.charCodeAt(0))}
+async function pushLoad(){const st={sub:null,row:null,ready:true};
+  try{if(pushSupported()){const reg=await swReg(),sub=reg&&await reg.pushManager.getSubscription();
+    if(sub){st.sub=sub;const {data}=await S.sb.from('push_subs').select('endpoint,prefs').eq('endpoint',sub.endpoint).maybeSingle();st.row=data||null}}}catch(e){}
+  S.push=st;if(S.sheet&&(S.sheet.type==='push'||S.sheet.type==='menu')){S.still=true;renderSheet(false)}}
+function pushSheet(){const st=S.push||{},head=`<h2>Benachrichtigungen</h2><p>Gilt für dieses Gerät</p>`;let body='',foot='';
+  const kinds=PUSH_KINDS.filter(k=>k[0]!=='meldung'||isKW());
+  const list=`<div class="rows">`+kinds.map(([k,t,d])=>`<div class="row"><div class="m"><b>${t}</b><i class="wrap">${d}</i></div></div>`).join('')+`</div>`;
+  if(!pushSupported())body=isIOS()&&!isStandalone()
+    ?`<div class="hint">Auf dem iPhone gehen Benachrichtigungen nur, wenn die Kasse auf dem <b>Home-Bildschirm</b> liegt:<br>In Safari unten auf <b>Teilen</b> tippen → <b>„Zum Home-Bildschirm“</b>. Danach die Kasse über das neue Icon öffnen und hier einschalten. Dafür braucht es iOS 16.4 oder neuer.</div>`
+    :`<div class="hint">Dieser Browser kann keine Benachrichtigungen empfangen. Öffne die Kasse am Handy über das Icon auf dem Home-Bildschirm.</div>`;
+  else if(!st.ready)body=`<div class="empty">Lade …</div>`;
+  else if(Notification.permission==='denied')body=`<div class="hint">Benachrichtigungen sind für die Dragons Kasse blockiert. Auf dem iPhone: <b>Einstellungen → Mitteilungen → Dragons Kasse → Mitteilungen erlauben</b>. Danach hier noch einmal öffnen.</div>`;
+  else if(!st.row){body=`<p class="note" style="margin:0 4px 12px">Schalte Benachrichtigungen ein, dann bekommst du eine Nachricht bei:</p>${list}<p class="note" style="margin:10px 4px 0">Danach kannst du einzelne Themen wieder abschalten.</p>`;
+    foot=`<button class="btn primary" data-act="pushOn">🔔 Benachrichtigungen einschalten</button>`}
+  else{const pr=st.row.prefs||{};
+    body=`<div class="tag ok" style="margin:0 2px 12px">🔔 An auf diesem Gerät</div><div class="rows">`+kinds.map(([k,t,d])=>`<label class="row pushk"><div class="m"><b>${t}</b><i class="wrap">${d}</i></div><input type="checkbox" class="switch" data-pk="${k}" ${pr[k]!==false?'checked':''} aria-label="${esc(t)}"></label>`).join('')+`</div>`;
+    foot=`<div class="split"><button class="btn" data-act="pushOff">Ausschalten</button><button class="btn primary" data-act="pushTest">Test senden</button></div>`}
+  return{head,body,foot}}
+/* ---------- Trikots: Spieler nach Alter, von jung bis alt ---------- */
+const ageOf=iso=>{const [y,m,d]=iso.split('-').map(Number),n=new Date();let a=n.getFullYear()-y;if(n.getMonth()+1<m||(n.getMonth()+1===m&&n.getDate()<d))a--;return a};
+const validBirth=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||'')&&!isNaN(Date.parse(v))&&v<=today()&&v>='1940-01-01';
+const lastWash=pid=>(S.wash[pid]||[])[0]||null;
+function trikotList(){const all=S.players.filter(p=>p.role==='Spieler'&&p.active!==false);
+  const withD=all.filter(p=>validBirth(S.geburt[p.id])).sort((a,b)=>S.geburt[b.id].localeCompare(S.geburt[a.id])||(a.number??999)-(b.number??999)||a.name.localeCompare(b.name));
+  const without=all.filter(p=>!validBirth(S.geburt[p.id])).sort((a,b)=>(a.number??999)-(b.number??999)||a.name.localeCompare(b.name));
+  return{withD,without}}
+function trikotSheet(){if(!isKW())return{head:`<h2>Trikots</h2>`,body:`<div class="empty">Nur für Kassenwart und Admin.</div>`,foot:''};const {withD,without}=trikotList(),kw=true;
+  const row=(p,i)=>{const d=S.geburt[p.id],ok=validBirth(d);
+    const lw=lastWash(p.id);
+    return `<div class="row tap" data-act="trikotEdit" data-id="${esc(p.id)}" role="button" tabindex="0">${ok?`<span class="pos">${i+1}</span>`:'<span class="pos">–</span>'}${avatar(p)}<div class="m"><b>${esc(p.name)}</b><i>${ok?esc(dDE(d))+' · '+ageOf(d)+' Jahre':'Geburtsdatum fehlt'}</i>${lw?`<div class="tags"><span class="tag ok">🧺 gewaschen ${esc(dDE(lw.at.slice(0,10)).slice(0,6))}</span></div>`:''}</div>${p.number!=null?`<div class="r"><strong class="num">#${p.number}</strong></div>`:''}${I('chevR')}</div>`};
+  let body=withD.length?`<h3 class="sub-h" style="margin-top:0">Jung → alt</h3><div class="rows">${withD.map(row).join('')}</div>`:'';
+  if(without.length)body+=`<h3 class="sub-h" ${withD.length?'':'style="margin-top:0"'}>Ohne Geburtsdatum · ${without.length}</h3><div class="rows">${without.map(row).join('')}</div>`;
+  if(!withD.length&&!without.length)body=`<div class="empty">Noch keine Spieler im Kader.</div>`;
+  body=`<div class="hint" style="margin-bottom:12px">Diesen Bereich sehen nur Kassenwart und Admin. Tippe auf einen Spieler und dann auf „Gewaschen“, wenn er die Trikots gewaschen hat.${without.length?' Dort kannst du auch das Geburtsdatum eintragen.':''}</div>`+body;
+  return{head:`<h2>Trikots</h2><p>${withD.length} von ${withD.length+without.length} Spielern sortiert</p>`,body,foot:''}}
+function trikotEditSheet(s){const p=pById(s.id);if(!p||!isKW())return trikotSheet();const d=S.geburt[p.id]||'',kw=true,can=true,log=S.wash[p.id]||[];
+  const head=`<div style="display:flex;gap:12px;align-items:center">${avatar(p)}<div style="min-width:0"><h2>${esc(p.name)}</h2><p>${validBirth(d)?esc(dDE(d))+' · '+ageOf(d)+' Jahre':'Geburtsdatum fehlt'}${p.number!=null?' · #'+p.number:''}</p></div></div>`;
+  const lw=log[0];
+  let body=`<div class="credbox"><div><span>Zuletzt gewaschen</span><b>${lw?esc(dDE(lw.at.slice(0,10))):'noch nie'}</b></div>${lw&&lw.by?`<div><span>Eingetragen von</span><b>${esc(lw.by)}</b></div>`:''}<div><span>Insgesamt</span><b>${log.length}×</b></div></div>`;
+  if(!can)body+=`<p class="note" style="margin:10px 4px 0">Nur ${esc(p.name.split(' ')[0])} selbst, der Kassenwart und der Admin können „Gewaschen“ eintragen.</p>`;
+  if(log.length)body+=`<h3 class="sub-h">Verlauf</h3><div class="rows">${log.slice(0,8).map(x=>`<div class="row"><div class="m"><b>${esc(dDE(x.at.slice(0,10)))}</b><i>${esc(x.by||'')}</i></div></div>`).join('')}</div>`;
+  if(kw)body+=`<h3 class="sub-h">Geburtsdatum</h3><div class="two"><div class="field"><input id="gbd" type="date" aria-label="Geburtsdatum" value="${esc(validBirth(d)?d:'')}" min="1940-01-01" max="${today()}"></div><button class="btn" data-act="trikotSave" data-id="${esc(p.id)}">Speichern</button></div>${d?`<button class="linkbtn" data-act="trikotDel" data-id="${esc(p.id)}">Geburtsdatum entfernen</button>`:''}`;
+  const foot=`<div class="split"><button class="btn" data-act="trikotBack">Zurück</button>${can?`<button class="btn primary" data-act="trikotWash" data-id="${esc(p.id)}">🧺 Gewaschen</button>`:''}</div>`;
+  return{head,body,foot}}
+function menuSheet(){
+  const w=doenerWeek(),n=doenerList(w.tue).length,last=fbGames()[0],fr=last?fbRounds():null;
+  const item=(act,ic,t,sub)=>`<button class="menuitem" data-act="${act}"><span class="mi-ic" aria-hidden="true">${ic}</span><span class="mi-t"><b>${t}</b><small>${esc(sub)}</small></span>${I('chevR')}</button>`;
+  return{head:`<h2>Mehr</h2>`,body:`<div class="menulist">`+item('openDoener','🥙','Döner',(w.open?'Bis Di 18 Uhr':'Bestellschluss vorbei')+' · '+n+' '+(n===1?'Bestellung':'Bestellungen'))+item('openFussball','⚽','Fußball',last?`Siege in Runde ${fr.rounds.length+1}: Jung ${fr.cur.jung} : ${fr.cur.alt} Alt`:'Ergebnisse und Torschützen')+item('openKf','🎉','Kabinenfest',(()=>{const l=kfList(),tw=kfThisWeek();return l.length?(tw.length?`Diese Woche: ${tw.map(e=>kfWho(e)?.name||'Unbekannt').join(', ')}`:'Diese Woche frei')+` · ${l.length} offen`:'Alles erledigt'})())+item('openGb','🎂','Geburtstage',(()=>{const g=gbList().withB;if(!g.length)return 'Noch keine eingetragen';const x=g[0];return x.days===0?`Heute: ${x.p.name} 🎉`:`Nächster: ${x.p.name.split(' ')[0]} · ${mdDE(x.md)}`})())+(isKW()?item('openTrikot','👕','Trikots',(()=>{const t=trikotList();return t.withD.length?`${t.withD.length} Spieler · jung bis alt`:'Spieler nach Alter sortiert'})()):'')+item('openPush','🔔','Benachrichtigungen',S.push?.row?'An auf diesem Gerät':'Aus – hier einschalten')+`</div>`,foot:''}}
+function textSheet(s){return{head:`<h2>Text zum Kopieren</h2><p>Lange drücken → Alles auswählen → Kopieren</p>`,body:`<textarea id="cp" rows="14" readonly style="width:100%;font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink)">${esc(s.txt||'')}</textarea>`,foot:''}}
+async function copyOut(txt){
+  try{await navigator.clipboard.writeText(txt);toast('Kopiert – jetzt in die Gruppe einfügen')}catch(e){openSheet({type:'text',txt});const t=$('#cp');if(t){t.focus();t.select()}}}
+function fbAddGoal(s,team,pid,kind,d){let t=s.goals.find(x=>x.team===team&&x.pid===pid);
+  if(!t){if(d<0)return;t={pid,team,n:0,k:0};s.goals.push(t)}
+  t[kind]=Math.max(0,(t[kind]||0)+d)}
+// Ein Kabinenfest pro beendeter Runde für das Verlierer-Team. Feste ID je Rundennummer (kf-fb-r1, kf-fb-r2 …),
+// damit es nie doppelt entsteht – auch nicht, wenn später ein älteres Spiel geändert wird.
+// Noch offene Auto-Kabinenfeste werden angepasst oder entfernt; erledigte bleiben unangetastet.
+async function syncFbKf(){const {rounds}=fbRounds(),now=new Date().toISOString(),neu=[];
+  for(const r of rounds){const id='kf-fb-r'+r.no,ex=S.entries.find(e=>e.id===id),pid='team-'+r.loser,note=`Fußball Runde ${r.no} verloren (${teamName(r.winner)} ${r.w} : ${r.l})`;
+    if(!ex){await S.db.doc('entries/'+id).set({playerId:pid,fineId:'kf-manual',title:'Fußball-Runde verloren',amount:0,qty:null,unit:null,col:'strafen',spieltag:false,kabinenfest:true,kfDone:false,
+      note,date:r.date,createdAt:now,createdBy:S.uid||null,paid:false,paidAt:null,auto:'fussball',round:r.no});neu.push(r)}
+    else if(!ex.kfDone&&(ex.playerId!==pid||ex.note!==note||ex.date!==r.date))await S.db.doc('entries/'+id).update({playerId:pid,note,date:r.date})}
+  for(const e of S.entries){const m=/^kf-fb-r(\d+)$/.exec(e.id);if(m&&+m[1]>rounds.length&&!e.kfDone)await S.db.doc('entries/'+e.id).delete()}
+  return neu}
+
+function openSheet(s){const sb=$('#sheetRoot .sheet-b');if(sb)sb.scrollTop=0;S.sheet=s;S.confirmDel=null;S.confirmPayAll=null;document.body.classList.add('locked');renderSheet(false)}
+// Kreuz oben rechts: in Unterseiten einen Schritt zurück (Spiel → Fußball); aus einem Bereich (Fußball, Döner …) zurück zur Übersicht
+const SHEET_PARENT={fbEdit:'fussball',fbRound:'fussball',fbGame:'fussball',trikotEdit:'trikot',gbEdit:'gb',gbPick:'gb'};
+const fbFrom=()=>S.sheet&&S.sheet.type==='fbRound'?{type:'fbRound',no:S.sheet.no}:null; // Herkunft merken, damit „zurück“ in die Runde führt
+function stepBack(){const s=S.sheet;if(!s)return;
+  if(s.back){S.still=true;openSheet(s.back);return} // z. B. Torschützen → Spiel, Spiel → Runde
+  const par=SHEET_PARENT[s.type];if(par){S.still=true;openSheet({type:par});return}
+  closeSheet()}
 function closeSheet(){S.sheet=null;$('#sheetRoot').innerHTML='';document.body.classList.remove('locked')}
 function baseAmount(s){if(s.touched)return num(s.amount);const f=s.fine;return (f.base||0)+(f.per||0)*(s.qty||0)}
 function fineAmount(s){return baseAmount(s)*(s.spieltag?2:1)}
@@ -1010,10 +1347,15 @@ const TEAM_ENT=[{id:'team-alt',name:'Team Alt',role:'Mannschaft',team:true},{id:
 const canSpieltag=f=>(f.cat||'')!=='Beiträge & Getränke'&&f.id!=='kf-manual';
 function renderSheet(refresh){
   const s=S.sheet,root=$('#sheetRoot');if(!s)return;
-  if(refresh&&(s.type==='fine'||s.type==='editFine'||s.type==='editPlayer'||s.type==='bill'||s.type==='settings'||s.type==='editEntry'||s.type==='receipt'))return; // Formulare nicht unter den Fingern neu bauen
+  if(refresh&&(s.type==='fine'||s.type==='editFine'||s.type==='editPlayer'||s.type==='bill'||s.type==='settings'||s.type==='editEntry'||s.type==='receipt'||s.type==='fbEdit'))return; // Formulare nicht unter den Fingern neu bauen
+  // Neue Server-Daten, während jemand in einem Feld des Fensters tippt: nicht neu aufbauen, sonst ist die Eingabe weg
+  {const a=document.activeElement;if(refresh&&a&&root.contains(a)&&(a.tagName==='TEXTAREA'||a.tagName==='SELECT'||(a.tagName==='INPUT'&&!/^(checkbox|radio|button|submit)$/i.test(a.type)))){S.still=false;return}}
+  if(s.type==='doener'){const t=$('#dtext'),pp=$('#dpay');if(t)s.draft=t.value;if(pp)s.pay=pp.value}
   const keepScroll=root.querySelector('.sheet-b')?.scrollTop||0;
   let head='',body='',foot='';
-  if(s.type==='fine'&&countFine(s.fine)){
+  const sub={menu:menuSheet,doener:doenerSheet,fussball:fussballSheet,fbEdit:fbEditSheet,fbRound:fbRoundSheet,fbGame:fbGameSheet,fbPick:fbPickSheet,push:pushSheet,trikot:trikotSheet,trikotEdit:trikotEditSheet,text:textSheet,gb:gbSheet,gbEdit:gbEditSheet,gbPick:gbPickSheet,kfWeekAdd:kfWeekAddSheet}[s.type];
+  if(sub){({head,body,foot}=sub(s))}
+  else if(s.type==='fine'&&countFine(s.fine)){
     const d=deckeSheet(s);head=d.head;body=d.body;foot=d.foot;
   } else if(s.type==='fine'){
     const f=s.fine;
@@ -1085,14 +1427,17 @@ function renderSheet(refresh){
       return `<div class="mrow cf">${avatar(p)}<div class="m"><b>${esc(p.name)}${drg(p.id)}</b><i>${last?'gemeldet '+esc(dtDE(last)):'gemeldet'} · ${es.length} ${es.length===1?'Eintrag':'Einträge'}</i></div><div class="r"><strong class="num">${eur(sum)}</strong></div>
         <div class="acts"><button class="mini on" data-act="confirmPay" data-id="${esc(pid)}">${I('check')} Bestätigt</button><button class="mini" data-act="rejectPay" data-id="${esc(pid)}">Nicht erhalten</button></div></div>`}).join('')+`</div>`:`<div class="empty">Alle gemeldeten Zahlungen sind bestätigt.</div>`;
   } else if(s.type==='kf'){
-    const list=kfList(),plan=s.view==='plan',canW=S.canWrite!==false;
+    const list=kfList(),cal=s.view==='cal',canW=S.canWrite!==false;
     head=`<h2>Kabinenfest</h2><p>${list.length?list.length+' offen':'Alles erledigt'}</p>`;
-    const seg=`<div class="seg full" role="group" aria-label="Ansicht" style="margin-bottom:12px"><button data-act="kfview" data-k="liste" aria-pressed="${!plan}">Offen</button><button data-act="kfview" data-k="plan" aria-pressed="${plan}">Wochenplan</button></div>`;
-    if(!list.length)body=`<div class="empty">Keine offenen Kabinenfeste – alles erledigt.</div>`;
-    else if(plan)body=seg+`<div class="hint" style="margin-bottom:12px">Die Reihenfolge folgt der Liste „Offen“. Jede Woche ist ein Kabinenfest dran.</div><div class="rows">`+list.map((e,i)=>{const p=pById(e.playerId),w=kfWeek(i);
-      return `<div class="row weekrow ${i===0?'now':''}"><div class="wk"><b>KW ${w.kw}</b><i>${w.range}</i></div>${avatar(p)}<div class="m"><b>${esc(p?p.name:'Unbekannt')}${p?drg(p.id):''}</b><i>${esc(e.title)}</i>${i===0?'<div class="tags"><span class="tag owe">Diese Woche</span></div>':''}</div></div>`}).join('')+`</div>`;
-    else body=seg+(canW&&list.length>1?`<div class="hint" style="margin-bottom:12px">Am Griff links ziehen, um die Reihenfolge zu ändern.</div>`:'')+`<div class="rows" id="kflist">`+list.map((e,i)=>{const p=pById(e.playerId);
-      return `<div class="row kfrow" data-id="${esc(e.id)}">${canW?`<span class="grip" role="button" tabindex="0" data-id="${esc(e.id)}" aria-label="Reihenfolge ändern: ${esc(p?p.name:'')}">${ICONS.grip}</span>`:''}<span class="pos">${i+1}</span>${avatar(p)}<div class="m"><b>${esc(p?p.name:'Unbekannt')}${p?drg(p.id):''}</b><i>${esc(e.title+' · '+dDE(e.date))}</i></div>${canW?`<button class="chipbtn" data-act="kf" data-id="${esc(e.id)}">${I('check')}Erledigt</button>`:''}</div>`}).join('')+`</div>`;
+    const seg=`<div class="seg full" role="group" aria-label="Ansicht" style="margin-bottom:12px"><button data-act="kfview" data-k="liste" aria-pressed="${!cal}">Offen</button><button data-act="kfview" data-k="cal" aria-pressed="${cal}">Kalender</button></div>`;
+    if(!list.length)body=(cal?seg:'')+`<div class="empty">Keine offenen Kabinenfeste – alles erledigt.</div>`;
+    else if(cal)body=seg+kfCalendar(s);
+    else{const fx=kfSchedule().filter(x=>kfFixed(x.e)),q=kfQueue(),who=e=>{const p=kfWho(e);return p&&p.team?`<span class="av teamav">${p.id==='team-alt'?'A':'J'}</span>`:avatar(p)};
+      const done=e=>canW?`<button class="chipbtn" data-act="kf" data-id="${esc(e.id)}">${I('check')}Erledigt</button>`:'';
+      body=seg+(fx.length?`<h3 class="sub-h" style="margin-top:0">Fest eingeplant</h3><div class="rows">`+fx.map(({e,mon})=>{const p=kfWho(e),w=kwRange(mon);return `<div class="row"><span class="pos">KW ${w.kw}</span>${who(e)}<div class="m"><b>${esc(p?p.name:'Unbekannt')}${p&&!p.team?drg(p.id):''}</b><i>${esc(w.range)} · ${esc(e.note&&!/^Eingeplant für KW/.test(e.note)?e.note:e.title)}</i></div>${done(e)}</div>`}).join('')+`</div><h3 class="sub-h">Danach der Reihe nach</h3>`:'')
+        +(canW&&q.length>1?`<div class="hint" style="margin-bottom:12px">Am Griff links ziehen, um die Reihenfolge zu ändern.</div>`:'')
+        +(q.length?`<div class="rows" id="kflist">`+q.map((e,i)=>{const p=kfWho(e);
+      return `<div class="row kfrow" data-id="${esc(e.id)}">${canW?`<span class="grip" role="button" tabindex="0" data-id="${esc(e.id)}" aria-label="Reihenfolge ändern: ${esc(p?p.name:'')}">${ICONS.grip}</span>`:''}<span class="pos">${i+1}</span>${who(e)}<div class="m"><b>${esc(p?p.name:'Unbekannt')}${p&&!p.team?drg(p.id):''}</b><i>${esc(e.title+' · '+dDE(e.date))}</i></div>${done(e)}</div>`}).join('')+`</div>`:`<div class="empty">Alle offenen Kabinenfeste sind fest eingeplant.</div>`)}
     if(S.canWrite===true)foot=`<button class="btn primary" data-act="addKf">${I('plus')}Kabinenfest hinzufügen</button>`;
   } else if(s.type==='editEntry'){
     const e=S.entries.find(x=>x.id===s.id);if(!e){closeSheet();return}
@@ -1122,6 +1467,7 @@ function renderSheet(refresh){
     const st=S.settings;
     head=`<h2>Zahlungsdaten &amp; Zahltag</h2><p>Wohin die Mannschaft bezahlt</p>`;
     body=`<div class="fields">
+      <div class="field"><label for="sdpp">PayPal für Döner (E-Mail oder PayPal.Me-Name)</label><input id="sdpp" value="${esc(st.doenerPaypal||'')}" placeholder="leer lassen = kein PayPal-Knopf bei Döner" autocomplete="off"></div>
       <div class="field"><label for="spp">PayPal-E-Mail oder PayPal.Me-Name</label><input id="spp" value="${esc(st.paypal||'')}" placeholder="kasse@beispiel.de oder paypal.me/dragonskasse" autocomplete="off"></div>
       <div class="hint">Mit einem PayPal.Me-Namen öffnet sich PayPal direkt mit dem Betrag. Bei einer E-Mail-Adresse öffnet sich PayPals Zahlungsseite mit Adresse und Betrag schon ausgefüllt.</div>
       <div class="field"><label for="siban">IBAN für Überweisungen (optional)</label><input id="siban" value="${esc(fmtIban(st.iban||''))}" autocomplete="off" inputmode="text"></div>
@@ -1171,8 +1517,21 @@ function renderSheet(refresh){
       ${p.id&&S.entries.some(e=>e.playerId===p.id)?`<div class="hint">Zu ${esc(p.name)} gibt es ${S.entries.filter(e=>e.playerId===p.id).length} Einträge. Sie bleiben gespeichert, zählen aber nirgends mehr mit. Zum bloßen Ausblenden lieber „Aktiv“ ausschalten.</div>`:''}</div>`;
     foot=`<div class="split">${p.id?`<button class="btn danger" data-act="delPlayer">${S.confirmDel==='player'?'Wirklich löschen?':'Löschen'}</button>`:''}<button class="btn primary" data-act="savePlayer">Speichern</button></div>`;
   }
-  root.innerHTML=`<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true"><div class="grabber" aria-hidden="true"></div><div class="sheet-h pad">${`<div class="t">${head}</div>`}<button class="iconbtn round" data-act="close" aria-label="Schließen">${I('x')}</button></div><div class="sheet-b pad">${body}</div>${foot?`<div class="sheet-f pad">${foot}</div>`:''}</div></div>`;
-  if(S.still){root.querySelectorAll('.scrim,.sheet').forEach(e=>e.style.animation='none');S.still=false}
+  // Ist schon ein Fenster offen, wird nur der Inhalt getauscht: kein Neuaufbau, keine Einblend-Animation, kein Flackern.
+  const ex=root.querySelector('.sheet[role=dialog]'),hEl=ex&&ex.querySelector('.sheet-h .t'),bEl=ex&&ex.querySelector('.sheet-b');
+  if(hEl&&bEl){
+    let fEl=ex.querySelector('.sheet-f');
+    // Hintergrund-Aktualisierung (neue Daten vom Server) ohne sichtbare Änderung: gar nichts anfassen
+    if(refresh&&hEl.__html===head&&bEl.__html===body&&(fEl?fEl.__html:'')===foot){S.still=false;return}
+    if(hEl.__html!==head||!refresh){hEl.innerHTML=head;hEl.__html=head}
+    bEl.innerHTML=body;bEl.__html=body;
+    if(foot){if(!fEl){fEl=document.createElement('div');fEl.className='sheet-f pad';ex.appendChild(fEl)}fEl.innerHTML=foot;fEl.__html=foot}else if(fEl)fEl.remove();
+  }else{
+    root.innerHTML=`<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true"><div class="grabber" aria-hidden="true"></div><div class="sheet-h pad"><div class="t">${head}</div><button class="iconbtn round" data-act="close" aria-label="Schließen">${I('x')}</button></div><div class="sheet-b pad">${body}</div>${foot?`<div class="sheet-f pad">${foot}</div>`:''}</div></div>`;
+    if(S.still)root.querySelectorAll('.scrim,.sheet').forEach(e=>e.style.animation='none');
+    const h2=root.querySelector('.sheet-h .t'),b2=root.querySelector('.sheet-b'),f2=root.querySelector('.sheet-f');h2.__html=head;b2.__html=body;if(f2)f2.__html=foot;
+  }
+  S.still=false;
   root.querySelector('.sheet-b').scrollTop=keepScroll;
   if(s.type==='fine')updateSubmit();
   hydrateImgs();
@@ -1317,7 +1676,7 @@ async function setEntry(id,patch){try{await S.db.doc('entries/'+id).update(patch
     const ids=[...box.querySelectorAll('.kfrow')].map(x=>x.dataset.id);kfSave(ids);box.querySelectorAll('.pos').forEach((x,i)=>x.textContent=i+1)};
   document.addEventListener('pointerup',end);document.addEventListener('pointercancel',end);
   document.addEventListener('keydown',e=>{const g=e.target.closest&&e.target.closest('.grip');if(!g||(e.key!=='ArrowUp'&&e.key!=='ArrowDown'))return;e.preventDefault();
-    const ids=kfList().map(x=>x.id),i=ids.indexOf(g.dataset.id),j=i+(e.key==='ArrowUp'?-1:1);if(i<0||j<0||j>=ids.length)return;
+    const ids=kfQueue().map(x=>x.id),i=ids.indexOf(g.dataset.id),j=i+(e.key==='ArrowUp'?-1:1);if(i<0||j<0||j>=ids.length)return;
     [ids[i],ids[j]]=[ids[j],ids[i]];kfSave(ids);S.still=true;renderSheet(false);const n=document.querySelector('.grip[data-id="'+g.dataset.id+'"]');if(n)n.focus()});
 })();
 document.addEventListener('click',async ev=>{
@@ -1337,7 +1696,8 @@ document.addEventListener('click',async ev=>{
     case 'billpick':{const s=S.sheet;s.sel.has(id)?s.sel.delete(id):s.sel.add(id);el.setAttribute('aria-pressed',s.sel.has(id));
       if(!s.perTouched&&s.sel.size){s.per=String(Math.round(num($('#ba').value)/s.sel.size*100)/100).replace('.',',');$('#bpp').value=s.per}updateSplit();break}
     case 'saveBill':saveBill();break;
-    case 'openKf':openSheet({type:'kf',view:'liste'});break;
+    case 'openKf':S.still=true;openSheet({type:'kf',view:'liste'});break;
+    case 'kfcal':{const s=S.sheet,n=bToday(),c=s.cal||{y:n.getFullYear(),m:n.getMonth()},x=new Date(c.y,c.m+ +el.dataset.d,1);s.cal={y:x.getFullYear(),m:x.getMonth()};S.still=true;renderSheet(false);break}
     case 'kfview':S.sheet.view=el.dataset.k;S.still=true;renderSheet(false);break;
     case 'addKf':closeSheet();openSheet({type:'fine',fine:{id:'kf-manual',title:'Kabinenfest',base:0,per:0,kabinenfest:true,hint:'Kabinenfest ohne Strafbetrag eintragen. Den Grund schreibst du in die Notiz.'},sel:new Set(),qty:0,touched:true,amount:0,spieltag:false,kf:true,note:'',date:today(),col:'strafen'});break;
     case 'editSettings':openSheet({type:'settings'});break;
@@ -1363,13 +1723,23 @@ document.addEventListener('click',async ev=>{
       try{const c=await makeBackup();toast(`Backup gespeichert – ${c.entries} Einträge, ${c.bills} Rechnungen${c.noStamp?' (Zeitpunkt konnte nicht vermerkt werden)':''}`)}catch(e){toast('Backup fehlgeschlagen: '+(e.message||e))}finally{S.busyBackup=false;render()}break}
     case 'saveSettings':{const ib=$('#siban').value.replace(/\s/g,'').toUpperCase();
       if(ib&&!ibanOk(ib)){toast('Die IBAN ist ungültig – bitte prüfen');break}
-      const d={...S.settings,iban:ib||null,owner:$('#sowner').value.trim()||null,paypal:$('#spp').value.trim()||null,payNote:$('#snote').value.trim()||null};
+      const d={...S.settings,iban:ib||null,owner:$('#sowner').value.trim()||null,paypal:$('#spp').value.trim()||null,doenerPaypal:$('#sdpp').value.trim()||null,payNote:$('#snote').value.trim()||null};
       try{await S.db.doc('settings/kasse').set(d);closeSheet();toast('Gespeichert')}catch(e){toast(errMsg(e))}break}
     case 'linkMe':{try{await S.db.doc('links/'+S.uid).set({playerId:id,at:new Date().toISOString()});toast('Verknüpft – du bist '+(pById(id)?.name||''))}catch(e){toast(errMsg(e))}break}
     case 'kwConfirm':{try{await S.db.doc('settings/kasse').set({...S.settings,kassenwartPlayer:kwPid(),kassenwartUid:id});toast('Kassenwart bestätigt')}catch(e){toast(errMsg(e))}break}
     case 'kwReset':{const d={...S.settings};delete d.kassenwartUid;try{await S.db.doc('settings/kasse').set(d);toast('Kassenwart zurückgesetzt')}catch(e){toast(errMsg(e))}break}
     case 'startZahltag':startZahltag();break;
-    case 'logout':await S.sb.auth.signOut();location.reload();break;
+    case 'logout':try{const reg=await swReg(),sub=reg&&await reg.pushManager.getSubscription();if(sub){await S.sb.from('push_subs').delete().eq('endpoint',sub.endpoint);await sub.unsubscribe()}}catch(e){} // Gerät soll nach dem Abmelden keine Nachrichten mehr bekommen
+      await S.sb.auth.signOut();location.reload();break;
+    case 'pushOn':{const perm=Notification.requestPermission();el.disabled=true; // Erlaubnis direkt beim Tippen anfragen (iOS verlangt das)
+      try{if(await perm!=='granted'){toast('Ohne deine Erlaubnis geht es leider nicht');await pushLoad();break}
+        const reg=await swReg();if(!reg)throw new Error('Service Worker fehlt');
+        const sub=(await reg.pushManager.getSubscription())||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uToU8(window.KASSE_CONFIG.vapid)});
+        const j=sub.toJSON();const {error}=await S.sb.from('push_subs').upsert({endpoint:j.endpoint,user_id:S.uid,p256dh:j.keys.p256dh,auth:j.keys.auth,prefs:{},updated_at:new Date().toISOString()});if(error)throw error;
+        toast('Benachrichtigungen sind an 🔔');await pushLoad()}
+      catch(e){el.disabled=false;toast('Einschalten hat nicht geklappt: '+(e.message||e))}break}
+    case 'pushOff':{el.disabled=true;try{const sub=S.push?.sub;if(sub){await S.sb.from('push_subs').delete().eq('endpoint',sub.endpoint);await sub.unsubscribe()}toast('Benachrichtigungen sind aus')}catch(e){toast(errMsg(e))}await pushLoad();break}
+    case 'pushTest':{el.disabled=true;const {data,error}=await S.sb.rpc('push_test');el.disabled=false;toast(error?(/nicht eingerichtet/.test(error.message)?'Push ist auf dem Server noch nicht eingerichtet':'Test hat nicht geklappt: '+error.message):data?'Test verschickt – sollte gleich ankommen':'Für dieses Konto ist kein Gerät angemeldet');break}
     case 'approve':{const m=S.members.find(x=>x.user_id===id);if(!m)break;const {error}=await S.sb.from('members').update({approved:!m.approved}).eq('user_id',id);toast(error?error.message:(m.approved?'Gesperrt':'Freigeschaltet'));break}
     case 'delMember':if(S.confirmDel!=='m'+id){S.confirmDel='m'+id;render();break}S.confirmDel=null;{const {error}=await S.sb.from('members').delete().eq('user_id',id);toast(error?error.message:'Entfernt')}break;
     case 'endZahltag':if(!S.confirmEnd){S.confirmEnd=true;render();setTimeout(()=>{S.confirmEnd=false;render()},5000);break}
@@ -1424,7 +1794,69 @@ document.addEventListener('click',async ev=>{
     case 'pick':{const s=S.sheet;s.sel.has(id)?s.sel.delete(id):s.sel.add(id);el.setAttribute('aria-pressed',s.sel.has(id));updateSubmit();break}
     case 'qty':{const s=S.sheet;s.qty=Math.max(0,(s.qty||0)+Number(el.dataset.d));$('#qty').value=s.qty;s.touched=false;updateSubmit();break}
     case 'submitFine':submitFine();break;
-    case 'close':case 'scrim':closeSheet();break;
+    case 'close':stepBack();break;
+    case 'scrim':closeSheet();break;
+    case 'openMenu':openSheet({type:'menu'});pushLoad();break;
+    case 'openTrikot':case 'trikotBack':if(isKW()){S.still=true;openSheet({type:'trikot'})}break;
+    case 'trikotEdit':if(isKW()){S.still=true;openSheet({type:'trikotEdit',id})}break;
+    case 'trikotWash':{if(!isKW())break;const old=S.wash[id]||[],now=new Date().toISOString(),by=pById(myPid())?.name||S.email||null;
+      if(old[0]&&old[0].at.slice(0,10)===now.slice(0,10)){toast('Heute schon als gewaschen eingetragen');break}
+      const log=[{at:now,by},...old].slice(0,20);el.disabled=true;
+      try{await S.db.doc('trikotwash/'+id).set({log});toast(`Gewaschen: ${pById(id)?.name||''} 🧺`,async()=>{if(old.length)await S.db.doc('trikotwash/'+id).set({log:old});else await S.db.doc('trikotwash/'+id).delete()});S.still=true;openSheet({type:'trikot'})}
+      catch(e){el.disabled=false;toast(errMsg(e))}break}
+    case 'trikotSave':{if(!isKW())break;const v=$('#gbd')?.value||'';if(!validBirth(v)){toast('Bitte ein gültiges Geburtsdatum wählen');break}
+      el.disabled=true;try{await S.db.doc('geburt/'+id).set({date:v});if(S.gb[id]!==v.slice(5))await S.db.doc('geburtstage/'+id).set({md:v.slice(5)});toast('Gespeichert');S.still=true;openSheet({type:'trikot'})}catch(e){el.disabled=false;toast(errMsg(e))}break}
+    case 'trikotDel':{if(!isKW())break;try{await S.db.doc('geburt/'+id).delete();toast('Geburtsdatum entfernt');S.still=true;openSheet({type:'trikot'})}catch(e){toast(errMsg(e))}break}
+    case 'openGb':case 'gbBack':S.still=true;openSheet({type:'gb'});break;
+    case 'gbEdit':if(isKW()){S.still=true;openSheet({type:'gbEdit',id})}break;
+    case 'gbAdd':if(isKW()){S.still=true;openSheet({type:'gbPick'})}break;
+    case 'gbPick':if(isKW()){S.still=true;openSheet({type:'gbEdit',id,back:{type:'gbPick'}})}break;
+    case 'gbSave':{if(!isKW())break;const t=+($('#gbt')?.value||0),m=+($('#gbm')?.value||0);const md=String(m).padStart(2,'0')+'-'+String(t).padStart(2,'0');
+      if(!t||!m||!validMd(md)||t>[31,29,31,30,31,30,31,31,30,31,30,31][m-1]){toast('Bitte Tag und Monat wählen');break}
+      el.disabled=true;try{await S.db.doc('geburtstage/'+id).set({md});{const g=S.geburt[id];if(validBirth(g)&&g.slice(5)!==md){const nd=g.slice(0,4)+'-'+md;if(validBirth(nd))await S.db.doc('geburt/'+id).set({date:nd});else await S.db.doc('geburt/'+id).delete()}}toast('Geburtstag gespeichert 🎂');S.still=true;openSheet({type:'gb'})}catch(e){el.disabled=false;toast(errMsg(e))}break}
+    case 'gbDel':{if(!isKW())break;try{await S.db.doc('geburtstage/'+id).delete();toast('Geburtstag entfernt');S.still=true;openSheet({type:'gb'})}catch(e){toast(errMsg(e))}break}
+    case 'kfAddWeek':if(S.canWrite===true){S.still=true;openSheet({type:'kfWeekAdd',mon:id,pid:null,note:'',back:{type:'kf',view:'cal',cal:S.sheet&&S.sheet.cal}})}break;
+    case 'kfwPick':{const s=S.sheet;s.note=$('#kfwn')?.value||'';s.pid=s.pid===id?null:id;S.still=true;renderSheet(false);break}
+    case 'kfwBack':S.still=true;openSheet(S.sheet.back);break;
+    case 'kfwSave':{const s=S.sheet;if(S.canWrite!==true||!s.pid)break;const note=($('#kfwn')?.value||'').trim().slice(0,120),r=kwRange(s.mon);el.disabled=true;
+      try{await S.db.collection('entries').doc().set({playerId:s.pid,fineId:'kf-manual',title:'Kabinenfest',amount:0,qty:null,unit:null,col:'strafen',spieltag:false,kabinenfest:true,kfDone:false,kfWeek:s.mon,note:note||('Eingeplant für KW '+r.kw),date:today(),createdAt:new Date().toISOString(),createdBy:S.uid||null,paid:false,paidAt:null});
+        toast(`Kabinenfest in KW ${r.kw}: ${kfWho({playerId:s.pid})?.name||''} 🍻`);S.still=true;openSheet(s.back)}catch(e){el.disabled=false;toast(errMsg(e))}break}
+    case 'openPush':S.still=true;S.push={...(S.push||{}),ready:false};openSheet({type:'push'});pushLoad();break;
+    case 'openDoener':S.still=true;openSheet({type:'doener'});break;
+    case 'openFussball':S.still=true;openSheet({type:'fussball'});break;
+    case 'fbBack':S.still=true;openSheet(S.sheet&&S.sheet.back||{type:'fussball'});break;
+    case 'saveDoener':{const s=S.sheet,w=doenerWeek(),pid=myPid(),text=($('#dtext')?.value||'').trim().slice(0,200);
+      if(!pid)break;if(!w.open){toast('Bestellschluss ist vorbei');S.still=true;renderSheet(false);break}
+      if(!text){toast('Schreib kurz, was du möchtest');$('#dtext')?.focus();break}
+      const id=w.tue+'_'+pid,old=S.doener.find(d=>d.id===id),now=new Date().toISOString();el.disabled=true;
+      try{await S.db.doc('doener/'+id).set({week:w.tue,pid,text,at:old?.at||now,...(old?{updatedAt:now}:{})});s.draft=undefined;toast(old?'Bestellung geändert':'Du bist eingetragen 🥙');S.still=true;renderSheet(false)}
+      catch(e){el.disabled=false;toast(doenerWeek().open?errMsg(e):'Bestellschluss ist vorbei')}break}
+    case 'delDoener':{if(!id.endsWith('_'+myPid()))break;if(S.confirmDel!=='dn'+id){S.confirmDel='dn'+id;S.still=true;renderSheet(false);break}
+      S.confirmDel=null;try{await S.db.doc('doener/'+id).delete();if(id.endsWith('_'+myPid()))S.sheet.draft=undefined;toast('Bestellung gelöscht')}catch(e){toast(errMsg(e))}S.still=true;renderSheet(false);break}
+    case 'copyDoener':{const w=doenerWeek(),l=doenerList(w.tue);
+      await copyOut(`Döner-Bestellung Dienstag ${dDE(w.tue).slice(0,6)} (${l.length})\n\n`+l.map((d,i)=>`${i+1}. ${pById(d.pid)?.name||'?'}: ${d.text}`).join('\n'));break}
+    case 'fbNew':if(isKW()){S.still=true;openSheet({type:'fbEdit',id:null,date:today(),goals:[],og:{jung:0,alt:0}})}break;
+    case 'fbEdit':{const g=S.fussball.find(x=>x.id===id);if(g&&isKW()){const back=fbFrom();S.still=true;openSheet({type:'fbEdit',back,id,date:g.date,goals:(g.goals||[]).map(t=>({n:0,k:0,...t})),og:{jung:0,alt:0,...(g.og||{})},createdAt:g.createdAt})}break}
+    case 'fbGame':{const g=S.fussball.find(x=>x.id===id);if(!g)break;const back=fbFrom();S.still=true;if(isKW())openSheet({type:'fbEdit',back,id,date:g.date,goals:(g.goals||[]).map(t=>({n:0,k:0,...t})),og:{jung:0,alt:0,...(g.og||{})},createdAt:g.createdAt});else openSheet({type:'fbGame',back,id});break}
+    case 'fbPickOpen':{const s=S.sheet;S.still=true;openSheet({type:'fbPick',team:el.dataset.team,sel:new Set(),back:s});break}
+    case 'fbPick':{const s=S.sheet;if(s.sel.has(id))s.sel.delete(id);else s.sel.add(id);S.still=true;renderSheet(false);break}
+    case 'fbPickDone':{const s=S.sheet;for(const pid of s.sel)fbAddGoal(s.back,s.team,pid,'n',1);S.still=true;openSheet(s.back);break}
+    case 'fbPickBack':S.still=true;openSheet(S.sheet.back);break;
+    case 'fbRound':S.still=true;openSheet({type:'fbRound',no:+id});break;
+    case 'fbGoal':fbAddGoal(S.sheet,el.dataset.team,id,el.dataset.kind,+el.dataset.d);S.still=true;renderSheet(false);break;
+    case 'fbOg':{const s=S.sheet,k=el.dataset.team;s.og[k]=Math.max(0,(s.og[k]||0)+ +el.dataset.d);S.still=true;renderSheet(false);break}
+    case 'fbSave':{const s=S.sheet;if(!isKW())break;const date=$('#fbd')?.value||'';if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){toast('Bitte ein Datum wählen');break}
+      const jung=fbPts(s,'jung'),alt=fbPts(s,'alt');
+      if(!jung&&!alt){toast('Trag zuerst die Tore ein');break}
+      if(jung===alt){toast('Unentschieden gibt es nicht – ein Team muss vorne liegen');break}
+      const id2=s.id||('g'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)),now=new Date().toISOString();el.disabled=true;
+      try{await S.db.doc('fussball/'+id2).set({date,jung,alt,goals:s.goals.filter(t=>(t.n||0)+(t.k||0)>0).map(t=>({pid:t.pid,team:t.team,n:t.n||0,k:t.k||0})),og:{jung:s.og.jung||0,alt:s.og.alt||0},createdAt:s.createdAt||now,...(s.id?{updatedAt:now}:{}),by:pById(myPid())?.name||null});
+        let neu=[];try{neu=await syncFbKf()}catch(e){toast('Spiel gespeichert, aber das Kabinenfest konnte nicht eingetragen werden');S.still=true;openSheet(s.back||{type:'fussball'});break}
+        if(neu.length){const r=neu[neu.length-1];toast(`${teamName(r.winner)} hat ${FB_WIN} Siege! ${teamName(r.loser)} bekommt ein Kabinenfest 🍻`)}else toast(s.id?'Spiel gespeichert':'Spiel eingetragen ⚽');
+        S.still=true;openSheet(s.back||{type:'fussball'})}
+      catch(e){el.disabled=false;toast(errMsg(e))}break}
+    case 'fbDel':{const s=S.sheet;if(S.confirmDel!=='fb'){S.confirmDel='fb';S.still=true;renderSheet(false);break}
+      try{await S.db.doc('fussball/'+s.id).delete();await syncFbKf().catch(()=>{});toast('Spiel gelöscht');S.still=true;openSheet(s.back||{type:'fussball'})}catch(e){toast(errMsg(e))}break}
     case 'person':openSheet({type:'person',id});break;
     case 'addFor':S.preselect=id;closeSheet();S.tab='erfassen';$('#view').innerHTML='';render();toast('Strafe antippen – '+(pById(id)?.name||'')+' ist vorausgewählt');break;
     case 'paid':{const e=S.entries.find(x=>x.id===id);if(!e)break;
@@ -1442,7 +1874,7 @@ document.addEventListener('click',async ev=>{
       const gets=all.filter(x=>x.b.net<0).sort((a,b)=>a.b.net-b.b.net).map(({p,b})=>`${p.name}: ${eur(-b.net)}`);
       const sumNet=r2(all.reduce((s,x)=>s+Math.max(0,x.b.net),0));
       const txt=`Dragons Kasse – offen (Stand ${dDE(today())})\n\n`+(lines.join('\n')||'Alles bezahlt 🎉')+`\n\nGesamt noch zu zahlen: ${eur(sumNet)}`+(gets.length?`\n\nBekommen noch Geld:\n${gets.join('\n')}`:'');
-      try{await navigator.clipboard.writeText(txt);toast('Kopiert – jetzt in die Gruppe einfügen')}catch(e){openSheet({type:'text'});const r=$('#sheetRoot');r.innerHTML=`<div class="scrim" data-act="scrim"><div class="sheet"><div class="sheet-h pad"><div class="t"><h2>Text zum Kopieren</h2></div><button class="iconbtn round" data-act="close" aria-label="Schließen">${I('x')}</button></div><div class="sheet-b pad"><textarea id="cp" rows="14" style="width:100%;font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink)">${esc(txt)}</textarea></div></div></div>`;$('#cp').select()}break}
+      await copyOut(txt);break}
     case 'undo':{const u=S.undo;$('#toast').hidden=true;S.undo=null;if(u)try{await u()}catch(e){toast(errMsg(e))}break}
     case 'editFine':{const f=id?S.fines.find(x=>x.id===id):{title:'',cat:'',base:0,per:0,unit:'',order:(S.fines.length+1)*10};openSheet({type:'editFine',fine:{...f}});break}
     case 'saveFine':{const f=S.sheet.fine;const d={title:$('#ft').value.trim(),cat:$('#fc').value.trim()||'Sonstiges',base:num($('#fb').value),per:num($('#fp').value),unit:$('#fu').value.trim()||null,
@@ -1461,6 +1893,10 @@ document.addEventListener('input',ev=>{
   const t=ev.target,s=S.sheet;
   if(t.id==='q'){S.q=t.value;$('#finelist').innerHTML=fineList();return}
   if(t.id==='rpm'){S.rpm=t.value;return}
+  if(s&&s.type==='doener'&&t.id==='dpay'){s.pay=t.value;const a=num(t.value),l=$('#dpaylink'),dt=ppTarget(S.settings.doenerPaypal);
+    if(l&&dt){if(a>0){l.href=paypalUrl(a,'',dt,'Döner Dragons – '+(pById(myPid())?.name||''));l.target='_blank';l.rel='noopener';l.removeAttribute('aria-disabled');l.classList.remove('off');l.textContent='Mit PayPal bezahlen · '+eur(a)}
+      else{l.removeAttribute('href');l.setAttribute('aria-disabled','true');l.classList.add('off');l.textContent='Mit PayPal bezahlen'}}return}
+  if(s&&s.type==='fbEdit'&&t.id==='fbd'){s.date=t.value;return}
   if(s&&s.type==='kasse'&&['kk','kp','kb'].includes(t.id)){const k=kasseSoll();if(k){const ist=kasseIst();$('#kist').textContent=eur(ist);$('#kdiff').innerHTML=kasseDiffHtml(ist,k.soll)}return}
   if(s&&s.type==='bill'){
     if(t.id==='bs'){s.split=t.checked;$('#splitbox').hidden=!t.checked;updateSplit()}
@@ -1486,6 +1922,7 @@ document.addEventListener('change',async ev=>{const t=ev.target;
     if(role==='kassenwart')for(const m of S.members)if(m.role==='kassenwart'&&m.user_id!==id)await S.sb.from('members').update({role:'member'}).eq('user_id',m.user_id);
     const {error}=await S.sb.from('members').update({role}).eq('user_id',id);toast(error?error.message:(role==='kassenwart'?'Neuer Kassenwart gesetzt':'Rolle geändert'));return}
   const s=S.sheet;if(!s)return;
+  if(s.type==='push'&&t.dataset.pk&&S.push?.row){const pr={...(S.push.row.prefs||{}),[t.dataset.pk]:t.checked};const {error}=await S.sb.from('push_subs').update({prefs:pr,updated_at:new Date().toISOString()}).eq('endpoint',S.push.row.endpoint);if(error){t.checked=!t.checked;toast(errMsg(error))}else S.push.row.prefs=pr;return}
   if(s.type==='fine'&&t.id==='kfc'){s.kf=t.checked;updateSubmit()}
   if(s.type==='fine'&&t.id==='spt'){s.spieltag=t.checked;updateSubmit()}
   if(s.type==='fine'&&t.id==='colsel')s.col=t.value;
@@ -1494,7 +1931,7 @@ document.addEventListener('change',async ev=>{const t=ev.target;
 document.addEventListener('toggle',e=>{const d=e.target;if(d&&d.classList&&d.classList.contains('mgroup'))S.mOpen[d.dataset.key]=d.open},true);
 ['gesturestart','gesturechange','gestureend'].forEach(g=>document.addEventListener(g,e=>e.preventDefault()));
 document.addEventListener('touchmove',e=>{if(e.touches.length>1)e.preventDefault()},{passive:false});
-document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.sheet)closeSheet();if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches&&ev.target.matches('.row.tap')){ev.preventDefault();ev.target.click()}});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.sheet)stepBack();if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches&&(ev.target.matches('.row.tap')||ev.target.matches('[role=button][data-act]:not(button)'))&&!ev.target.closest('.grip')){ev.preventDefault();ev.target.click()}});
 
 /* ---------- Start ---------- */
 render();
@@ -1576,7 +2013,7 @@ async function boot(){
   const {data:me,error}=await sb.from('members').select('*').eq('user_id',S.uid).maybeSingle();
   if(error){authScreen('login','Verbindung fehlgeschlagen: '+error.message);return}
   if(!me||!me.approved){const {data:pl}=await sb.from('players').select('id,data');S.players=(pl||[]).map(r=>({id:r.id,...r.data}));S.me=me||null;authScreen(me?'pending':'link');return}
-  S.me=me;setPerms(me.role);
+  S.me=me;setPerms(me.role);if(pushSupported())swReg();
   if(started){render();return}started=true;S.status='loading';
   const db=makeDb(sb);S.db=db;$('#view').innerHTML='';render();
   const timer=setTimeout(()=>{S.stale=true;if(S.status==='loading')S.status='ready';render()},10000);
@@ -1588,14 +2025,21 @@ async function boot(){
   db.collection('receipts').onSnapshot(s=>{S.receipts=s.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{});
   db.collection('bills').onSnapshot(s=>{S.bills=s.docs.map(d=>({id:d.id,...d.data()}));done('b')},fail);
   db.doc('settings/kasse').onSnapshot(d=>{S.settings=d.exists?d.data():{};render()},()=>{});
-  if(isKW()){
+  const startKw=()=>{if(S.kwSubs||!isKW())return;S.kwSubs=true;
   db.doc('kasse_intern/kassenstand').onSnapshot(d=>{S.kstand=d.exists?d.data():{};render();if(S.sheet&&S.sheet.type==='kasse'&&!document.activeElement?.closest?.('.sheet input'))renderSheet(false)},()=>{});
   db.doc('kasse_intern/backup').onSnapshot(d=>{S.backup=d.exists?d.data():{};render()},()=>{});
   db.doc('kasse_intern/protokoll').onSnapshot(d=>{S.klog=d.exists?d.data():{};if(S.sheet&&S.sheet.type==='kasse')renderSheet(false)},()=>{});
-  }
+  db.doc('kasse_intern/gb_done').onSnapshot(d=>{S.gbDone=d.exists?d.data():{};S.gbDoneLoaded=true;render()},()=>{});
+  db.collection('geburt').onSnapshot(s=>{S.geburt=Object.fromEntries(s.docs.map(d=>[d.id,d.data().date]));render()},()=>{});
+  db.collection('trikotwash').onSnapshot(s=>{S.wash=Object.fromEntries(s.docs.map(d=>[d.id,d.data().log||[]]));render()},()=>{});
+  };S.startKw=startKw;startKw();
   db.collection('zahltag').onSnapshot(s=>{S.zahltags=s.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{});
+  sb.rpc('doener_cleanup').then(()=>{},()=>{}); // alte Döner-Bestellungen (vor heute) entfernen
+  db.collection('doener').onSnapshot(s=>{S.doener=s.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{});
+  db.collection('geburtstage').onSnapshot(s=>{S.gb=Object.fromEntries(s.docs.map(d=>[d.id,d.data().md]));S.gbLoaded=true;render()},()=>{});
+  db.collection('fussball').onSnapshot(s=>{S.fussball=s.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{});
   const loadMembers=async()=>{const {data}=await sb.from('members').select('*');S.members=data||[];const mine=S.members.find(m=>m.user_id===S.uid);
-    if(mine&&(mine.role!==S.me.role||!mine.approved)){if(!mine.approved)return location.reload();S.me=mine;setPerms(mine.role)}render()};
+    if(mine&&(mine.role!==S.me.role||!mine.approved)){if(!mine.approved)return location.reload();S.me=mine;setPerms(mine.role);S.startKw&&S.startKw()}render()};
 
   loadMembers();sb.channel('rt-members').on('postgres_changes',{event:'*',schema:'public',table:'members'},loadMembers).subscribe();
 }
