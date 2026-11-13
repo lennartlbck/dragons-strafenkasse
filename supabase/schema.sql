@@ -537,7 +537,7 @@ end $$;
 -- ---------- Push-Benachrichtigungen (kostenlos: Web Push + Edge Function + pg_net + pg_cron im Free-Plan) ----------
 -- Ablauf: Die Datenbank entscheidet, wer welche Nachricht bekommt (push_send), und schickt die Liste der Geräte
 -- über pg_net an die Edge Function „push“ (supabase/functions/push). Die verschlüsselt und versendet.
--- Einmalig beim Live-Gang (NICHT im Repo): select vault.create_secret('<PUSH_SECRET>', 'push_secret');
+-- Schlüssel erzeugt der Server selbst (Tabelle push_config, nur für den Server lesbar) – niemand muss etwas eintippen.
 -- Fehler beim Benachrichtigen dürfen nie eine Buchung verhindern – deshalb fängt jede Push-Funktion alles ab.
 do $$ begin create extension if not exists pg_net; exception when others then raise notice 'pg_net nicht verfügbar: %', sqlerrm; end $$;
 do $$ begin create extension if not exists pg_cron; exception when others then raise notice 'pg_cron nicht verfügbar: %', sqlerrm; end $$;
@@ -573,12 +573,28 @@ create or replace function public.berlin_txt(ts text) returns text language sql 
   select to_char(ts::timestamptz at time zone 'Europe/Berlin', 'DD.MM. "um" HH24:MI') || ' Uhr'
 $$;
 
+-- Geheimnis für den Aufruf der Edge Function und die VAPID-Schlüssel. Kein Zugriff für App-Nutzer (RLS ohne Regeln),
+-- nur Datenbank-Funktionen und die Edge Function (Service-Schlüssel) lesen hier. Das Geheimnis entsteht zufällig in der Datenbank,
+-- die VAPID-Schlüssel erzeugt die Edge Function beim ersten Aufruf selbst.
+create table if not exists public.push_config (
+  id            int primary key default 1 check (id = 1),
+  secret        text not null,
+  vapid_public  text,
+  vapid_private jsonb,
+  updated_at    timestamptz not null default now()
+);
+alter table public.push_config enable row level security;
+revoke all on public.push_config from anon, authenticated;
+insert into public.push_config (id, secret)
+values (1, encode(sha256(convert_to(gen_random_uuid()::text || gen_random_uuid()::text || clock_timestamp()::text, 'UTF8')), 'hex'))
+on conflict (id) do nothing;
+
 -- schickt die Nachricht an die Edge Function (asynchron, nach dem Speichern)
 create or replace function public.push_post(payload jsonb) returns void
 language plpgsql security definer set search_path = public as $$
 declare secret text;
 begin
-  select decrypted_secret into secret from vault.decrypted_secrets where name = 'push_secret' limit 1;
+  select c.secret into secret from public.push_config c where c.id = 1;
   if secret is null then return; end if;
   perform net.http_post(url := 'https://ezgvbwxyyryuurgaczoq.supabase.co/functions/v1/push', body := payload,
     headers := jsonb_build_object('Content-Type', 'application/json', 'x-push-secret', secret), timeout_milliseconds := 10000);
@@ -712,7 +728,10 @@ create or replace function public.push_test() returns int
 language plpgsql security definer set search_path = public as $$
 begin
   if not public.is_member() then raise exception 'Nicht freigeschaltet'; end if;
-  if not exists (select 1 from vault.decrypted_secrets where name = 'push_secret') then raise exception 'Push ist noch nicht eingerichtet'; end if;
+  if not exists (select 1 from public.push_config where id = 1 and vapid_public is not null) then
+    perform public.push_post(jsonb_build_object('init', true));
+    raise exception 'Push ist noch nicht eingerichtet';
+  end if;
   return public.push_send('test', null, null, '🐉 Dragons Kasse', 'Benachrichtigungen funktionieren!', 'test', auth.uid());
 end $$;
 
@@ -720,6 +739,19 @@ revoke execute on function public.push_post(jsonb), public.push_send(text, text[
   public.push_zahltag_ins(), public.push_fussball_ins(), public.push_meldung(text), public.push_tick() from public, anon, authenticated;
 revoke execute on function public.push_test() from public, anon;
 grant execute on function public.push_test() to authenticated;
+
+-- Öffentlicher VAPID-Schlüssel für die App (zum Anmelden eines Geräts). Fehlt er noch, wird die Einrichtung angestoßen.
+create or replace function public.push_vapid_key() returns text
+language plpgsql security definer set search_path = public as $$
+declare k text;
+begin
+  if not public.is_member() then return null; end if;
+  select vapid_public into k from public.push_config where id = 1;
+  if k is null then perform public.push_post(jsonb_build_object('init', true)); end if;
+  return k;
+end $$;
+revoke execute on function public.push_vapid_key() from public, anon;
+grant execute on function public.push_vapid_key() to authenticated;
 
 do $$ begin
   perform cron.schedule('dragons-push', '0 * * * *', 'select public.push_tick()');

@@ -1,32 +1,17 @@
 # Push-Benachrichtigungen einrichten (einmalig beim Live-Gang)
 
 Alles läuft im **kostenlosen** Supabase-Plan: Web Push, eine Edge Function, `pg_net` und `pg_cron`.
-Die geheimen Werte stehen **nur** in `~/App Dragons/Schluessel/push-geheim.json`, also nie im Repo.
+**Es muss kein geheimer Schlüssel eingetippt werden.** Die Datenbank erzeugt das Geheimnis selbst (Tabelle `push_config`),
+die Edge Function erzeugt die VAPID-Schlüssel beim ersten Aufruf selbst, und die App holt sich den öffentlichen Schlüssel vom Server.
 
 ## Reihenfolge
 
-1. **SQL ausführen:** Supabase → SQL Editor → `supabase/schema.sql` ausführen. Dabei entstehen:
-   - die Tabelle `push_subs`
-   - die Auslöser und Funktionen
-   - die Erweiterungen `pg_net` und `pg_cron`
-   - der stündliche Zeitplan `dragons-push`
-2. **Geheimnis in den Vault** (SQL Editor, Wert `PUSH_SECRET` aus der Schlüsseldatei):
-   ```sql
-   select vault.create_secret('<PUSH_SECRET>', 'push_secret');
-   ```
-3. **Edge Function anlegen:**
-   - Supabase → Edge Functions → *Deploy a new function* → *Via Editor*.
-   - Name: `push`. Inhalt: `supabase/functions/push/index.ts`.
-   - In den Einstellungen der Funktion **„Verify JWT“ ausschalten**. Die Funktion prüft stattdessen `PUSH_SECRET`.
-4. **Secrets der Edge Function** (Edge Functions → Secrets), alle drei aus der Schlüsseldatei:
-   - `PUSH_SECRET`
-   - `VAPID_PUBLIC_KEY`
-   - `VAPID_PRIVATE_JWK`
-5. **Geburtstage eintragen:** `supabase/seed-geburtstage.sql` im SQL Editor ausführen. Die Datei ist lokal und nicht im Repo. Genauso `supabase/seed-doener-paypal.sql` (PayPal-Adresse für Döner).
-6. **App hochladen:** `index.html`, `sw.js`, `config.js` (enthält nur den öffentlichen Schlüssel).
-7. **Test:**
-   1. Kasse vom Home-Bildschirm öffnen.
-   2. ☰ → Benachrichtigungen → einschalten → „Test senden“.
+1. **SQL ausführen:** Supabase → SQL Editor → `supabase/schema.sql` ausführen.
+2. **Edge Function anlegen oder aktualisieren:** Edge Functions → `push` → Code → Inhalt von `supabase/functions/push/index.ts` einfügen → Deploy.
+3. **Einmal in den Einstellungen der Funktion „Verify JWT“ ausschalten** (Sicherheitseinstellung, bewusst manuell). Die Funktion prüft stattdessen das Geheimnis aus `push_config`.
+4. **Geburtstage eintragen:** `supabase/seed-geburtstage.sql` im SQL Editor ausführen. Genauso `supabase/seed-doener-paypal.sql`. Beide Dateien sind lokal und nicht im Repo.
+5. **App hochladen:** `index.html`, `sw.js`, `config.js`.
+6. **Test:** Kasse vom Home-Bildschirm öffnen → ☰ → Benachrichtigungen → einschalten → „Test senden“.
 
 ## Wer bekommt was
 

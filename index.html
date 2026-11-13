@@ -1734,7 +1734,12 @@ document.addEventListener('click',async ev=>{
     case 'pushOn':{const perm=Notification.requestPermission();el.disabled=true; // Erlaubnis direkt beim Tippen anfragen (iOS verlangt das)
       try{if(await perm!=='granted'){toast('Ohne deine Erlaubnis geht es leider nicht');await pushLoad();break}
         const reg=await swReg();if(!reg)throw new Error('Service Worker fehlt');
-        const sub=(await reg.pushManager.getSubscription())||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uToU8(window.KASSE_CONFIG.vapid)});
+        // öffentlichen Schlüssel vom Server holen (beim allerersten Mal richtet der Server sich kurz ein)
+        let vk=null;for(let i=0;i<4&&!vk;i++){const {data}=await S.sb.rpc('push_vapid_key');vk=data;if(!vk)await new Promise(r=>setTimeout(r,2500))}
+        if(!vk){toast('Push wird auf dem Server noch eingerichtet – bitte in einer Minute nochmal');await pushLoad();break}
+        let sub=await reg.pushManager.getSubscription();
+        if(sub&&sub.options&&sub.options.applicationServerKey&&btoa(String.fromCharCode(...new Uint8Array(sub.options.applicationServerKey))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')!==vk){await sub.unsubscribe();sub=null} // alter Schlüssel → neu anmelden
+        if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uToU8(vk)});
         const j=sub.toJSON();const {error}=await S.sb.from('push_subs').upsert({endpoint:j.endpoint,user_id:S.uid,p256dh:j.keys.p256dh,auth:j.keys.auth,prefs:{},updated_at:new Date().toISOString()});if(error)throw error;
         toast('Benachrichtigungen sind an 🔔');await pushLoad()}
       catch(e){el.disabled=false;toast('Einschalten hat nicht geklappt: '+(e.message||e))}break}

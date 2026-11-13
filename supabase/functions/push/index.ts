@@ -4,12 +4,11 @@
 // Die Funktion verschlüsselt die Nachricht nach Web-Push-Standard (RFC 8291 + VAPID RFC 8292) und schickt sie an
 // Apple, Google oder Mozilla. Keine Fremdbibliotheken: alles mit WebCrypto, das in Deno und Node gleich funktioniert.
 //
-// Geheimnisse (Supabase → Edge Functions → Secrets), NIE ins Repo:
-//   PUSH_SECRET        – gleicher Wert wie im Vault-Eintrag „push_secret“; nur wer ihn kennt, darf senden
-//   VAPID_PUBLIC_KEY   – öffentlicher Schlüssel (steht auch in config.js)
-//   VAPID_PRIVATE_JWK  – privater Schlüssel als JWK-JSON
-// Automatisch vorhanden: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (zum Aufräumen abgemeldeter Geräte).
-// Beim Anlegen „Verify JWT“ AUSschalten – die Funktion prüft stattdessen PUSH_SECRET.
+// Schlüssel: Niemand muss etwas eintippen. Die Datenbank erzeugt beim Einrichten selbst ein zufälliges Geheimnis
+// (Tabelle push_config, nur für den Server lesbar). Die VAPID-Schlüssel erzeugt diese Funktion beim ersten Aufruf
+// selbst und speichert sie dort. Die App holt sich den öffentlichen Schlüssel über push_vapid_key().
+// Automatisch vorhanden: SUPABASE_URL und der Service-Schlüssel (SUPABASE_SERVICE_ROLE_KEY bzw. SUPABASE_SECRET_KEYS).
+// In den Einstellungen der Funktion „Verify JWT“ AUSschalten – sie prüft stattdessen das Geheimnis aus push_config.
 
 const enc = new TextEncoder();
 const APP_URL = 'https://lennartlbck.github.io/dragons-strafenkasse/';
@@ -65,20 +64,47 @@ export async function sendPush(sub, msg, vapid, fx = fetch) {
 function sameSecret(a, b) { if (!a || !b || a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; }
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json' } });
 
+// Service-Schlüssel (neues oder altes Supabase-Schlüsselformat)
+export function serviceKey(env) {
+  if (env.SUPABASE_SERVICE_ROLE_KEY) return env.SUPABASE_SERVICE_ROLE_KEY;
+  try { const k = JSON.parse(env.SUPABASE_SECRET_KEYS || '{}'); return k.default || Object.values(k)[0] || ''; } catch { return ''; }
+}
+const restHeaders = key => ({ apikey: key, ...(key.startsWith('eyJ') ? { Authorization: 'Bearer ' + key } : {}) });
+let CFG = null; // Zwischenspeicher, solange die Funktion warm ist
+export function resetCache() { CFG = null; }
+async function loadCfg(env, fx) {
+  if (CFG && CFG.vapid_public) return CFG;
+  const key = serviceKey(env);
+  const r = await fx(`${env.SUPABASE_URL}/rest/v1/push_config?id=eq.1&select=secret,vapid_public,vapid_private`, { headers: restHeaders(key) });
+  if (!r.ok) throw new Error('push_config nicht lesbar: ' + r.status);
+  const rows = await r.json(); CFG = rows[0] || null; return CFG;
+}
+// Erzeugt beim ersten Mal die VAPID-Schlüssel und speichert sie (nur, wenn noch keine da sind)
+async function ensureVapid(env, fx, cfg) {
+  if (cfg.vapid_public && cfg.vapid_private) return cfg;
+  const k = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+  const pub = b64u.enc(await crypto.subtle.exportKey('raw', k.publicKey)), priv = await crypto.subtle.exportKey('jwk', k.privateKey);
+  const key = serviceKey(env);
+  await fx(`${env.SUPABASE_URL}/rest/v1/push_config?id=eq.1&vapid_public=is.null`, { method: 'PATCH', headers: { ...restHeaders(key), 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ vapid_public: pub, vapid_private: priv }) });
+  CFG = null; return loadCfg(env, fx); // neu lesen: falls zwei Aufrufe gleichzeitig kamen, gewinnt der erste
+}
+
 export async function handle(req, env, fx = fetch) {
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405);
-  if (!sameSecret(req.headers.get('x-push-secret') || '', env.PUSH_SECRET || '')) return json({ error: 'unauthorized' }, 401);
+  let cfg; try { cfg = await loadCfg(env, fx); } catch (e) { return json({ error: 'config' }, 500); }
+  if (!cfg || !sameSecret(req.headers.get('x-push-secret') || '', cfg.secret || '')) return json({ error: 'unauthorized' }, 401);
   let p; try { p = await req.json(); } catch { return json({ error: 'bad json' }, 400); }
+  try { cfg = await ensureVapid(env, fx, cfg); } catch (e) { return json({ error: 'vapid' }, 500); }
+  if (p.init) return json({ ok: true, vapid: !!cfg.vapid_public });
   const subs = Array.isArray(p.subs) ? p.subs.slice(0, 500) : [];
   const msg = { title: String(p.title || 'Dragons Kasse').slice(0, 120), body: String(p.body || '').slice(0, 400), tag: p.tag ? String(p.tag).slice(0, 64) : undefined, url: APP_URL };
-  const vapid = { publicKey: env.VAPID_PUBLIC_KEY, privateJwk: env.VAPID_PRIVATE_JWK, subject: env.VAPID_SUBJECT };
+  const vapid = { publicKey: cfg.vapid_public, privateJwk: cfg.vapid_private, subject: env.VAPID_SUBJECT };
   const res = await Promise.all(subs.map(s => sendPush(s, msg, vapid, fx)));
   // Abgemeldete Geräte (404/410) aus der Tabelle entfernen
   const gone = res.filter(r => r.status === 404 || r.status === 410).map(r => r.endpoint);
-  const key = env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = serviceKey(env);
   if (gone.length && env.SUPABASE_URL && key) {
-    const h = { apikey: key, ...(key.startsWith('eyJ') ? { Authorization: 'Bearer ' + key } : {}) };
-    await Promise.all(gone.map(e => fx(`${env.SUPABASE_URL}/rest/v1/push_subs?endpoint=eq.${encodeURIComponent(e)}`, { method: 'DELETE', headers: h }).catch(() => null)));
+    await Promise.all(gone.map(e => fx(`${env.SUPABASE_URL}/rest/v1/push_subs?endpoint=eq.${encodeURIComponent(e)}`, { method: 'DELETE', headers: restHeaders(key) }).catch(() => null)));
   }
   return json({ sent: res.filter(r => r.status >= 200 && r.status < 300).length, failed: res.filter(r => !(r.status >= 200 && r.status < 300)).map(r => ({ status: r.status, error: r.error })), gone: gone.length });
 }
