@@ -3,7 +3,7 @@
 Mannschaftskasse der TSG Münster Dragons (1. Herren): Strafen eintragen, Monatsübersicht,
 Rechnungen, Zahltag mit PayPal/Überweisung und automatischer Verzugsstrafe.
 
-- **Frontend:** eine statische Seite (`index.html`), gehostet über GitHub Pages
+- **Frontend:** eine statische Seite (`index.html` + `app.js`), gehostet über GitHub Pages. Supabase-Bibliothek (`vendor/`) und Schriften (`fonts/`) liegen mit im Repo, damit nichts von fremden Servern geladen wird; eine Content-Security-Policy lässt nur eigene Skripte zu.
 - **Daten & Login:** Supabase (E-Mail + Passwort, Row-Level-Security)
 
 ## Rollen

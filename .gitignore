@@ -4,3 +4,6 @@ supabase/seed-*.sql
 .DS_Store
 dev/
 .claude/
+
+# graphify (lokaler Code-Graph)
+graphify-out/

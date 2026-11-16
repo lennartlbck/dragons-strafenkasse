@@ -10,7 +10,7 @@ die Edge Function erzeugt die VAPID-Schlüssel beim ersten Aufruf selbst, und di
 2. **Edge Function anlegen oder aktualisieren:** Edge Functions → `push` → Code → Inhalt von `supabase/functions/push/index.ts` einfügen → Deploy.
 3. **Einmal in den Einstellungen der Funktion „Verify JWT“ ausschalten** (Sicherheitseinstellung, bewusst manuell). Die Funktion prüft stattdessen das Geheimnis aus `push_config`.
 4. **Geburtstage eintragen:** `supabase/seed-geburtstage.sql` im SQL Editor ausführen. Genauso `supabase/seed-doener-paypal.sql`. Beide Dateien sind lokal und nicht im Repo.
-5. **App hochladen:** `index.html`, `sw.js`, `config.js`.
+5. **App hochladen:** `index.html`, `app.js`, `sw.js`, `config.js`, die Ordner `vendor/` (Supabase-Bibliothek) und `fonts/` (Schriften). Ändert sich `app.js`, den Wert hinter `app.js?v=` in `index.html` anpassen, damit Handys nicht kurz die alte Version laden.
 6. **Test:** Kasse vom Home-Bildschirm öffnen → ☰ → Benachrichtigungen → einschalten → „Test senden“.
 
 ## Wer bekommt was
@@ -23,6 +23,9 @@ die Edge Function erzeugt die VAPID-Schlüssel beim ersten Aufruf selbst, und di
 | Dienstag 17 Uhr | alle, die noch keinen Döner bestellt haben |
 | Neues Fußballspiel / Runde vorbei | alle |
 | „Ich habe bezahlt“ gemeldet | Kassenwart und Admin |
+| Döner: „Ich habe bezahlt“ | der Dönerwart (Rolle „Dönerwart“ unter Verwalten → Mitglieder & Rollen) |
+| Mittwoch 12 Uhr | alle, die am Dienstag Döner bestellt haben und noch nicht als bezahlt abgehakt sind |
+| Kalender: „Fertig“ im Wochenplan | alle (eine Nachricht pro Woche, kein Einzel-Alarm je Eintrag) |
 | Geburtstag (9 Uhr) | Glückwunsch an das Geburtstagskind, Info an alle anderen; dazu automatisch ein Kabinenfest |
 
 Jeder kann jedes Thema pro Gerät abschalten. Beim Abmelden wird das Gerät automatisch abgemeldet.

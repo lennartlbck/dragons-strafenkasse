@@ -14,14 +14,14 @@ create table if not exists public.members (
   created_at timestamptz not null default now()
 );
 
--- Rollen: member (Spieler), kassenwart, admin, deckenzaehler (wie Spieler, nur mit eigenem Namen)
+-- Rollen: member (Spieler), kassenwart, admin, deckenzaehler (wie Spieler, nur mit eigenem Namen), doenerwart (wie Spieler, hakt Döner-Zahlungen ab), trainer (wie Spieler, ändert alles im Kalender), mannschaftsverantwortlicher (wie Spieler, trägt Treffpunkte bei Spielen ein), trikotwart (wie Spieler, ändert als Einziger die Trikots)
 do $$
 declare c text;
 begin
   for c in select conname from pg_constraint where conrelid = 'public.members'::regclass and contype = 'c' and pg_get_constraintdef(oid) like '%role%' loop
     execute format('alter table public.members drop constraint %I', c);
   end loop;
-  alter table public.members add constraint members_role_check check (role in ('member','kassenwart','admin','deckenzaehler'));
+  alter table public.members add constraint members_role_check check (role in ('member','kassenwart','admin','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart'));
 end $$;
 
 create or replace function public.my_role() returns text
@@ -41,14 +41,14 @@ drop policy if exists members_signup on public.members;
 create policy members_signup on public.members for insert
   with check (user_id = auth.uid() and role = 'member' and approved = false);
 drop policy if exists members_admin_update on public.members;
--- Rollen verwalten: Admin darf alles. Der Kassenwart darf Mitglieder freischalten/sperren und die Rollen member/deckenzaehler
+-- Rollen verwalten: Admin darf alles. Der Kassenwart darf Mitglieder freischalten/sperren und die Rollen member/deckenzaehler/doenerwart/trainer/mannschaftsverantwortlicher/trikotwart
 -- vergeben, aber niemanden zum Admin oder Kassenwart machen und Admins/Kassenwarte weder ändern noch entfernen.
 create policy members_admin_update on public.members for update
-  using (public.is_admin() or (public.is_kw() and role in ('member','deckenzaehler')))
-  with check (public.is_admin() or (public.is_kw() and role in ('member','deckenzaehler')));
+  using (public.is_admin() or (public.is_kw() and role in ('member','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart')))
+  with check (public.is_admin() or (public.is_kw() and role in ('member','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart')));
 drop policy if exists members_admin_delete on public.members;
 create policy members_admin_delete on public.members for delete
-  using (public.is_admin() or (public.is_kw() and role in ('member','deckenzaehler')) or (user_id = auth.uid() and approved = false));
+  using (public.is_admin() or (public.is_kw() and role in ('member','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart')) or (user_id = auth.uid() and approved = false));
 
 -- ---------- Dokument-Tabellen ----------
 do $$
@@ -226,6 +226,18 @@ drop policy if exists belege_ins on storage.objects;
 create policy belege_ins on storage.objects for insert with check (bucket_id = 'belege' and public.is_member() and (storage.foldername(name))[1] = auth.uid()::text);
 drop policy if exists belege_del on storage.objects;
 create policy belege_del on storage.objects for delete using (bucket_id = 'belege' and (public.can_book() or (storage.foldername(name))[1] = auth.uid()::text));
+
+-- Profilfotos im Kader: öffentlich lesbar (wie die bisherigen Fotos in img/), max. 1 MB, nur Bilder. Hochladen/Löschen nur Kassenwart und Admin.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('fotos', 'fotos', true, 1048576, array['image/jpeg','image/png','image/webp'])
+on conflict (id) do update set public = true, file_size_limit = 1048576, allowed_mime_types = excluded.allowed_mime_types;
+-- Lesen per Abfrage braucht es zum Löschen alter Fotos (die Bilder selbst sind über die öffentliche Adresse ohnehin abrufbar)
+drop policy if exists fotos_read on storage.objects;
+create policy fotos_read on storage.objects for select using (bucket_id = 'fotos' and public.can_book());
+drop policy if exists fotos_ins on storage.objects;
+create policy fotos_ins on storage.objects for insert with check (bucket_id = 'fotos' and public.can_book());
+drop policy if exists fotos_del on storage.objects;
+create policy fotos_del on storage.objects for delete using (bucket_id = 'fotos' and public.can_book());
 
 -- Live-Updates für Belege (erst nach dem Anlegen der Tabelle)
 do $$
@@ -496,19 +508,64 @@ create policy doener_upd on public.doener for update
 drop policy if exists doener_del on public.doener;
 create policy doener_del on public.doener for delete
   using (data->>'pid' = public.my_pid() and public.doener_open(data->>'week'));
--- Löscht alle Bestellungen für Dienstage vor heute (deutsche Zeit). Die App ruft das beim Start auf.
+-- Löscht Bestellungen für Dienstage, die vor gestern lagen (deutsche Zeit): Mittwochs ist die Liste noch da (Zahlungs-Erinnerung). Die App ruft das beim Start auf.
 create or replace function public.doener_cleanup() returns int
 language plpgsql security definer set search_path = public as $$
 declare n int;
 begin
   if not public.is_member() then return 0; end if;
   delete from public.doener
-   where case when data->>'week' ~ '^\d{4}-\d{2}-\d{2}$' then (data->>'week')::date < (now() at time zone 'Europe/Berlin')::date else true end;
+   where case when data->>'week' ~ '^\d{4}-\d{2}-\d{2}$' then (data->>'week')::date < (now() at time zone 'Europe/Berlin')::date - 1 else true end;
   get diagnostics n = row_count;
   return n;
 end $$;
 revoke execute on function public.doener_cleanup() from public, anon;
 grant execute on function public.doener_cleanup() to authenticated;
+
+-- Dönerwart: Rolle „doenerwart“ unter Mitglieder & Rollen. Er bekommt „Ich habe bezahlt“ als Nachricht und hakt die Zahlungen ab.
+create or replace function public.is_doenerwart() returns boolean
+language sql stable security definer set search_path = public as $$ select coalesce(public.my_role() = 'doenerwart', false) $$;
+-- Nur der Dönerwart hakt eine Bestellung als bezahlt ab oder macht es rückgängig
+create or replace function public.doener_set_paid(doc_id text, paid boolean) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_doenerwart() then raise exception 'Nur der Dönerwart darf das'; end if;
+  update public.doener
+     set data = case when paid then data || jsonb_build_object('paid', true, 'paidAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
+                     else data - 'paid' - 'paidAt' end,
+         updated_at = now()
+   where id = doc_id;
+end $$;
+-- Spieler meldet „Ich habe den Döner bezahlt“ → Nachricht an den Dönerwart. „bezahlt“ bleibt allein beim Dönerwart; die Meldung (reportedAt) stoppt nur die Mittwochs-Erinnerung.
+create or replace function public.doener_report_paid(w text) returns int
+language plpgsql security definer set search_path = public as $$
+declare pid text := public.my_pid(); nm text; t text;
+begin
+  if pid is null then raise exception 'Kein verknüpfter Spieler'; end if;
+  select data->>'text' into t from public.doener where id = w || '_' || pid;
+  if t is null then raise exception 'Du hast diese Woche keinen Döner bestellt'; end if;
+  if not exists (select 1 from public.members where role = 'doenerwart' and approved) then raise exception 'Es ist noch kein Dönerwart festgelegt'; end if;
+  update public.doener set data = data || jsonb_build_object('reportedAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')) where id = w || '_' || pid;
+  select data->>'name' into nm from public.players where id = pid;
+  return public.push_send('doener', null, array['doenerwart'], '💶 Döner bezahlt gemeldet',
+    coalesce(nm, 'Jemand') || ' sagt: Döner bezahlt (' || t || ') – bitte abhaken.', 'doener-bezahlt');
+end $$;
+-- Schutz: „bezahlt“ (paid/paidAt) setzen oder entfernen darf nur der Dönerwart. Bei allen anderen werden die beiden
+-- Felder beim Speichern auf den bisherigen Stand zurückgesetzt (Spieler ändern nur ihren Bestelltext).
+create or replace function public.doener_guard_paid() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if public.is_doenerwart() then return new; end if;
+  new.data := new.data - 'paid' - 'paidAt';
+  if tg_op = 'UPDATE' then
+    new.data := new.data || jsonb_strip_nulls(jsonb_build_object('paid', old.data->'paid', 'paidAt', old.data->'paidAt'));
+  end if;
+  return new;
+end $$;
+drop trigger if exists doener_guard_paid on public.doener;
+create trigger doener_guard_paid before insert or update on public.doener for each row execute function public.doener_guard_paid();
+revoke execute on function public.is_doenerwart(), public.doener_set_paid(text, boolean), public.doener_report_paid(text) from public, anon;
+grant execute on function public.is_doenerwart(), public.doener_set_paid(text, boolean), public.doener_report_paid(text) to authenticated;
 
 -- ---------- Fußball: Team Jung gegen Team Alt ----------
 -- Alle Mitglieder sehen Spiele und Torschützen, eintragen dürfen nur Kassenwart und Admin.
@@ -701,6 +758,13 @@ begin
       null, '🥙 Döner bis 18 Uhr bestellen',
       case when c = 0 then 'Noch hat niemand bestellt.' when c = 1 then '1 hat schon bestellt.' else c || ' haben schon bestellt.' end, 'doener');
   end if;
+  -- Mittwoch 12 Uhr: wer am gestrigen Dienstag Döner bestellt hat, noch nicht abgehakt ist und noch nicht „Ich habe bezahlt“ gemeldet hat
+  if extract(isodow from n) = 3 and extract(hour from n) = 12 then
+    w := to_char(n::date - 1, 'YYYY-MM-DD');
+    perform public.push_send('doener',
+      array(select d.data->>'pid' from public.doener d where d.data->>'week' = w and not coalesce((d.data->>'paid')::boolean, false) and not (d.data ? 'reportedAt')),
+      null, '🥙 Döner noch nicht bezahlt', 'Du hast den Döner von gestern noch nicht bezahlt. Bitte per PayPal bezahlen und in der App „Ich habe bezahlt“ tippen.', 'doener-erinnerung');
+  end if;
   if extract(hour from n) = 9 then
     perform public.geburtstag_tick(n::date);
   end if;
@@ -761,17 +825,22 @@ end $$;
 -- ---------- Geburtsdaten für „Trikots“ (Spieler nach Alter) ----------
 -- Bewusst NICHT in der Tabelle players: die dürfen auch noch nicht freigeschaltete Konten lesen.
 -- Trikots sind vorerst nur für Kassenwart und Admin: nur sie sehen und ändern Geburtsdaten.
+-- Trikotwart: als Einziger darf er bei „Trikots“ etwas ändern (Geburtsdaten, Wäsche). Sehen dürfen Kassenwart, Admin und Trikotwart.
+create or replace function public.is_trikotwart() returns boolean
+language sql stable security definer set search_path = public as $$ select coalesce(public.my_role() = 'trikotwart', false) $$;
+revoke execute on function public.is_trikotwart() from public, anon;
+grant execute on function public.is_trikotwart() to authenticated;
 create table if not exists public.geburt (id text primary key, data jsonb not null default '{}', updated_at timestamptz not null default now(),
   constraint geburt_datum check (data->>'date' ~ '^\d{4}-\d{2}-\d{2}$'));
 alter table public.geburt enable row level security;
 drop policy if exists geburt_read on public.geburt;
-create policy geburt_read on public.geburt for select using (public.can_book());
+create policy geburt_read on public.geburt for select using (public.can_book() or public.is_trikotwart());
 drop policy if exists geburt_ins on public.geburt;
-create policy geburt_ins on public.geburt for insert with check (public.can_book());
+create policy geburt_ins on public.geburt for insert with check (public.is_trikotwart());
 drop policy if exists geburt_upd on public.geburt;
-create policy geburt_upd on public.geburt for update using (public.can_book()) with check (public.can_book());
+create policy geburt_upd on public.geburt for update using (public.is_trikotwart()) with check (public.is_trikotwart());
 drop policy if exists geburt_del on public.geburt;
-create policy geburt_del on public.geburt for delete using (public.can_book());
+create policy geburt_del on public.geburt for delete using (public.is_trikotwart());
 do $$ begin alter publication supabase_realtime add table public.geburt; exception when duplicate_object then null; end $$;
 
 -- ---------- Trikots gewaschen ----------
@@ -780,14 +849,130 @@ create table if not exists public.trikotwash (id text primary key, data jsonb no
   constraint trikotwash_form check (jsonb_typeof(data->'log') = 'array' and jsonb_array_length(data->'log') <= 20 and length(data::text) < 4000));
 alter table public.trikotwash enable row level security;
 drop policy if exists trikotwash_read on public.trikotwash;
-create policy trikotwash_read on public.trikotwash for select using (public.can_book());
+create policy trikotwash_read on public.trikotwash for select using (public.can_book() or public.is_trikotwart());
 drop policy if exists trikotwash_ins on public.trikotwash;
-create policy trikotwash_ins on public.trikotwash for insert with check (public.can_book());
+create policy trikotwash_ins on public.trikotwash for insert with check (public.is_trikotwart());
 drop policy if exists trikotwash_upd on public.trikotwash;
-create policy trikotwash_upd on public.trikotwash for update using (public.can_book()) with check (public.can_book());
+create policy trikotwash_upd on public.trikotwash for update using (public.is_trikotwart()) with check (public.is_trikotwart());
 drop policy if exists trikotwash_del on public.trikotwash;
-create policy trikotwash_del on public.trikotwash for delete using (public.can_book());
+create policy trikotwash_del on public.trikotwash for delete using (public.is_trikotwart());
 do $$ begin alter publication supabase_realtime add table public.trikotwash; exception when duplicate_object then null; end $$;
+
+-- ---------- Kalender: Trainingszeiten und Spiele ----------
+-- Alle freigeschalteten Mitglieder sehen die Termine. Eintragen, ändern und löschen dürfen nur Trainer (Rolle „trainer“) und Admin, der Kassenwart nicht.
+-- type 'usual' = übliche Trainingszeiten pro Wochentag (wd 0 = Montag); 'cancel' = Tag ohne Training (verhindert, dass die üblichen Zeiten wieder erscheinen); 'plan' = Merker „Wochenplan gesendet“; 'baelle' = wer an diesem Donnerstag die Bälle entharzt (pids, doneAt, doneBy).
+-- Die Spiele der Saison stehen in supabase/seed-spiele.sql (lokal, nicht im Repo).
+create or replace function public.can_termine() returns boolean
+language sql stable security definer set search_path = public as $$ select coalesce(public.my_role() in ('trainer', 'admin'), false) $$;
+create table if not exists public.termine (id text primary key, data jsonb not null default '{}', updated_at timestamptz not null default now(),
+  constraint termine_form check (coalesce(length(data::text) < 1000 and ((data->>'type' in ('training','spiel','cancel') and data->>'date' ~ '^\d{4}-\d{2}-\d{2}$') or (data->>'type' = 'usual' and data->>'wd' ~ '^[0-6]$') or (data->>'type' = 'plan' and data->>'mon' ~ '^\d{4}-\d{2}-\d{2}$') or (data->>'type' = 'baelle' and data->>'date' ~ '^\d{4}-\d{2}-\d{2}$' and jsonb_typeof(data->'pids') = 'array')), false)));
+alter table public.termine enable row level security;
+drop policy if exists termine_read on public.termine;
+create policy termine_read on public.termine for select using (public.is_member());
+drop policy if exists termine_ins on public.termine;
+create policy termine_ins on public.termine for insert with check (public.can_termine() and (data->>'type' <> 'baelle' or public.is_admin()));
+drop policy if exists termine_upd on public.termine;
+create policy termine_upd on public.termine for update using (public.can_termine() and (data->>'type' <> 'baelle' or public.is_admin())) with check (public.can_termine() and (data->>'type' <> 'baelle' or public.is_admin()));
+drop policy if exists termine_del on public.termine;
+create policy termine_del on public.termine for delete using (public.can_termine() and (data->>'type' <> 'baelle' or public.is_admin()));
+do $$ begin alter publication supabase_realtime add table public.termine; exception when duplicate_object then null; end $$;
+-- Mannschaftsverantwortlicher: darf bei Spielen NUR den Treffpunkt eintragen (über diese Funktion, nicht direkt in die Tabelle)
+create or replace function public.is_mv() returns boolean
+language sql stable security definer set search_path = public as $$ select coalesce(public.my_role() = 'mannschaftsverantwortlicher', false) $$;
+create or replace function public.termin_treffpunkt(doc_id text, meet text, meet_place text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not (public.can_termine() or public.is_mv()) then raise exception 'Keine Berechtigung'; end if;
+  if coalesce(meet, '') <> '' and meet !~ '^\d{2}:\d{2}$' then raise exception 'Ungültige Uhrzeit'; end if;
+  update public.termine
+     set data = data || jsonb_build_object('meet', nullif(meet, ''), 'meetPlace', nullif(left(coalesce(meet_place, ''), 120), '')), updated_at = now()
+   where id = doc_id and data->>'type' = 'spiel';
+end $$;
+-- „Fertig“: eine einzige Benachrichtigung „Wochenplan“ an alle (statt einer pro Eintrag). Der Text wird hier aus den Terminen der Woche
+-- gebaut (kein freier Text vom Aufrufer). Merkt sich, wann sie gesendet wurde.
+drop function if exists public.wochenplan_senden(text, text);
+create or replace function public.wochenplan_senden(mon text) returns int
+language plpgsql security definer set search_path = public as $$
+declare
+  n int; nm text; d date; i int; r record; u record; wd text; t time; mt text; has_tr boolean; body text;
+  lines text[] := '{}'; today date := (now() at time zone 'Europe/Berlin')::date;
+begin
+  if not (public.can_termine() or public.is_mv()) then raise exception 'Keine Berechtigung'; end if;
+  if mon is null or mon !~ '^\d{4}-\d{2}-\d{2}$' or extract(isodow from mon::date) <> 1 then raise exception 'Ungültige Woche'; end if;
+  for i in 0..6 loop
+    d := mon::date + i;
+    wd := (array['Mo','Di','Mi','Do','Fr','Sa','So'])[i + 1] || ' ' || to_char(d, 'DD.MM');
+    has_tr := exists (select 1 from public.termine where data->>'type' in ('training', 'cancel') and data->>'date' = d::text);
+    for r in select data from public.termine where data->>'type' in ('training', 'spiel') and data->>'date' = d::text order by data->>'start', data->>'type' loop
+      if r.data->>'type' = 'spiel' then
+        mt := '';
+        if d >= today then
+          if coalesce((r.data->>'home')::boolean, true) then
+            if nullif(r.data->>'start', '') is not null then
+              t := (r.data->>'start')::time - interval '90 minutes';
+              mt := ' – Treffpunkt ' || to_char(t, 'HH24:MI') || ' Uhr';
+            end if;
+          elsif nullif(r.data->>'meet', '') is not null then
+            mt := ' – Treffpunkt ' || (r.data->>'meet') || ' Uhr' || coalesce(' · ' || nullif(r.data->>'meetPlace', ''), '');
+          else
+            mt := ' – Treffpunkt folgt';
+          end if;
+        end if;
+        lines := lines || (wd || ': Spiel ' || coalesce(r.data->>'start', '') || ' ' || coalesce(r.data->>'title', '') || mt);
+      else
+        lines := lines || (wd || ': ' || coalesce(r.data->>'start', '') || '–' || coalesce(r.data->>'end', '') || ' ' || coalesce(nullif(r.data->>'title', ''), 'Training'));
+      end if;
+    end loop;
+    if not has_tr and d >= today then
+      for u in select data from public.termine where data->>'type' = 'usual' and data->>'wd' = i::text order by data->>'start' loop
+        lines := lines || (wd || ': ' || (u.data->>'start') || '–' || (u.data->>'end') || ' ' || coalesce(nullif(u.data->>'title', ''), 'Training'));
+      end loop;
+    end if;
+  end loop;
+  body := left(coalesce(nullif(array_to_string(lines, E'\n'), ''), 'Diese Woche ist nichts geplant.'), 400);
+  select data->>'name' into nm from public.players where id = public.my_pid();
+  n := public.push_send('plan', null, null, '📅 Wochenplan KW ' || to_char(mon::date, 'IW'), body, 'wochenplan');
+  insert into public.termine (id, data)
+    values ('plan-' || mon, jsonb_build_object('type', 'plan', 'mon', mon, 'sentAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'by', nm))
+  on conflict (id) do update set data = excluded.data, updated_at = now();
+  return n;
+end $$;
+-- Bälle entharzen: die eingeteilten Personen (und der Admin) melden den Donnerstag als erledigt. Den Plan ändert nur der Admin (Tabelle termine).
+create or replace function public.baelle_erledigt(d text) returns void
+language plpgsql security definer set search_path = public as $$
+declare pid text := public.my_pid();
+begin
+  if not (public.is_admin() or (pid is not null and exists (select 1 from public.termine where id = 'baelle-' || d and data->'pids' ? pid))) then
+    raise exception 'Keine Berechtigung';
+  end if;
+  update public.termine
+     set data = data || jsonb_build_object('doneAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'doneBy', (select data->>'name' from public.players where id = pid)), updated_at = now()
+   where id = 'baelle-' || d and data->>'type' = 'baelle';
+end $$;
+-- Bälle-Plan ändern (nur Admin): alle Wochen einer Änderung in einem Schritt – klappt eine nicht, wird nichts gespeichert.
+-- changes = [{id, pids, pinned?}, …]; erledigte Wochen bleiben unverändert.
+create or replace function public.baelle_speichern(changes jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare c jsonb;
+begin
+  if not public.is_admin() then raise exception 'Nur der Admin darf den Plan ändern'; end if;
+  if jsonb_typeof(changes) <> 'array' or jsonb_array_length(changes) > 100 then raise exception 'Ungültige Änderung'; end if;
+  for c in select * from jsonb_array_elements(changes) loop
+    if jsonb_typeof(c->'pids') <> 'array' or jsonb_array_length(c->'pids') not between 1 and 10
+       or exists (select 1 from jsonb_array_elements(c->'pids') e where jsonb_typeof(e) <> 'string') then
+      raise exception 'Ungültige Personen';
+    end if;
+    update public.termine
+       set data = data || jsonb_build_object('pids', c->'pids') || case when coalesce((c->>'pinned')::boolean, false) then '{"pinned": true}'::jsonb else '{}'::jsonb end,
+           updated_at = now()
+     where id = c->>'id' and data->>'type' = 'baelle' and data->>'doneAt' is null;
+    if not found then raise exception 'Woche % gibt es nicht oder sie ist schon erledigt', c->>'id'; end if;
+  end loop;
+end $$;
+revoke execute on function public.baelle_speichern(jsonb) from public, anon;
+grant execute on function public.baelle_speichern(jsonb) to authenticated;
+revoke execute on function public.can_termine(), public.is_mv(), public.termin_treffpunkt(text, text, text), public.wochenplan_senden(text), public.baelle_erledigt(text) from public, anon;
+grant execute on function public.can_termine(), public.is_mv(), public.termin_treffpunkt(text, text, text), public.wochenplan_senden(text), public.baelle_erledigt(text) to authenticated;
 
 -- ---------- Geburtstage (Tag und Monat) ----------
 -- Für alle freigeschalteten Mitglieder sichtbar; eintragen dürfen Kassenwart und Admin.
