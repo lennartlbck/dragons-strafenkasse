@@ -21,12 +21,14 @@ die Edge Function erzeugt die VAPID-Schlüssel beim ersten Aufruf selbst, und di
 | Zahltag gestartet | jeder, der etwas zahlen muss |
 | Zahltag endet in < 24 h (18 Uhr) | wer noch offen ist und nicht gemeldet hat |
 | Dienstag 17 Uhr | alle, die noch keinen Döner bestellt haben |
+| Dienstag 19:00 und 19:15 Uhr | der Dönerwart: „Döner bestellen“ (nur wenn jemand bestellt hat) |
 | Neues Fußballspiel / Runde vorbei | alle |
 | „Ich habe bezahlt“ gemeldet | Kassenwart und Admin |
 | Döner: „Ich habe bezahlt“ | der Dönerwart (Rolle „Dönerwart“ unter Verwalten → Mitglieder & Rollen) |
 | Mittwoch 12 Uhr | alle, die am Dienstag Döner bestellt haben und noch nicht als bezahlt abgehakt sind |
 | Kalender: „Fertig“ im Wochenplan | alle (eine Nachricht pro Woche, kein Einzel-Alarm je Eintrag) |
-| Geburtstag (9 Uhr) | Glückwunsch an das Geburtstagskind, Info an alle anderen; dazu automatisch ein Kabinenfest |
+| Berichte: Sonntag vor der Abgabe 12 Uhr, Abgabetag 9 Uhr | wer „Lage der Liga“ oder das Grußwort schreibt |
+| Geburtstag (9 Uhr) | Glückwunsch an das Geburtstagskind, Info an alle anderen; dazu automatisch ein Kabinenfest. Wer in `kasse_intern` → `push_stumm` steht, bekommt keine Geburtstags-Nachrichten |
 
 Jeder kann jedes Thema pro Gerät abschalten. Beim Abmelden wird das Gerät automatisch abgemeldet.
 

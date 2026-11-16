@@ -56,8 +56,9 @@
 
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
-html{-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:pan-x pan-y}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45;overscroll-behavior-y:none}
+/* kein Nachziehen über den Rand (iOS-Gummiband); falls doch, ist dahinter Blau statt Weiß */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:pan-x pan-y;overscroll-behavior-y:none;background:var(--brand-ink)}
+body{margin:0;min-height:100vh;min-height:100dvh;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45;overscroll-behavior-y:none}
 body.locked{overflow:hidden}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--brand-ink)}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -594,6 +595,6 @@ details.bank summary{cursor:pointer;font-weight:600;color:var(--brand);min-heigh
 <script src="config.js"></script>
 <script src="vendor/supabase-2.45.4.min.js"></script>
 
-<script src="app.js?v=27541d16"></script>
+<script src="app.js?v=fd33c2ed"></script>
 </body>
 </html>

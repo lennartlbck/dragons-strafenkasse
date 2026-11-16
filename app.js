@@ -73,7 +73,7 @@ async function payEntries(pid,ids,via){if(!ids.length)return{n:0,used:0};
 const sumAmt=es=>r2(es.reduce((a,e)=>a+(e.amount||0),0));
 const netTxt=n=>n>0?eur(n):n<0?'+ '+eur(-n):eur(0);
 // ---------- Backup ----------
-const BACKUP_TABLES=['players','fines','entries','bills','settings','zahltag','fees','receipts','members','kasse_intern','fussball','doener','geburt','trikotwash','geburtstage'];
+const BACKUP_TABLES=['players','fines','entries','bills','settings','zahltag','fees','receipts','members','kasse_intern','fussball','doener','geburt','trikotwash','geburtstage','schulden'];
 const daysSince=iso=>iso?Math.floor((Date.now()-Date.parse(iso))/DAY):null;
 async function makeBackup(){
   const out={app:'Dragons Kasse',format:1,exportedAt:new Date().toISOString(),tables:{}},counts={};
@@ -188,7 +188,7 @@ const purpose=p=>'Mannschaftskasse Dragons '+p.name;
 const toPay=b=>Math.max(0,Math.round((b.open-b.credit)*100)/100);
 const DAY=864e5,KW_DEFAULT='p29',LATE_FEE=10;
 const myPid=()=>S.me?S.me.player_id:null;
-function setPerms(role){const mgr=role==='admin'||role==='kassenwart';S.canEdit=mgr;S.canWrite=mgr;S.onlyDecke=role==='deckenzaehler'}
+function setPerms(){const mgr=hasRole('admin','kassenwart');S.canEdit=mgr;S.canWrite=mgr;S.onlyDecke=!mgr&&hasRole('deckenzaehler')}
 const favKey=()=>'favs-'+(S.uid||'x');
 function loadFavs(){try{const v=JSON.parse(localStorage.getItem(favKey())||'[]');return Array.isArray(v)?v:[]}catch(e){return[]}}
 function saveFavs(){try{localStorage.setItem(favKey(),JSON.stringify(S.favs))}catch(e){}}
@@ -198,7 +198,11 @@ const COUNT_FLOW={f26:'Deckentreffer',f02:'Bier',f03:'Radler'};
 const countFine=f=>!!f&&f.id in COUNT_FLOW;
 const canEnter=f=>S.canWrite===true||(!!S.onlyDecke&&!!f&&f.id===DECKE_FINE);
 const kwPid=()=>S.settings.kassenwartPlayer||KW_DEFAULT;
-const hasRole=(...r)=>!!S.me&&r.includes(S.me.role);
+// Hauptrolle (role) plus weitere Rollen (roles); 'member' zählt nicht als Rolle
+const rolesOf=m=>m?[m.role,...(m.roles||[])].filter(r=>r&&r!=='member'):[];
+const hasRole=(...r)=>rolesOf(S.me).some(x=>r.includes(x));
+// aus einer Auswahl Haupt- und weitere Rollen machen (Admin/Kassenwart zuerst, damit die Datenbank-Regeln greifen)
+const splitRoles=sel=>{const l=ROLES.map(x=>x[0]).filter(k=>k!=='member'&&sel.includes(k)).sort((a,b)=>(b==='admin')-(a==='admin'));return{role:l[0]||'member',roles:l.slice(1)}};
 const isDoenerwart=()=>hasRole('doenerwart'),isTrikotwart=()=>hasRole('trikotwart');
 const canTrikot=()=>isKW()||isTrikotwart(); // Trikots sehen: Kassenwart, Admin, Trikotwart; ändern nur der Trikotwart
 const isAdmin=()=>hasRole('admin');
@@ -275,7 +279,7 @@ function kwCard(){
 }
 function meLine(){
   if(!S.me)return '';const p=pById(myPid());
-  return `<p class="me">Angemeldet als <b>${esc(p?p.name:S.email||'')}</b>${S.me.role!=='member'?`<span class="tag">${esc(roleName(S.me.role))}</span>`:''}<button class="chipbtn" data-act="logout">${I('logout')}Abmelden</button></p>`;
+  return `<p class="me">Angemeldet als <b>${esc(p?p.name:S.email||'')}</b>${rolesOf(S.me).map(r=>`<span class="tag">${esc(roleName(r))}</span>`).join('')}<button class="chipbtn" data-act="logout">${I('logout')}Abmelden</button></p>`;
 }
 
 function kontenSeg(){return `<div class="toolbar" style="margin-top:0"><div class="seg full" role="group" aria-label="Ansicht">${[['personen','Personen'],['verlauf','Verlauf'],['statistik','Statistik']].map(([k,l])=>`<button data-act="kview" data-k="${k}" aria-pressed="${S.kview===k}">${l}</button>`).join('')}</div></div>`}
@@ -483,7 +487,9 @@ async function kfSave(ids){
   if(bad){toast(errMsg(bad.reason));if(S.sheet&&S.sheet.type==='kf')renderSheet(false)}
 }
 function kontenCopy(){
-  return `<div class="toolbar"><button class="menuitem rechbtn" data-act="tab" data-k="rechnungen"><span class="mi-ic" aria-hidden="true">🧾</span><span class="mi-t"><b>Rechnungen</b><small>Ausgaben, Einzahlungen und Belege</small></span>${I('chevR')}</button></div>`;
+  const sd=(S.schulden||[]).filter(x=>!x.done);
+  return `<div class="toolbar"><button class="menuitem rechbtn" data-act="tab" data-k="rechnungen"><span class="mi-ic" aria-hidden="true">🧾</span><span class="mi-t"><b>Rechnungen</b><small>Ausgaben, Einzahlungen und Belege</small></span>${I('chevR')}</button></div>`
+    +(hasRole('kassenwart')?`<div class="toolbar"><button class="menuitem rechbtn" data-act="openSchulden"><span class="mi-ic" aria-hidden="true">📝</span><span class="mi-t"><b>Schulden</b><small>${sd.length?`${sd.length} offen · ${eur(sd.reduce((a,x)=>a+(x.amount||0),0))}`:'Nur für dich sichtbar'}</small></span>${I('chevR')}</button></div>`:'');
 }
 function kontenList(){
   const ps=sortedPlayers(false).map(p=>({p,b:balance(p.id)}));
@@ -622,11 +628,11 @@ function verwaltenAdmin(){
     h+=`<h2 class="section-h">Backup</h2><div class="stat backup ${warn?'warn':''}"><p>${ago===null?'<b>Noch kein Backup.</b> ':`Letztes Backup <b>${ago===0?'heute':ago===1?'gestern':'vor '+ago+' Tagen'}</b>${bk.by?' von '+esc(bk.by):''}. `}Der kostenlose Supabase-Tarif macht keine eigenen Sicherungen – lade am besten einmal im Monat ein Backup herunter und leg es z. B. in iCloud ab.</p>
       <button class="btn block ${warn?'primary':''}" data-act="backup" ${S.busyBackup?'disabled':''}>${S.busyBackup?'Wird erstellt …':'Backup herunterladen'}</button></div>`; }
   // Rollen von Admin und Kassenwart ändert nur der Admin (die Datenbank erzwingt das ebenfalls)
-  const isAdm=isAdmin(),locked=m=>!isAdm&&(m.role==='admin'||m.role==='kassenwart');
+  const isAdm=isAdmin(),locked=m=>!isAdm&&rolesOf(m).some(r=>r==='admin'||r==='kassenwart');
   const ms=[...S.members].sort((a,b)=>(a.approved?1:0)-(b.approved?1:0)||String(a.email).localeCompare(String(b.email)));
   const mBody=`<p class="note" style="margin-top:-2px">Nur freigeschaltete Konten sehen die Kasse. Nur der <b>Kassenwart</b> kann den Zahltag starten; Kassenwart und Admins tragen Strafen und Rechnungen ein.</p>`;
-  const mList=ms.length?`<div class="rows">`+ms.map(m=>{const pp=pById(m.player_id);return `<div class="mrow">${avatar(pp)}<div class="m"><b>${esc(pp?pp.name:'– kein Spieler –')}</b><i>${esc(m.email||'')}${m.user_id===S.uid?' · du':''}</i></div><div class="r">${m.approved?`<span class="tag ok">freigeschaltet</span>`:`<span class="tag kf">wartet</span>`}</div>
-    <div class="acts"><select class="mini" data-act="role" data-id="${esc(m.user_id)}" aria-label="Rolle" ${m.user_id===S.uid||locked(m)?'disabled':''}>${ROLES.map(([k,l])=>`<option value="${k}" ${m.role===k?'selected':''} ${!isAdm&&(k==='admin'||k==='kassenwart')?'disabled':''}>${l}</option>`).join('')}</select>
+  const mList=ms.length?`<div class="rows">`+ms.map(m=>{const pp=pById(m.player_id);return `<div class="mrow">${avatar(pp)}<div class="m"><b>${esc(pp?pp.name:'– kein Spieler –')}</b><i>${esc(isNameMail(m.email)?'Name bei Anmeldung: „'+m.email.split('@')[0].replace(/\./g,' ')+'“':m.email||'')}${m.user_id===S.uid?' · du':''}</i></div><div class="r">${m.approved?`<span class="tag ok">freigeschaltet</span>`:`<span class="tag kf">wartet</span>`}</div>
+    <div class="acts"><button class="mini" data-act="editRoles" data-id="${esc(m.user_id)}" ${m.user_id===S.uid||locked(m)?'disabled':''}>${esc(rolesOf(m).map(roleName).join(', ')||'Spieler')}</button>
     ${m.user_id===S.uid||locked(m)?'':`<button class="mini ${m.approved?'':'on'}" data-act="approve" data-id="${esc(m.user_id)}">${m.approved?'Sperren':'Freischalten'}</button><button class="mini ${S.confirmDel==='m'+m.user_id?'warn':''}" data-act="delMember" data-id="${esc(m.user_id)}">${S.confirmDel==='m'+m.user_id?'Wirklich entfernen?':'Entfernen'}</button>`}</div></div>`}).join('')+`</div>`
     :`<div class="empty">Noch keine Mitglieder.</div>`;
   h+=tile('vt-mitglieder','👥','Mitglieder &amp; Rollen',`${ms.length} Konten${ms.some(m=>!m.approved)?' · '+ms.filter(m=>!m.approved).length+' warten':''}`,mBody+mList);
@@ -748,7 +754,7 @@ function fbPickSheet(s){const e=s.back,l=teamName(s.team),used=new Set(e.goals.f
   const n=s.sel.size;
   return{head,body,foot:`<div class="split"><button class="btn" data-act="fbPickBack">Zurück</button><button class="btn primary" data-act="fbPickDone" ${n?'':'disabled'}>${n?n+' hinzufügen':'Spieler wählen'}</button></div>`}}
 /* ---------- Push-Benachrichtigungen (Web Push, kostenlos) ---------- */
-const PUSH_KINDS=[['strafe','Neue Strafen','Wenn für dich etwas eingetragen wird'],['zahltag','Zahltag','Beim Start und einen Tag vor dem Ende, falls noch etwas offen ist'],['doener','Döner','Bestell-Erinnerung (Di 17 Uhr), Zahlungs-Erinnerung (Mi 12 Uhr) und Hinweise für den Dönerwart'],['fussball','Fußball','Neue Spiele und das Ende einer Runde'],['geburtstag','Geburtstage','Glückwünsche an dich und wer heute Geburtstag hat'],['plan','Wochenplan','Wenn Trainer oder Mannschaftsverantwortlicher die Woche eingetragen haben'],['meldung','Gemeldete Zahlungen','Wenn jemand „Ich habe bezahlt“ meldet']];
+const PUSH_KINDS=[['strafe','Neue Strafen','Wenn für dich etwas eingetragen wird'],['zahltag','Zahltag','Beim Start und einen Tag vor dem Ende, falls noch etwas offen ist'],['doener','Döner','Bestell-Erinnerung (Di 17 Uhr), Zahlungs-Erinnerung (Mi 12 Uhr) und Hinweise für den Dönerwart'],['fussball','Fußball','Neue Spiele und das Ende einer Runde'],['geburtstag','Geburtstage','Glückwünsche an dich und wer heute Geburtstag hat'],['plan','Wochenplan','Wenn Trainer oder Mannschaftsverantwortlicher die Woche eingetragen haben'],['bericht','Berichte','Sonntag vor der Abgabe (12 Uhr) und am Abgabetag (9 Uhr), wenn du einen Bericht schreibst'],['meldung','Gemeldete Zahlungen','Wenn jemand „Ich habe bezahlt“ meldet']];
 const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 const pushSupported=()=>'serviceWorker' in navigator&&!!window.PushManager&&!!window.Notification;
@@ -807,8 +813,31 @@ function menuSheet(){
     +item('openBaelle','🏐','Bälle entharzen',(()=>{const c=baelleCur();return c?`Diese Woche: ${baelleNames(c)}${c.doneAt?' ✓':''}`:'Kein Plan für diese Woche'})())
     +item('openKf','🎉','Kabinenfest',(()=>{const l=kfList(),tw=kfThisWeek();return l.length?(tw.length?`Diese Woche: ${tw.map(e=>kfWho(e)?.name||'Unbekannt').join(', ')}`:'Diese Woche frei')+` · ${l.length} offen`:'Alles erledigt'})())
     +(canTrikot()?item('openTrikot','👕','Trikots',(()=>{const t=trikotList();return t.withD.length?`${t.withD.length} Spieler · jung bis alt`:'Spieler nach Alter sortiert'})()):'')
+    +item('openBerichte','📝','Berichte',(()=>{const n=berichteNext(),me=myPid()&&n.find(x=>x.lage===myPid()||x.gruss===myPid());return me?`Du: ${me.lage===myPid()?'Lage der Liga':'Grußwort'} · Abgabe ${me.abgabe?dDE(me.abgabe).slice(0,6):'–'}`:n[0]?`Nächstes: ${n[0].gegner} · ${dDE(n[0].date).slice(0,6)}`:'Lage der Liga und Grußwort'})())
     +item('openGb','🎂','Geburtstage',(()=>{const g=gbList().withB;if(!g.length)return 'Noch keine eingetragen';const x=g[0];return x.days===0?`Heute: ${x.p.name} 🎉`:`Nächster: ${x.p.name.split(' ')[0]} · ${mdDE(x.md)}`})())
     +item('openPush','🔔','Benachrichtigungen',S.push?.row?'An auf diesem Gerät':'Aus – hier einschalten')+`</div>`,foot:''}}
+// Rollen einer Person: mehrere ankreuzbar. Admin/Kassenwart vergibt nur der Admin.
+function rolesSheet(s){const m=S.members.find(x=>x.user_id===s.uid),p=m&&pById(m.player_id);if(!m)return{head:'<h2>Rollen</h2>',body:'',foot:''};
+  return{head:`<h2>Rollen</h2><p>${esc(p?p.name:m.email||'')}</p>`,
+    body:`<div class="fields">${ROLES.filter(([k])=>k!=='member').map(([k,l])=>`<label class="check"><input type="checkbox" data-role="${k}" ${s.sel.includes(k)?'checked':''} ${!isAdmin()&&(k==='admin'||k==='kassenwart')?'disabled':''}> ${esc(l)}</label>`).join('')}</div><p class="note" style="margin:10px 4px 0">Ohne Haken ist die Person einfach Spieler. Es gibt nur einen Kassenwart.</p>`,
+    foot:`<button class="btn primary" data-act="saveRoles">Speichern</button>`}}
+// Schulden: einfache Liste nur für den Kassenwart (Name, Betrag, abhaken)
+function schuldenSheet(){const all=[...(S.schulden||[])].sort((a,b)=>(!!a.done-!!b.done)||String(b.createdAt).localeCompare(String(a.createdAt)));
+  const open=all.filter(x=>!x.done),sum=open.reduce((a,x)=>a+(x.amount||0),0);
+  const row=x=>`<div class="row ${x.done?'paid':''}"><button class="tick" data-act="schuldTick" data-id="${esc(x.id)}" aria-pressed="${!!x.done}" aria-label="${esc(x.name+(x.done?': wieder offen':': abhaken'))}"><span>${ICONS.check}</span></button><div class="m"><b>${esc(x.name)}</b>${x.note?`<i class="wrap">${esc(x.note)}</i>`:''}</div><div class="r"><strong class="num">${eur(x.amount||0)}</strong></div><button class="iconbtn ${S.confirmDel==='sd'+x.id?'warn':''}" data-act="schuldDel" data-id="${esc(x.id)}" aria-label="${S.confirmDel==='sd'+x.id?'Wirklich löschen?':'Löschen'}">${I('x')}</button></div>`;
+  return{head:`<h2>Schulden</h2><p>Nur für dich als Kassenwart sichtbar</p>`,
+    body:`<div class="fields"><div class="two"><div class="field"><label for="sdn">Name</label><input id="sdn" maxlength="80" autocomplete="off"></div><div class="field"><label for="sda">Betrag (€)</label><input id="sda" inputmode="decimal"></div></div>
+      <div class="field"><label for="sdt">Notiz (optional)</label><input id="sdt" maxlength="120" autocomplete="off"></div><button class="btn primary" data-act="schuldAdd">${I('plus')}Eintragen</button></div>`
+      +(all.length?`<div class="credbox" style="margin-top:14px"><div class="sum"><span>Noch offen (${open.length})</span><b class="num">${eur(sum)}</b></div></div><div class="rows" style="margin-top:10px">${all.map(row).join('')}</div>`:`<div class="empty" style="margin-top:14px">Noch keine Schulden eingetragen.</div>`),foot:''}}
+// Berichte fürs Hallenheft: Plan pro Heimspiel (Lage der Liga, Grußwort, Abgabe). Nur zum Ansehen.
+const berichteAll=()=>[...(S.berichte||[])].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+const berichteNext=()=>berichteAll().filter(x=>x.date>=today());
+function berichteSheet(){const me=myPid(),pn=id=>pById(id)?.name||'–',all=berichteAll();
+  const row=x=>{const [,m,d]=x.date.split('-'),past=x.date<today(),mine=!!me&&(x.lage===me||x.gruss===me);
+    return `<div class="row ${past?'paid':''}"><div class="kdate"><b>${+d}.</b><small>${esc(MONTHS[+m-1].slice(0,3))}</small></div><div class="m"><b class="wrapb">${esc(x.gegner||'')}</b><div style="display:grid;grid-template-columns:auto 1fr;gap:2px 8px;margin-top:4px;font-size:15px;line-height:1.3">${[['Lage der Liga',x.lage],['Grußwort',x.gruss]].map(([t,id])=>`<span style="color:var(--muted);font-size:15px">${t}</span><b style="font-size:15px;font-weight:${id===me?800:600}">${esc(pn(id))}</b>`).join('')}</div><div class="tags">${x.abgabe?`<span class="tag">Abgabe ${esc(dDE(x.abgabe).slice(0,6))}</span>`:''}${mine?'<span class="tag kf">du schreibst</span>':''}</div></div></div>`};
+  const fut=all.filter(x=>x.date>=today()),past=all.filter(x=>x.date<today());
+  return{head:`<h2>Berichte</h2><p>Lage der Liga und Grußwort fürs Hallenheft</p>`,body:`<p class="note" style="margin:0 4px 10px">Wer schreibt, bekommt am Sonntag vor der Abgabe um 12 Uhr und am Abgabetag um 9 Uhr eine Erinnerung.</p>`
+    +(all.length?(fut.length?`<div class="rows">${fut.map(row).join('')}</div>`:'')+(past.length?`<h3 class="sub-h">Vorbei</h3><div class="rows">${past.map(row).join('')}</div>`:''):`<div class="empty">Noch kein Plan eingetragen.</div>`),foot:''}}
 function textSheet(s){return{head:`<h2>Text zum Kopieren</h2><p>Lange drücken → Alles auswählen → Kopieren</p>`,body:`<textarea id="cp" rows="14" readonly style="width:100%;font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink)">${esc(s.txt||'')}</textarea>`,foot:''}}
 async function copyOut(txt){
   try{await navigator.clipboard.writeText(txt);toast('Kopiert – jetzt in die Gruppe einfügen')}catch(e){openSheet({type:'text',txt});const t=$('#cp');if(t){t.focus();t.select()}}}
@@ -1021,7 +1050,7 @@ function renderSheet(refresh){
   if(s.type==='doener'){const t=$('#dtext'),pp=$('#dpay');if(t)s.draft=t.value;if(pp)s.pay=pp.value}
   const keepScroll=root.querySelector('.sheet-b')?.scrollTop||0;
   let head='',body='',foot='';
-  const sub={menu:menuSheet,doener:doenerSheet,fussball:fussballSheet,fbEdit:fbEditSheet,fbRound:fbRoundSheet,fbGame:fbGameSheet,fbPick:fbPickSheet,push:pushSheet,trikot:trikotSheet,trikotEdit:trikotEditSheet,termin:terminSheet,terminView:terminViewSheet,usual:usualSheet,usualItem:usualItemSheet,baelle:baelleSheet,baelleEdit:baelleEditSheet,text:textSheet,gb:gbSheet,gbEdit:gbEditSheet,gbPick:gbPickSheet,kfWeekAdd:kfWeekAddSheet}[s.type];
+  const sub={menu:menuSheet,doener:doenerSheet,fussball:fussballSheet,fbEdit:fbEditSheet,fbRound:fbRoundSheet,fbGame:fbGameSheet,fbPick:fbPickSheet,push:pushSheet,trikot:trikotSheet,trikotEdit:trikotEditSheet,termin:terminSheet,terminView:terminViewSheet,usual:usualSheet,usualItem:usualItemSheet,baelle:baelleSheet,baelleEdit:baelleEditSheet,text:textSheet,gb:gbSheet,gbEdit:gbEditSheet,gbPick:gbPickSheet,kfWeekAdd:kfWeekAddSheet,roles:rolesSheet,schulden:schuldenSheet,berichte:berichteSheet}[s.type];
   if(sub){({head,body,foot}=sub(s))}
   else if(s.type==='fine'&&countFine(s.fine)){
     const d=deckeSheet(s);head=d.head;body=d.body;foot=d.foot;
@@ -1146,8 +1175,8 @@ function renderSheet(refresh){
     const b=s.bill,ein=b.kind==='einzahlung';
     head=`<h2>${b.id?(ein?'Sondereinzahlung bearbeiten':'Rechnung bearbeiten'):(ein?'Neue Sondereinzahlung':'Neue Rechnung')}</h2><p>${ein?'Geld, das zusätzlich in die Kasse kommt (Sponsor, Spende …)':'Ausgabe fürs Team – erscheint in der Kostenliste'}</p>`;
     body=`<div class="fields">`;
-    if(!ein){const cats=[...new Set([...BILL_CATS,...S.bills.map(x=>x.cat).filter(c=>c&&c!=='Gutschrift'&&c!=='Sondereinzahlung')])],own=!!b.cat&&!cats.includes(b.cat);
-      body+=`<div class="field"><label for="bc">Kategorie</label><select id="bc"><option value="">Kategorie wählen …</option>${cats.map(c=>`<option value="${esc(c)}" ${b.cat===c?'selected':''}>${esc(c)}</option>`).join('')}<option value="__other" ${own?'selected':''}>Andere …</option></select></div><div class="field" id="bcown" ${own?'':'hidden'}><label for="bco">Eigene Kategorie</label><input id="bco" value="${own?esc(b.cat):''}" placeholder="z. B. Trikots"></div>`}
+    if(!ein){const cats=billCats(),own=!!b.cat&&!cats.includes(b.cat);
+      body+=`<div class="field"><label for="bc">Kategorie</label><select id="bc"><option value="">Kategorie wählen …</option>${cats.map(c=>`<option value="${esc(c)}" ${b.cat===c?'selected':''}>${esc(c)}</option>`).join('')}<option value="__other" ${own?'selected':''}>Andere …</option></select></div><div class="field" id="bcown" ${own?'':'hidden'}><label for="bco">Eigene Kategorie</label><input id="bco" value="${own?esc(b.cat):''}" placeholder="z. B. Trikots" maxlength="40"><label class="check" style="margin-top:8px"><input type="checkbox" id="bcsave" checked> Kategorie speichern – steht dann immer in der Liste</label></div>`}
     body+=`<div class="field"><label for="bt">${ein?'Von wem / wofür':'Beschreibung (optional)'}</label><input id="bt" value="${esc(b.title||'')}" placeholder="${ein?'z. B. Sponsor Horn':'z. B. 3 Kisten nach dem Heimspiel'}"></div>
       <div class="two"><div class="field"><label for="ba">Betrag (€)</label><input id="ba" inputmode="decimal" value="${b.amount?String(b.amount).replace('.',','):''}"></div><div class="field"><label for="bd">Datum</label><input id="bd" type="date" value="${esc(b.date||today())}"></div></div>`;
     if(!ein){
@@ -1255,12 +1284,16 @@ function updateSplit(){
   const n=s.sel.size,per=num(s.per);
   i.textContent=n?`${n} ${n===1?'Person':'Personen'} × ${eur(per)} = ${eur(n*per)} als Sonderausgabe`:'Personen antippen, die mitzahlen.';
 }
+// Kategorien für Rechnungen: feste Liste, gespeicherte eigene (settings.billCats) und alle schon benutzten
+const billCats=()=>[...new Set([...BILL_CATS,...(S.settings.billCats||[]),...S.bills.map(x=>x.cat).filter(c=>c&&c!=='Gutschrift'&&c!=='Sondereinzahlung')])];
 async function saveBill(){
   const s=S.sheet,b=s.bill,ein=b.kind==='einzahlung';
   const d={kind:b.kind,cat:ein?'Sondereinzahlung':((()=>{const v=$('#bc').value;return v==='__other'?$('#bco').value.trim():v})()||'Sonstiges'),title:$('#bt').value.trim()||null,amount:Math.round(num($('#ba').value)*100)/100,
     date:$('#bd').value||today(),paidBy:ein?null:($('#bp').value||null),note:$('#bn').value.trim()||null,
     refunded:!!b.refunded,credited:b.credited||0,verrechnet:!!b.verrechnet,receiptId:b.receiptId||null,splitIds:b.splitIds||[],perPerson:b.perPerson||0,createdAt:b.createdAt||new Date().toISOString(),createdBy:b.createdBy||S.uid||null};
   if(!(d.amount>0)){toast('Bitte einen Betrag eingeben');return}
+  if(!ein&&$('#bc').value==='__other'&&$('#bcsave')?.checked&&$('#bco').value.trim()&&!billCats().includes(d.cat)) // eigene Kategorie merken
+    S.db.doc('settings/kasse').update({billCats:[...(S.settings.billCats||[]),d.cat]}).catch(e=>toast(errMsg(e)));
   if(b.id&&(b.credited||0)>0&&(d.paidBy!==(b.paidBy||null)||d.amount<(b.credited||0))){toast(`Mit dieser Rechnung wurden schon ${eur(b.credited)} Strafen bezahlt – Person und Betrag lassen sich nicht mehr ändern. Öffne zuerst diese Strafen wieder.`);return}
   const split=!b.id&&!ein&&s.split;
   if(split){if(!s.sel.size){toast('Bitte auswählen, wer mitzahlt');return}d.splitIds=[...s.sel];d.perPerson=Math.round(num(s.per)*100)/100;if(!(d.perPerson>0)){toast('Bitte Betrag pro Person eingeben');return}}
@@ -1450,6 +1483,20 @@ document.addEventListener('click',async ev=>{
     case 'pushOff':{el.disabled=true;try{const sub=S.push?.sub;if(sub){await S.sb.from('push_subs').delete().eq('endpoint',sub.endpoint);await sub.unsubscribe()}toast('Benachrichtigungen sind aus')}catch(e){toast(errMsg(e))}await pushLoad();break}
     case 'pushTest':{el.disabled=true;const {data,error}=await S.sb.rpc('push_test');el.disabled=false;toast(error?(/nicht eingerichtet/.test(error.message)?'Push ist auf dem Server noch nicht eingerichtet':'Test hat nicht geklappt: '+error.message):data?'Test verschickt – sollte gleich ankommen':'Für dieses Konto ist kein Gerät angemeldet');break}
     case 'approve':{const m=S.members.find(x=>x.user_id===id);if(!m)break;const {error}=await S.sb.from('members').update({approved:!m.approved}).eq('user_id',id);toast(error?error.message:(m.approved?'Gesperrt':'Freigeschaltet'));break}
+    case 'editRoles':{const m=S.members.find(x=>x.user_id===id);if(m)openSheet({type:'roles',uid:id,sel:rolesOf(m)});break}
+    case 'saveRoles':{const s=S.sheet,sel=[...document.querySelectorAll('#sheetRoot [data-role]:checked')].map(x=>x.dataset.role);el.disabled=true;
+      // es gibt nur einen Kassenwart: bei den anderen die Rolle entfernen
+      let error=null;
+      if(sel.includes('kassenwart'))for(const m of S.members)if(!error&&m.user_id!==s.uid&&rolesOf(m).includes('kassenwart'))({error}=await S.sb.from('members').update(splitRoles(rolesOf(m).filter(r=>r!=='kassenwart'))).eq('user_id',m.user_id));
+      if(!error)({error}=await S.sb.from('members').update(splitRoles(sel)).eq('user_id',s.uid));el.disabled=false;
+      if(error){toast(error.message);break}toast('Rollen gespeichert');closeSheet();break}
+    case 'openBerichte':S.still=true;openSheet({type:'berichte'});break;
+    case 'openSchulden':if(hasRole('kassenwart'))openSheet({type:'schulden'});break;
+    case 'schuldAdd':{const name=$('#sdn').value.trim(),amount=Math.round(num($('#sda').value)*100)/100,note=$('#sdt').value.trim()||null;
+      if(!name){toast('Bitte einen Namen eingeben');break}if(!(amount>0)){toast('Bitte einen Betrag eingeben');break}
+      el.disabled=true;try{await S.db.collection('schulden').add({name,amount,note,done:false,createdAt:new Date().toISOString()});toast('Eingetragen');S.still=true;renderSheet(false)}catch(e){el.disabled=false;toast(errMsg(e))}break}
+    case 'schuldTick':{const x=(S.schulden||[]).find(y=>y.id===id);if(!x)break;try{await S.db.doc('schulden/'+id).update({done:!x.done,doneAt:x.done?null:new Date().toISOString()});S.still=true;renderSheet(false)}catch(e){toast(errMsg(e))}break}
+    case 'schuldDel':if(S.confirmDel!=='sd'+id){S.confirmDel='sd'+id;S.still=true;renderSheet(false);break}S.confirmDel=null;try{await S.db.doc('schulden/'+id).delete();S.still=true;renderSheet(false)}catch(e){toast(errMsg(e))}break;
     case 'delMember':if(S.confirmDel!=='m'+id){S.confirmDel='m'+id;render();break}S.confirmDel=null;{const {error}=await S.sb.from('members').delete().eq('user_id',id);toast(error?error.message:'Entfernt')}break;
     case 'endZahltag':if(!S.confirmEnd){S.confirmEnd=true;render();setTimeout(()=>{S.confirmEnd=false;render()},5000);break}
       S.confirmEnd=false;try{await S.db.doc('zahltag/'+zt().runId).update({active:false,cancelledAt:new Date().toISOString()});toast('Zahltag beendet – keine Strafen')}catch(e){toast(errMsg(e))}break;
@@ -1675,9 +1722,6 @@ document.addEventListener('change',async ev=>{const t=ev.target;
     s.note=$('#rcn')?.value||'';s.amount=$('#rca')?.value||'';s.date=$('#rcd')?.value||today();
     const b=await shrinkImage(f);if(!b){toast('Das Foto konnte nicht gelesen werden');return}
     if(s.preview)URL.revokeObjectURL(s.preview);s.blob=b;s.preview=URL.createObjectURL(b);renderSheet(false);return}
-  if(t.dataset&&t.dataset.act==='role'){const id=t.dataset.id,role=t.value;
-    if(role==='kassenwart')for(const m of S.members)if(m.role==='kassenwart'&&m.user_id!==id)await S.sb.from('members').update({role:'member'}).eq('user_id',m.user_id);
-    const {error}=await S.sb.from('members').update({role}).eq('user_id',id);toast(error?error.message:(role==='kassenwart'?'Neuer Kassenwart gesetzt':'Rolle geändert'));return}
   const s=S.sheet;if(!s)return;
   if(s.type==='push'&&t.dataset.pk&&S.push?.row){const pr={...(S.push.row.prefs||{}),[t.dataset.pk]:t.checked};const {error}=await S.sb.from('push_subs').update({prefs:pr,updated_at:new Date().toISOString()}).eq('endpoint',S.push.row.endpoint);if(error){t.checked=!t.checked;toast(errMsg(error))}else S.push.row.prefs=pr;return}
   if(s.type==='fine'&&t.id==='kfc'){s.kf=t.checked;updateSubmit()}
@@ -1731,36 +1775,45 @@ function authScreen(mode,msg){
   const v=$('#view');const err=msg?`<div class="banner">${esc(msg)}</div>`:'';
   if(mode==='login'||mode==='signup')v.innerHTML=`<div class="auth">${err}<h2>${mode==='login'?'Anmelden':'Konto erstellen'}</h2>
     <form id="authForm" class="fields" data-mode="${mode}">
-      <div class="field"><label for="aMail">E-Mail</label><input id="aMail" type="email" autocomplete="email" required></div>
+      <div class="field"><label for="aMail">${mode==='login'?'Name':'Dein Name'}</label><input id="aMail" type="text" autocomplete="username" autocapitalize="words" placeholder="Vorname Nachname" required></div>
       <div class="field"><label for="aPw">Passwort${mode==='signup'?' (mind. 8 Zeichen)':''}</label><input id="aPw" type="password" autocomplete="${mode==='login'?'current-password':'new-password'}" minlength="${mode==='signup'?8:1}" required></div>
       <button class="btn primary" type="submit">${mode==='login'?'Anmelden':'Konto erstellen'}</button></form>
     <div class="toolbar">${mode==='login'?`<button class="btn" data-act="authMode" data-k="signup">Neu hier? Konto erstellen</button><button class="btn" data-act="authReset">Passwort vergessen</button>`:`<button class="btn" data-act="authMode" data-k="login">Ich habe schon ein Konto</button>`}</div></div>`;
   else if(mode==='newpw')v.innerHTML=`<div class="auth">${err}<h2>Neues Passwort</h2><form id="pwForm" class="fields"><div class="field"><label for="nPw">Neues Passwort (mind. 8 Zeichen)</label><input id="nPw" type="password" autocomplete="new-password" minlength="8" required></div><button class="btn primary" type="submit">Speichern</button></form></div>`;
-  else if(mode==='link')v.innerHTML=`<div class="auth">${err}<h2>Wer bist du?</h2><p class="note">Tippe auf deinen Namen. Der Admin schaltet dich danach frei.</p><div class="grid">${sortedPlayers(true).map(p=>`<button class="pick" data-act="claim" data-id="${esc(p.id)}">${p.role==='Spieler'&&p.number!=null?`<span class="no">${p.number}</span>`:''}${avatar(p)}<b>${esc(p.name.split(' ')[0])}${drg(p.id)}</b><span class="note" style="font-size:11px;margin-top:-4px">${esc(p.role==='Spieler'?p.name.split(' ').slice(1).join(' '):p.role)}</span></button>`).join('')}</div><div class="toolbar"><button class="btn" data-act="logout">Abmelden</button></div></div>`;
+  else if(mode==='link'){
+    // passt der eingegebene Name zu einem Spieler, steht er vorne und ist hervorgehoben; alle anderen sind grau
+    const free=sortedPlayers(true).filter(p=>!S.taken||!S.taken.has(p.id)),mine=free.find(p=>loginMail(p.name)===S.email);
+    v.innerHTML=`<div class="auth">${err}<h2>Wer bist du?</h2><p class="note">${mine?'Das bist du, oder? Tippe auf deinen Namen.':'Tippe auf deinen eigenen Namen. Namen, die schon jemand gewählt hat, sind ausgeblendet.'} Der Admin schaltet dich danach frei.</p><div class="grid">${(mine?[mine,...free.filter(p=>p!==mine)]:free).map(p=>`<button class="pick" data-act="claim" data-id="${esc(p.id)}" ${mine?(p===mine?'aria-pressed="true"':'disabled'):''}>${p.role==='Spieler'&&p.number!=null?`<span class="no">${p.number}</span>`:''}${avatar(p)}<b>${esc(p.name.split(' ')[0])}${drg(p.id)}</b><span class="note" style="font-size:11px;margin-top:-4px">${esc(p.role==='Spieler'?p.name.split(' ').slice(1).join(' '):p.role)}</span></button>`).join('')}</div><div class="toolbar"><button class="btn" data-act="logout">Abmelden</button></div></div>`;}
   else if(mode==='pending')v.innerHTML=`<div class="auth">${err}<h2>Fast geschafft</h2><p>Dein Konto ist angelegt und mit <b>${esc(pById(S.me&&S.me.player_id)?.name||'dir')}</b> verknüpft. Sobald der Admin dich freischaltet, siehst du hier die Kasse.</p><div class="toolbar"><button class="btn primary" data-act="recheck">Neu prüfen</button><button class="btn" data-act="logout">Abmelden</button></div></div>`;
-  else if(mode==='checkmail')v.innerHTML=`<div class="auth"><h2>E-Mail bestätigen</h2><p>Wir haben dir eine E-Mail geschickt. Tippe auf den Link darin, dann geht es hier weiter.</p><div class="toolbar"><button class="btn" data-act="authMode" data-k="login">Zur Anmeldung</button></div></div>`;
 }
 document.addEventListener('submit',async ev=>{
   const f=ev.target;if(f.id!=='authForm'&&f.id!=='pwForm')return;ev.preventDefault();const sb=S.sb;
   const btn=f.querySelector('button[type=submit]');btn.disabled=true;
   try{
     if(f.id==='pwForm'){const {error}=await sb.auth.updateUser({password:$('#nPw').value});if(error)throw error;history.replaceState(null,'',location.pathname);return boot()}
-    const email=$('#aMail').value.trim(),password=$('#aPw').value;
+    const email=loginMail($('#aMail').value),password=$('#aPw').value;if(!email)throw new Error('Bitte deinen Namen eingeben.');
     if(f.dataset.mode==='login'){const {error}=await sb.auth.signInWithPassword({email,password});if(error)throw error;return boot()}
     const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname}});if(error)throw error;
-    if(!data.session)return authScreen('checkmail');return boot();
+    if(!data.session)return authScreen('login','Konto angelegt, aber Supabase verlangt noch eine E-Mail-Bestätigung. Bitte dem Admin Bescheid geben.');return boot();
   }catch(e){btn.disabled=false;const m=String(e.message||e);
-    authScreen(f.id==='pwForm'?'newpw':f.dataset.mode,/Invalid login/i.test(m)?'E-Mail oder Passwort stimmt nicht.':/already registered/i.test(m)?'Für diese E-Mail gibt es schon ein Konto – melde dich an.':/Email not confirmed/i.test(m)?'Bitte bestätige zuerst deine E-Mail (Link im Postfach).':m)}
+    authScreen(f.id==='pwForm'?'newpw':f.dataset.mode,/Invalid login/i.test(m)?'E-Mail oder Passwort stimmt nicht.':/already registered/i.test(m)?'Für diesen Namen gibt es schon ein Konto – melde dich an.':/Email not confirmed/i.test(m)?'Bitte bestätige zuerst deine E-Mail (Link im Postfach).':m)}
 });
 document.addEventListener('click',async ev=>{
   const el=ev.target.closest('[data-act]');if(!el)return;const a=el.dataset.act;
   if(a==='authMode')authScreen(el.dataset.k);
-  else if(a==='authReset'){const email=($('#aMail')||{}).value;if(!email){authScreen('login','Gib zuerst deine E-Mail ein, dann tippe auf „Passwort vergessen“.');return}
+  else if(a==='authReset'){const email=($('#aMail')||{}).value;if(!email||!email.includes('@')){authScreen('login','Passwort vergessen? Sag dem Admin Bescheid, er setzt es dir zurück.');return}
     const {error}=await S.sb.auth.resetPasswordForEmail(email.trim(),{redirectTo:location.origin+location.pathname});authScreen('login',error?error.message:'Wir haben dir einen Link zum Zurücksetzen geschickt.')}
-  else if(a==='claim'){const {data:{user}}=await S.sb.auth.getUser();const {error}=await S.sb.from('members').insert({user_id:user.id,email:user.email,player_id:el.dataset.id});if(error){authScreen('link',error.message);return}boot()}
+  else if(a==='claim'){const {data:{user}}=await S.sb.auth.getUser();const {error}=await S.sb.from('members').insert({user_id:user.id,email:user.email,player_id:el.dataset.id});if(error){const {data:tk}=await S.sb.rpc('taken_players');S.taken=new Set(tk||[]);authScreen('link',/duplicate|unique/i.test(error.message)?'Diesen Namen hat schon jemand gewählt. Tippe auf deinen eigenen Namen.':error.message);return}boot()}
   else if(a==='recheck')boot();
 });
 
+// Anmeldung mit Namen: Supabase braucht eine E-Mail-Adresse, die App bildet sie aus dem Namen (z. B. „Lennart Liebeck“ → lennart.liebeck@…).
+// Die Endung .invalid ist reserviert, an solche Adressen wird nie eine Mail verschickt. Alte Konten melden sich weiter mit ihrer E-Mail an.
+const LOGIN_DOMAIN='spieler.dragons-kasse.invalid';
+const loginMail=v=>{v=String(v||'').trim();if(v.includes('@'))return v.toLowerCase();
+  const n=v.toLowerCase().replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'.').replace(/^\.+|\.+$/g,'');
+  return n?n+'@'+LOGIN_DOMAIN:''};
+const isNameMail=e=>String(e||'').endsWith('@'+LOGIN_DOMAIN);
 let started=false;
 async function boot(){
   const sb=S.sb;
@@ -1769,8 +1822,8 @@ async function boot(){
   S.uid=session.user.id;S.email=session.user.email;S.favs=loadFavs();
   const {data:me,error}=await sb.from('members').select('*').eq('user_id',S.uid).maybeSingle();
   if(error){authScreen('login','Verbindung fehlgeschlagen: '+error.message);return}
-  if(!me||!me.approved){const {data:pl}=await sb.from('players').select('id,data');S.players=(pl||[]).map(r=>({id:r.id,...r.data}));S.me=me||null;authScreen(me?'pending':'link');return}
-  S.me=me;setPerms(me.role);if(pushSupported())swReg();
+  if(!me||!me.approved){const {data:pl}=await sb.from('players').select('id,data');S.players=(pl||[]).map(r=>({id:r.id,...r.data}));S.me=me||null;if(!me){const {data:tk}=await sb.rpc('taken_players');S.taken=new Set(tk||[])}authScreen(me?'pending':'link');return}
+  S.me=me;setPerms();if(pushSupported())swReg();
   if(started){render();return}started=true;S.status='loading';
   const db=makeDb(sb);S.db=db;$('#view').innerHTML='';render();
   const timer=setTimeout(()=>{S.stale=true;if(S.status==='loading')S.status='ready';render()},10000);
@@ -1787,6 +1840,7 @@ async function boot(){
   db.doc('kasse_intern/backup').onSnapshot(d=>{S.backup=d.exists?d.data():{};renderSoon()},()=>{});
   db.doc('kasse_intern/protokoll').onSnapshot(d=>{S.klog=d.exists?d.data():{};if(S.sheet&&S.sheet.type==='kasse')renderSheet(false)},()=>{});
   db.doc('kasse_intern/gb_done').onSnapshot(d=>{S.gbDone=d.exists?d.data():{};S.gbDoneLoaded=true;renderSoon()},()=>{});
+  if(hasRole('kassenwart'))db.collection('schulden').onSnapshot(s=>{S.schulden=s.docs.map(d=>({id:d.id,...d.data()}));renderSoon();if(S.sheet&&S.sheet.type==='schulden')renderSheet(true)},()=>{});
   };
   const startTk=()=>{if(S.tkSubs||!canTrikot())return;S.tkSubs=true; // Trikots: Kassenwart, Admin, Trikotwart
   db.collection('geburt').onSnapshot(s=>{S.geburt=Object.fromEntries(s.docs.map(d=>[d.id,d.data().date]));renderSoon()},()=>{});
@@ -1797,9 +1851,10 @@ async function boot(){
   db.collection('termine').onSnapshot(s=>{S.termine=s.docs.map(d=>({id:d.id,...d.data()}));renderSoon()},()=>{});
   db.collection('doener').onSnapshot(s=>{S.doener=s.docs.map(d=>({id:d.id,...d.data()}));renderSoon()},()=>{});
   db.collection('geburtstage').onSnapshot(s=>{S.gb=Object.fromEntries(s.docs.map(d=>[d.id,d.data().md]));S.gbLoaded=true;renderSoon()},()=>{});
+  db.collection('berichte').onSnapshot(s=>{S.berichte=s.docs.map(d=>({id:d.id,...d.data()}));renderSoon()},()=>{});
   db.collection('fussball').onSnapshot(s=>{S.fussball=s.docs.map(d=>({id:d.id,...d.data()}));renderSoon()},()=>{});
   const loadMembers=async()=>{const {data}=await sb.from('members').select('*');S.members=data||[];const mine=S.members.find(m=>m.user_id===S.uid);
-    if(mine&&(mine.role!==S.me.role||!mine.approved))return location.reload();render()}; // neue Rolle: neu laden, damit Abos und geladene Daten zur Rolle passen
+    if(mine&&(rolesOf(mine).join()!==rolesOf(S.me).join()||!mine.approved))return location.reload();render()}; // neue Rolle: neu laden, damit Abos und geladene Daten zur Rolle passen
 
   loadMembers();sb.channel('rt-members').on('postgres_changes',{event:'*',schema:'public',table:'members'},loadMembers).subscribe();
 }

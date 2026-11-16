@@ -15,6 +15,8 @@ create table if not exists public.members (
 );
 
 -- Rollen: member (Spieler), kassenwart, admin, deckenzaehler (wie Spieler, nur mit eigenem Namen), doenerwart (wie Spieler, hakt Döner-Zahlungen ab), trainer (wie Spieler, ändert alles im Kalender), mannschaftsverantwortlicher (wie Spieler, trägt Treffpunkte bei Spielen ein), trikotwart (wie Spieler, ändert als Einziger die Trikots)
+-- Eine Person kann mehrere Rollen haben: `role` ist die Hauptrolle, `roles` die weiteren Rollen.
+alter table public.members add column if not exists roles text[] not null default '{}';
 do $$
 declare c text;
 begin
@@ -22,33 +24,39 @@ begin
     execute format('alter table public.members drop constraint %I', c);
   end loop;
   alter table public.members add constraint members_role_check check (role in ('member','kassenwart','admin','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart'));
+  alter table public.members add constraint members_roles_check check (roles <@ array['kassenwart','admin','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart']);
 end $$;
 
 create or replace function public.my_role() returns text
 language sql stable security definer set search_path = public as $$
   select case when approved then role end from public.members where user_id = auth.uid()
 $$;
+-- hat das eigene (freigeschaltete) Konto diese Rolle, als Hauptrolle oder als weitere Rolle?
+create or replace function public.has_role(r text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce((select approved and r = any(roles || role) from public.members where user_id = auth.uid()), false)
+$$;
 create or replace function public.is_member() returns boolean language sql stable security definer set search_path = public as $$ select public.my_role() is not null $$;
-create or replace function public.is_admin()  returns boolean language sql stable security definer set search_path = public as $$ select coalesce(public.my_role() = 'admin', false) $$;
-create or replace function public.is_kw()     returns boolean language sql stable security definer set search_path = public as $$ select coalesce(public.my_role() = 'kassenwart', false) $$;
+create or replace function public.is_admin()  returns boolean language sql stable security definer set search_path = public as $$ select public.has_role('admin') $$;
+create or replace function public.is_kw()     returns boolean language sql stable security definer set search_path = public as $$ select public.has_role('kassenwart') $$;
 -- Wichtig: nie NULL zurückgeben. Ohne Rolle wäre `not can_book()` sonst NULL und eine Prüfung `if not can_book()` liefe ins Leere.
-create or replace function public.can_book()  returns boolean language sql stable security definer set search_path = public as $$ select coalesce(public.my_role() in ('admin','kassenwart'), false) $$;
+create or replace function public.can_book()  returns boolean language sql stable security definer set search_path = public as $$ select public.has_role('admin') or public.has_role('kassenwart') $$;
 
 alter table public.members enable row level security;
 drop policy if exists members_read on public.members;
 create policy members_read on public.members for select using (user_id = auth.uid() or public.is_member());
 drop policy if exists members_signup on public.members;
 create policy members_signup on public.members for insert
-  with check (user_id = auth.uid() and role = 'member' and approved = false);
+  with check (user_id = auth.uid() and role = 'member' and roles = '{}' and approved = false);
 drop policy if exists members_admin_update on public.members;
 -- Rollen verwalten: Admin darf alles. Der Kassenwart darf Mitglieder freischalten/sperren und die Rollen member/deckenzaehler/doenerwart/trainer/mannschaftsverantwortlicher/trikotwart
--- vergeben, aber niemanden zum Admin oder Kassenwart machen und Admins/Kassenwarte weder ändern noch entfernen.
+-- vergeben, aber niemanden zum Admin oder Kassenwart machen und Admins/Kassenwarte (auch als weitere Rolle) weder ändern noch entfernen.
 create policy members_admin_update on public.members for update
-  using (public.is_admin() or (public.is_kw() and role in ('member','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart')))
-  with check (public.is_admin() or (public.is_kw() and role in ('member','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart')));
+  using (public.is_admin() or (public.is_kw() and not (roles || role) && array['admin','kassenwart']))
+  with check (public.is_admin() or (public.is_kw() and not (roles || role) && array['admin','kassenwart']));
 drop policy if exists members_admin_delete on public.members;
 create policy members_admin_delete on public.members for delete
-  using (public.is_admin() or (public.is_kw() and role in ('member','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart')) or (user_id = auth.uid() and approved = false));
+  using (public.is_admin() or (public.is_kw() and not (roles || role) && array['admin','kassenwart']) or (user_id = auth.uid() and approved = false));
 
 -- ---------- Dokument-Tabellen ----------
 do $$
@@ -84,7 +92,7 @@ begin
 end $$;
 
 -- Deckenzähler: darf NUR „Fußball an der Decke“ (fineId f26) für andere eintragen und eigene, unbezahlte Einträge zurücknehmen
-create or replace function public.is_decke() returns boolean language sql stable security definer set search_path = public as $$ select coalesce(public.my_role() = 'deckenzaehler', false) $$;
+create or replace function public.is_decke() returns boolean language sql stable security definer set search_path = public as $$ select public.has_role('deckenzaehler') $$;
 drop policy if exists entries_decke_ins on public.entries;
 create policy entries_decke_ins on public.entries for insert with check (
   public.is_decke() and data->>'fineId' = 'f26' and data->>'createdBy' = auth.uid()::text
@@ -103,7 +111,7 @@ create policy entries_decke_del on public.entries for delete
 create or replace function public.doc_patch(t text, doc_id text, patch jsonb) returns void
 language plpgsql security invoker set search_path = public as $$
 begin
-  if t not in ('players','fines','entries','bills','settings','zahltag','receipts') then raise exception 'unknown table'; end if;
+  if t not in ('players','fines','entries','bills','settings','zahltag','receipts','schulden') then raise exception 'unknown table'; end if;
   execute format('update public.%I set data = data || $1, updated_at = now() where id = $2', t) using patch, doc_id;
 end $$;
 
@@ -524,7 +532,7 @@ grant execute on function public.doener_cleanup() to authenticated;
 
 -- Dönerwart: Rolle „doenerwart“ unter Mitglieder & Rollen. Er bekommt „Ich habe bezahlt“ als Nachricht und hakt die Zahlungen ab.
 create or replace function public.is_doenerwart() returns boolean
-language sql stable security definer set search_path = public as $$ select coalesce(public.my_role() = 'doenerwart', false) $$;
+language sql stable security definer set search_path = public as $$ select public.has_role('doenerwart') $$;
 -- Nur der Dönerwart hakt eine Bestellung als bezahlt ab oder macht es rückgängig
 create or replace function public.doener_set_paid(doc_id text, paid boolean) returns void
 language plpgsql security definer set search_path = public as $$
@@ -544,7 +552,7 @@ begin
   if pid is null then raise exception 'Kein verknüpfter Spieler'; end if;
   select data->>'text' into t from public.doener where id = w || '_' || pid;
   if t is null then raise exception 'Du hast diese Woche keinen Döner bestellt'; end if;
-  if not exists (select 1 from public.members where role = 'doenerwart' and approved) then raise exception 'Es ist noch kein Dönerwart festgelegt'; end if;
+  if not exists (select 1 from public.members where 'doenerwart' = any(roles || role) and approved) then raise exception 'Es ist noch kein Dönerwart festgelegt'; end if;
   update public.doener set data = data || jsonb_build_object('reportedAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')) where id = w || '_' || pid;
   select data->>'name' into nm from public.players where id = pid;
   return public.push_send('doener', null, array['doenerwart'], '💶 Döner bezahlt gemeldet',
@@ -669,7 +677,7 @@ begin
     from public.push_subs s join public.members m on m.user_id = s.user_id and m.approved
    where coalesce(s.prefs->>kind, 'true') <> 'false'
      and (pids is null or m.player_id = any(pids))
-     and (roles is null or m.role = any(roles))
+     and (push_send.roles is null or (m.roles || m.role) && push_send.roles)
      and (uid is null or s.user_id = uid);
   if n = 0 then return 0; end if;
   perform public.push_post(jsonb_build_object('subs', subs, 'title', title, 'body', body, 'tag', tag));
@@ -768,6 +776,13 @@ begin
   if extract(hour from n) = 9 then
     perform public.geburtstag_tick(n::date);
   end if;
+  -- Berichte: Sonntag vor der Abgabe um 12 Uhr, am Abgabetag um 9 Uhr
+  if extract(isodow from n) = 7 and extract(hour from n) = 12 then
+    perform public.bericht_tick(n::date, false);
+  end if;
+  if extract(hour from n) = 9 then
+    perform public.bericht_tick(n::date, true);
+  end if;
   if extract(hour from n) = 18 then
     for z in select data from public.zahltag
               where coalesce((data->>'active')::boolean, false)
@@ -817,8 +832,25 @@ end $$;
 revoke execute on function public.push_vapid_key() from public, anon;
 grant execute on function public.push_vapid_key() to authenticated;
 
+-- Dienstag 19:00 und 19:15 Uhr (deutsche Zeit): Erinnerung an den Dönerwart, die Döner zu bestellen (nur wenn jemand bestellt hat).
+-- pg_cron rechnet in UTC; der Zeitplan läuft deshalb um 17 und 18 Uhr UTC, und die Funktion prüft selbst, ob es in Deutschland 19 Uhr ist.
+create or replace function public.doener_wart_tick() returns void
+language plpgsql security definer set search_path = public as $$
+declare n timestamp := now() at time zone 'Europe/Berlin'; c int;
+begin
+  if extract(isodow from n) <> 2 or extract(hour from n) <> 19 or extract(minute from n) >= 30 then return; end if;
+  select count(*) into c from public.doener where data->>'week' = to_char(n::date, 'YYYY-MM-DD');
+  if c = 0 then return; end if;
+  perform public.push_send('doener', null, array['doenerwart'],
+    case when extract(minute from n) < 15 then '🥙 Döner bestellen' else '🥙 Erinnerung: Döner bestellen' end,
+    case when c = 1 then '1 Bestellung' else c || ' Bestellungen' end || ' – bitte jetzt die Döner bestellen.', 'doener-wart');
+exception when others then raise warning 'doener_wart_tick: %', sqlerrm;
+end $$;
+revoke execute on function public.doener_wart_tick() from public, anon, authenticated;
+
 do $$ begin
   perform cron.schedule('dragons-push', '0 * * * *', 'select public.push_tick()');
+  perform cron.schedule('dragons-doener', '0,15 17,18 * * 2', 'select public.doener_wart_tick()');
 exception when others then raise notice 'pg_cron-Zeitplan nicht angelegt: %', sqlerrm;
 end $$;
 
@@ -827,7 +859,7 @@ end $$;
 -- Trikots sind vorerst nur für Kassenwart und Admin: nur sie sehen und ändern Geburtsdaten.
 -- Trikotwart: als Einziger darf er bei „Trikots“ etwas ändern (Geburtsdaten, Wäsche). Sehen dürfen Kassenwart, Admin und Trikotwart.
 create or replace function public.is_trikotwart() returns boolean
-language sql stable security definer set search_path = public as $$ select coalesce(public.my_role() = 'trikotwart', false) $$;
+language sql stable security definer set search_path = public as $$ select public.has_role('trikotwart') $$;
 revoke execute on function public.is_trikotwart() from public, anon;
 grant execute on function public.is_trikotwart() to authenticated;
 create table if not exists public.geburt (id text primary key, data jsonb not null default '{}', updated_at timestamptz not null default now(),
@@ -863,7 +895,7 @@ do $$ begin alter publication supabase_realtime add table public.trikotwash; exc
 -- type 'usual' = übliche Trainingszeiten pro Wochentag (wd 0 = Montag); 'cancel' = Tag ohne Training (verhindert, dass die üblichen Zeiten wieder erscheinen); 'plan' = Merker „Wochenplan gesendet“; 'baelle' = wer an diesem Donnerstag die Bälle entharzt (pids, doneAt, doneBy).
 -- Die Spiele der Saison stehen in supabase/seed-spiele.sql (lokal, nicht im Repo).
 create or replace function public.can_termine() returns boolean
-language sql stable security definer set search_path = public as $$ select coalesce(public.my_role() in ('trainer', 'admin'), false) $$;
+language sql stable security definer set search_path = public as $$ select public.has_role('trainer') or public.has_role('admin') $$;
 create table if not exists public.termine (id text primary key, data jsonb not null default '{}', updated_at timestamptz not null default now(),
   constraint termine_form check (coalesce(length(data::text) < 1000 and ((data->>'type' in ('training','spiel','cancel') and data->>'date' ~ '^\d{4}-\d{2}-\d{2}$') or (data->>'type' = 'usual' and data->>'wd' ~ '^[0-6]$') or (data->>'type' = 'plan' and data->>'mon' ~ '^\d{4}-\d{2}-\d{2}$') or (data->>'type' = 'baelle' and data->>'date' ~ '^\d{4}-\d{2}-\d{2}$' and jsonb_typeof(data->'pids') = 'array')), false)));
 alter table public.termine enable row level security;
@@ -878,7 +910,7 @@ create policy termine_del on public.termine for delete using (public.can_termine
 do $$ begin alter publication supabase_realtime add table public.termine; exception when duplicate_object then null; end $$;
 -- Mannschaftsverantwortlicher: darf bei Spielen NUR den Treffpunkt eintragen (über diese Funktion, nicht direkt in die Tabelle)
 create or replace function public.is_mv() returns boolean
-language sql stable security definer set search_path = public as $$ select coalesce(public.my_role() = 'mannschaftsverantwortlicher', false) $$;
+language sql stable security definer set search_path = public as $$ select public.has_role('mannschaftsverantwortlicher') $$;
 create or replace function public.termin_treffpunkt(doc_id text, meet text, meet_place text) returns void
 language plpgsql security definer set search_path = public as $$
 begin
@@ -992,9 +1024,11 @@ do $$ begin alter publication supabase_realtime add table public.geburtstage; ex
 
 -- Am Geburtstag (aufgerufen von push_tick um 9 Uhr deutscher Zeit): Kabinenfest eintragen + Glückwünsche + Info an alle anderen.
 -- 29.02. wird in Nicht-Schaltjahren am 28.02. gefeiert. Feste ID kf-gb-<Spieler>-<Jahr>: nie doppelt.
+-- Wer keine Geburtstags-Nachrichten bekommen soll, steht in kasse_intern 'push_stumm' (data.geburtstag = Liste von Spieler-IDs, lokal in seed-geburtstage.sql).
 create or replace function public.geburtstag_tick(d date) returns void
 language plpgsql security definer set search_path = public as $$
 declare r record; md text := to_char(d, 'MM-DD'); y text := to_char(d, 'YYYY');
+  stumm text[] := array(select jsonb_array_elements_text(coalesce((select data->'geburtstag' from public.kasse_intern where id = 'push_stumm'), '[]')));
   leap boolean := (extract(year from d)::int % 4 = 0 and (extract(year from d)::int % 100 <> 0 or extract(year from d)::int % 400 = 0));
 begin
   -- nur aktive Personen, die es noch im Kader gibt
@@ -1014,12 +1048,76 @@ begin
       end if;
     exception when others then raise warning 'geburtstag_tick Kabinenfest: %', sqlerrm;
     end;
-    perform public.push_send('geburtstag', array[r.pid], null, '🎉 Alles Gute zum Geburtstag!',
-      'Die ganze Mannschaft wünscht dir alles Gute, ' || split_part(r.nm, ' ', 1) || '! 🐉', 'gb-' || r.pid);
+    if r.pid <> all(stumm) then
+      perform public.push_send('geburtstag', array[r.pid], null, '🎉 Alles Gute zum Geburtstag!',
+        'Die ganze Mannschaft wünscht dir alles Gute, ' || split_part(r.nm, ' ', 1) || '! 🐉', 'gb-' || r.pid);
+    end if;
     perform public.push_send('geburtstag',
-      array(select m.player_id from public.members m where m.approved and m.player_id is not null and m.player_id <> r.pid),
+      array(select m.player_id from public.members m where m.approved and m.player_id is not null and m.player_id <> r.pid and m.player_id <> all(stumm)),
       null, '🎂 ' || r.nm || ' hat heute Geburtstag', 'Gratulier doch kurz in der Gruppe!', 'gb-' || r.pid);
   end loop;
 exception when others then raise warning 'geburtstag_tick: %', sqlerrm;
 end $$;
 revoke execute on function public.geburtstag_tick(date) from public, anon, authenticated;
+
+-- ---------- Schulden (Notizliste nur für den Kassenwart) ----------
+-- Name, Betrag, abgehakt. Sehen und ändern darf das ausschließlich der Kassenwart (auch nicht der Admin).
+create table if not exists public.schulden (id text primary key, data jsonb not null default '{}', updated_at timestamptz not null default now(),
+  constraint schulden_form check (length(data::text) < 1000 and length(coalesce(data->>'name', '')) between 1 and 80 and public.num_or0(data->>'amount') >= 0));
+alter table public.schulden enable row level security;
+drop policy if exists schulden_all on public.schulden;
+create policy schulden_all on public.schulden for all using (public.is_kw()) with check (public.is_kw());
+do $$ begin alter publication supabase_realtime add table public.schulden; exception when duplicate_object then null; end $$;
+
+-- ---------- Jeder Name nur einmal ----------
+-- Bei der Registrierung darf man nur einen Spieler wählen, den noch kein anderes Konto gewählt hat.
+do $$ begin
+  if exists (select 1 from public.members where player_id is not null group by player_id having count(*) > 1) then
+    raise notice 'members: ein Spieler ist mehreren Konten zugeordnet – Eindeutigkeit wird erst nach dem Aufräumen angelegt';
+  else
+    create unique index if not exists members_player_once on public.members (player_id);
+  end if;
+end $$;
+-- welche Spieler schon vergeben sind (nur die IDs, keine E-Mail-Adressen) – für die Namensauswahl bei der Registrierung
+create or replace function public.taken_players() returns setof text
+language sql stable security definer set search_path = public as $$
+  select player_id from public.members where player_id is not null and auth.uid() is not null
+$$;
+revoke execute on function public.taken_players() from public, anon;
+grant execute on function public.taken_players() to authenticated;
+
+-- ---------- Berichte fürs Hallenheft (Lage der Liga, Grußwort) ----------
+-- Pro Heimspiel: date, spieltag, gegner, lage (Spieler-ID), gruss (Spieler-ID), abgabe (Datum). Alle sehen den Plan; ändern lässt er sich in der App nicht.
+-- Der Plan steht in supabase/seed-berichte.sql (lokal, nicht im Repo).
+create table if not exists public.berichte (id text primary key, data jsonb not null default '{}', updated_at timestamptz not null default now(),
+  constraint berichte_form check (length(data::text) < 1000 and data->>'date' ~ '^\d{4}-\d{2}-\d{2}$' and coalesce(data->>'abgabe', '2000-01-01') ~ '^\d{4}-\d{2}-\d{2}$'));
+alter table public.berichte enable row level security;
+drop policy if exists berichte_read on public.berichte;
+create policy berichte_read on public.berichte for select using (public.is_member());
+drop policy if exists berichte_write on public.berichte;
+do $$ begin alter publication supabase_realtime add table public.berichte; exception when duplicate_object then null; end $$;
+
+-- Erinnerung an die Schreiber (aus push_tick): am Sonntag vor der Abgabe um 12 Uhr und am Abgabetag um 9 Uhr.
+-- Beispiel: Heimspiel 28.11., Abgabe Mo 23.11. → So 22.11. 12 Uhr und Mo 23.11. 9 Uhr. Ohne Abgabedatum keine Erinnerung.
+drop function if exists public.bericht_tick(date);
+create or replace function public.bericht_tick(d date, abgabetag boolean) returns void
+language plpgsql security definer set search_path = public as $$
+declare r record; k text; a date;
+begin
+  for r in select id, data from public.berichte where coalesce(data->>'abgabe', '') ~ '^\d{4}-\d{2}-\d{2}$' and data->>'date' ~ '^\d{4}-\d{2}-\d{2}$' loop
+    begin a := (r.data->>'abgabe')::date; perform (r.data->>'date')::date; exception when others then continue; end; -- ungültiges Datum: nur diese Zeile überspringen
+    -- Sonntag vor der Abgabe (ist die Abgabe selbst ein Sonntag, der Sonntag eine Woche davor)
+    continue when not (case when abgabetag then d = a else d = a - (case when extract(isodow from a)::int = 7 then 7 else extract(isodow from a)::int end) end);
+    foreach k in array array['lage', 'gruss'] loop
+      if nullif(r.data->>k, '') is not null then
+        perform public.push_send('bericht', array[r.data->>k], null,
+          case when abgabetag then '📝 Heute Abgabe: Bericht' else '📝 Bericht schreiben' end,
+          'Du schreibst ' || case k when 'lage' then '„Lage der Liga“' else 'das Grußwort' end || ' fürs Heimspiel gegen '
+          || coalesce(r.data->>'gegner', '?') || ' am ' || to_char((r.data->>'date')::date, 'DD.MM.')
+          || case when abgabetag then ' – bitte heute abgeben.' else ' – Abgabe bis ' || to_char(a, 'DD.MM.') || '.' end, 'bericht-' || r.id);
+      end if;
+    end loop;
+  end loop;
+exception when others then raise warning 'bericht_tick: %', sqlerrm;
+end $$;
+revoke execute on function public.bericht_tick(date, boolean) from public, anon, authenticated;
