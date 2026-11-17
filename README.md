@@ -13,7 +13,7 @@ Rechnungen, Zahltag mit PayPal/Überweisung und automatischer Verzugsstrafe.
 | Kassenwart | + Strafen/Rechnungen eintragen, **als Einziger** den Zahltag starten |
 | Admin | + Strafen/Rechnungen eintragen, Katalog, Kader, Zahlungsdaten, Mitglieder freischalten |
 
-Eine Person kann mehrere Rollen haben (z. B. Trainer und Dönerwart). Wasserwart, Aufräumdienst und Deckenzähler tragen „ihre“ Strafen selbst ein. Unter „Eintragen“ kann jeder eine Anzeige mit Foto erstatten; der Kassenwart trägt die Strafe ein oder lehnt ab. Unter „Schulden“ führt der Kassenwart eine eigene Liste, die nur er sieht.
+Eine Person kann mehrere Rollen haben (z. B. Trainer und Dönerwart). Der Deckenzähler trägt „Fußball an der Decke“ selbst ein; alle anderen melden Verstöße als Anzeige. Unter „Eintragen“ kann jeder eine Anzeige mit Foto erstatten; der Kassenwart trägt die Strafe ein oder lehnt ab. Unter „Schulden“ führt der Kassenwart eine eigene Liste, die nur er sieht.
 
 Neue Konten wählen bei der Registrierung ihren Namen und sehen die Kasse erst nach Freischaltung durch einen Admin.
 

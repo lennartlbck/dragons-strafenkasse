@@ -188,8 +188,8 @@ const purpose=p=>'Mannschaftskasse Dragons '+p.name;
 const toPay=b=>Math.max(0,Math.round((b.open-b.credit)*100)/100);
 const DAY=864e5,KW_DEFAULT='p29',LATE_FEE=10;
 const myPid=()=>S.me?S.me.player_id:null;
-// Ämter mit Strafrechten (wie amt_fine in schema.sql): nur diese Strafen dürfen sie selbst eintragen
-const AMT_FINES={deckenzaehler:['f26'],wasserwart:['f44','f45'],aufraeumdienst:['f25']};
+// Ämter mit Strafrechten (wie amt_fine in schema.sql): nur diese Strafen dürfen sie selbst eintragen. Wasserwart/Aufräumdienst melden per Anzeige.
+const AMT_FINES={deckenzaehler:['f26']};
 function setPerms(){const mgr=hasRole('admin','kassenwart'),a=Object.entries(AMT_FINES).filter(([r])=>hasRole(r));S.canEdit=mgr;S.canWrite=mgr;
   S.amtFines=!mgr&&a.length?new Set(a.flatMap(x=>x[1])):null;S.amtRoles=a.map(x=>roleName(x[0]))}
 const favKey=()=>'favs-'+(S.uid||'x');

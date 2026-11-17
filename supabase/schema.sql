@@ -14,7 +14,7 @@ create table if not exists public.members (
   created_at timestamptz not null default now()
 );
 
--- Rollen: member (Spieler), kassenwart, admin, deckenzaehler / wasserwart / aufraeumdienst (wie Spieler + bestimmte Strafen selbst eintragen), doenerwart (wie Spieler, hakt Döner-Zahlungen ab), trainer (wie Spieler, ändert alles im Kalender), mannschaftsverantwortlicher (wie Spieler, trägt Treffpunkte bei Spielen ein), trikotwart (wie Spieler, ändert als Einziger die Trikots)
+-- Rollen: member (Spieler), kassenwart, admin, deckenzaehler (wie Spieler + „Fußball an der Decke“ selbst eintragen), wasserwart / aufraeumdienst (nur Bezeichnung), doenerwart (wie Spieler, hakt Döner-Zahlungen ab), trainer (wie Spieler, ändert alles im Kalender), mannschaftsverantwortlicher (wie Spieler, trägt Treffpunkte bei Spielen ein), trikotwart (wie Spieler, ändert als Einziger die Trikots)
 -- Eine Person kann mehrere Rollen haben: `role` ist die Hauptrolle, `roles` die weiteren Rollen.
 alter table public.members add column if not exists roles text[] not null default '{}';
 do $$
@@ -91,11 +91,11 @@ begin
   end loop;
 end $$;
 
--- Ämter mit Strafrechten: Deckenzähler („Fußball an der Decke“ f26), Wasserwart (Flaschen f44, f45), Aufräumdienst (nicht aufgeräumt f25).
+-- Amt mit Strafrecht: nur der Deckenzähler („Fußball an der Decke“ f26). Wasserwart und Aufräumdienst sind reine Bezeichnungen; sie melden Verstöße wie alle als Anzeige, die der Kassenwart bestätigt.
 -- Sie dürfen NUR diese Strafen für andere eintragen (ohne Kabinenfest, höchstens 50 €) und eigene, unbezahlte Einträge zurücknehmen.
 create or replace function public.is_decke() returns boolean language sql stable security definer set search_path = public as $$ select public.has_role('deckenzaehler') $$;
 create or replace function public.amt_fine(fid text) returns boolean language sql stable security definer set search_path = public as $$
-  select (fid = 'f26' and public.has_role('deckenzaehler')) or (fid in ('f44', 'f45') and public.has_role('wasserwart')) or (fid = 'f25' and public.has_role('aufraeumdienst'))
+  select fid = 'f26' and public.has_role('deckenzaehler')
 $$;
 drop policy if exists entries_decke_ins on public.entries;
 drop policy if exists entries_decke_upd on public.entries;
