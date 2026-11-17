@@ -116,7 +116,7 @@ function avatar(p,cls=''){if(!p)return `<span class="av ${cls}">?</span>`;
   if(p.img)return `<span class="av ${cls}"><img src="${esc(p.img)}" alt="" loading="lazy"></span>`;
   const ini=p.name.split(/\s+/).map(w=>w[0]).slice(0,2).join('');return `<span class="av ${cls}">${esc(ini)}</span>`}
 S.termine=[];S.kalView='woche';S.kalMon=null;S.kalM=null;
-const ROLES=[['member','Spieler'],['kassenwart','Kassenwart'],['admin','Admin'],['deckenzaehler','Deckenzähler'],['doenerwart','Dönerwart'],['trainer','Trainer'],['mannschaftsverantwortlicher','Mannschaftsverantwortlicher'],['trikotwart','Trikotwart'],['wasserwart','Wasserwart'],['aufraeumdienst','Aufräumdienst']];
+const ROLES=[['member','Spieler'],['kassenwart','Kassenwart'],['admin','Admin'],['deckenzaehler','Deckenzähler'],['doenerwart','Dönerwart'],['trainer','Trainer'],['mannschaftsverantwortlicher','Mannschaftsverantwortlicher'],['trikotwart','Trikotwart'],['wasserwart','Wasserwart'],['aufraeumdienst','Aufräumdienst'],['kabinenfestwart','Kabinenfestwart']];
 const roleName=r=>(ROLES.find(x=>x[0]===r)||[0,r])[1];
 const pLabel=p=>p?(p.role==='Spieler'&&p.number!=null?'#'+p.number+' · ':'')+(p.role&&p.role!=='Spieler'?p.role:'Spieler'):'';
 
@@ -198,7 +198,11 @@ function saveFavs(){try{localStorage.setItem(favKey(),JSON.stringify(S.favs))}ca
 // Strafen mit Zwei-Schritt-Ablauf: Spieler wählen → Weiter → Anzahl pro Spieler
 const COUNT_FLOW={f26:'Deckentreffer',f02:'Bier',f03:'Radler'};
 const countFine=f=>!!f&&f.id in COUNT_FLOW;
-const canEnter=f=>S.canWrite===true||!!(S.amtFines&&f&&S.amtFines.has(f.id));
+const canEnter=f=>S.canWrite===true||!!(S.amtFines&&f&&S.amtFines.has(f.id))||(!!f&&f.id==='kf-manual'&&hasRole('kabinenfestwart'));
+// Kabinenfeste planen und abhaken: Kassenwart, Admin, Kabinenfestwart
+const canKf=()=>S.canWrite===true||hasRole('kabinenfestwart');
+// nur kfDone/kfOrder/kfWeek ändern (geht auch für den Kabinenfestwart, siehe kf_patch in schema.sql)
+async function kfPatch(id,patch){const {error}=await S.sb.rpc('kf_patch',{doc_id:id,patch});if(error)throw error;const e=S.entries.find(x=>x.id===id);if(e)Object.assign(e,patch);renderSoon()}
 const kwPid=()=>S.settings.kassenwartPlayer||KW_DEFAULT;
 // Hauptrolle (role) plus weitere Rollen (roles); 'member' zählt nicht als Rolle
 const rolesOf=m=>m?[m.role,...(m.roles||[])].filter(r=>r&&r!=='member'):[];
@@ -478,7 +482,7 @@ const kfThisWeek=()=>kfWeekMap()[isoD(monOf(bToday()))]||[];
 const kfWho=e=>pById(e.playerId)||TEAM_ENT.find(t=>t.id===e.playerId)||null;
 function kwRange(mon){const d=new Date(mon+'T12:00:00'),e=new Date(d);e.setDate(e.getDate()+6);const f=x=>`${String(x.getDate()).padStart(2,'0')}.${String(x.getMonth()+1).padStart(2,'0')}.`;return{kw:isoKw(d),range:f(d)+' – '+f(e)}}
 function isoKw(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const n=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-n);return Math.ceil(((t-Date.UTC(t.getUTCFullYear(),0,1))/864e5+1)/7)}
-function kfCalendar(s){const now=bToday(),cur=s.cal||{y:now.getFullYear(),m:now.getMonth()},map=kfWeekMap(),todayIso=isoD(now),thisMon=isoD(monOf(now)),canW=S.canWrite===true;
+function kfCalendar(s){const now=bToday(),cur=s.cal||{y:now.getFullYear(),m:now.getMonth()},map=kfWeekMap(),todayIso=isoD(now),thisMon=isoD(monOf(now)),canW=canKf();
   const first=new Date(cur.y,cur.m,1,12);let d=monOf(first);const last=new Date(cur.y,cur.m+1,0,12);
   let h=`<div class="calnav"><button class="iconbtn round" data-act="kfcal" data-d="-1" aria-label="Vorheriger Monat">${I('chevL')}</button><b>${MONTHS[cur.m]} ${cur.y}</b><button class="iconbtn round" data-act="kfcal" data-d="1" aria-label="Nächster Monat">${I('chevR')}</button></div>
     <div class="cal" role="grid" aria-label="Kabinenfest-Kalender ${MONTHS[cur.m]} ${cur.y}"><div class="cal-h"></div>${['Mo','Di','Mi','Do','Fr','Sa','So'].map(x=>`<div class="cal-h">${x}</div>`).join('')}`;
@@ -542,7 +546,7 @@ async function gbKfCheck(){if(!isKW()||S.status!=='ready'||!S.got.e||!S.gbLoaded
   catch(e){S._gbFailAt=Date.now()} // nicht bei jeder Aktualisierung neu versuchen, erst nach 5 Minuten
   S._gbBusy=false}
 async function kfSave(ids){
-  const jobs=[];ids.forEach((id,i)=>{const e=S.entries.find(x=>x.id===id);if(e&&e.kfOrder!==i*10){const prev=e.kfOrder;e.kfOrder=i*10;jobs.push(S.db.doc('entries/'+id).update({kfOrder:i*10}).catch(err=>{e.kfOrder=prev;throw err}))}});
+  const jobs=[];ids.forEach((id,i)=>{const e=S.entries.find(x=>x.id===id);if(e&&e.kfOrder!==i*10){const prev=e.kfOrder;e.kfOrder=i*10;jobs.push(kfPatch(id,{kfOrder:i*10}).catch(err=>{e.kfOrder=prev;throw err}))}});
   const r=await Promise.allSettled(jobs),bad=r.find(x=>x.status==='rejected');
   if(bad){toast(errMsg(bad.reason));if(S.sheet&&S.sheet.type==='kf')renderSheet(false)}
 }
@@ -1185,7 +1189,7 @@ function renderSheet(refresh){
       return `<div class="mrow cf">${avatar(p)}<div class="m"><b>${esc(p.name)}${drg(p.id)}</b><i>${last?'gemeldet '+esc(dtDE(last)):'gemeldet'} · ${es.length} ${es.length===1?'Eintrag':'Einträge'}</i></div><div class="r"><strong class="num">${eur(sum)}</strong></div>
         <div class="acts"><button class="mini on" data-act="confirmPay" data-id="${esc(pid)}">${I('check')} Bestätigt</button><button class="mini" data-act="rejectPay" data-id="${esc(pid)}">Nicht erhalten</button></div></div>`}).join('')+`</div>`:`<div class="empty">Alle gemeldeten Zahlungen sind bestätigt.</div>`;
   } else if(s.type==='kf'){
-    const list=kfList(),cal=s.view==='cal',canW=S.canWrite!==false;
+    const list=kfList(),cal=s.view==='cal',canW=canKf();
     head=`<h2>Kabinenfest</h2><p>${list.length?list.length+' offen':'Alles erledigt'}</p>`;
     const seg=`<div class="seg full" role="group" aria-label="Ansicht" style="margin-bottom:12px"><button data-act="kfview" data-k="liste" aria-pressed="${!cal}">Offen</button><button data-act="kfview" data-k="cal" aria-pressed="${cal}">Kalender</button></div>`;
     if(!list.length)body=(cal?seg:'')+`<div class="empty">Keine offenen Kabinenfeste – alles erledigt.</div>`;
@@ -1196,7 +1200,7 @@ function renderSheet(refresh){
         +(canW&&q.length>1?`<div class="hint" style="margin-bottom:12px">Am Griff links ziehen, um die Reihenfolge zu ändern.</div>`:'')
         +(q.length?`<div class="rows" id="kflist">`+q.map((e,i)=>{const p=kfWho(e);
       return `<div class="row kfrow" data-id="${esc(e.id)}">${canW?`<span class="grip" role="button" tabindex="0" data-id="${esc(e.id)}" aria-label="Reihenfolge ändern: ${esc(p?p.name:'')}">${ICONS.grip}</span>`:''}<span class="pos">${i+1}</span>${who(e)}<div class="m"><b>${esc(p?p.name:'Unbekannt')}${p&&!p.team?drg(p.id):''}</b><i>${esc(e.title+' · '+dDE(e.date))}</i></div>${done(e)}</div>`}).join('')+`</div>`:`<div class="empty">Alle offenen Kabinenfeste sind fest eingeplant.</div>`)}
-    if(S.canWrite===true)foot=`<button class="btn primary" data-act="addKf">${I('plus')}Kabinenfest hinzufügen</button>`;
+    if(canKf())foot=`<button class="btn primary" data-act="addKf">${I('plus')}Kabinenfest hinzufügen</button>`;
   } else if(s.type==='editEntry'){
     const e=S.entries.find(x=>x.id===s.id);if(!e){closeSheet();return}
     const hist=(e.history||[]).slice().reverse(),pl=(String(e.playerId).startsWith('team-')?TEAM_ENT:[]).concat(sortedPlayers(true));
@@ -1644,10 +1648,10 @@ document.addEventListener('click',async ev=>{
       if(!t||!m||!validMd(md)||t>[31,29,31,30,31,30,31,31,30,31,30,31][m-1]){toast('Bitte Tag und Monat wählen');break}
       el.disabled=true;try{await S.db.doc('geburtstage/'+id).set({md});{const g=S.geburt[id];if(validBirth(g)&&g.slice(5)!==md){const nd=g.slice(0,4)+'-'+md;if(validBirth(nd))await S.db.doc('geburt/'+id).set({date:nd});else await S.db.doc('geburt/'+id).delete()}}toast('Geburtstag gespeichert 🎂');S.still=true;openSheet({type:'gb'})}catch(e){el.disabled=false;toast(errMsg(e))}break}
     case 'gbDel':{if(!isKW())break;try{await S.db.doc('geburtstage/'+id).delete();toast('Geburtstag entfernt');S.still=true;openSheet({type:'gb'})}catch(e){toast(errMsg(e))}break}
-    case 'kfAddWeek':if(S.canWrite===true){S.still=true;openSheet({type:'kfWeekAdd',mon:id,pid:null,note:'',back:{type:'kf',view:'cal',cal:S.sheet&&S.sheet.cal}})}break;
+    case 'kfAddWeek':if(canKf()){S.still=true;openSheet({type:'kfWeekAdd',mon:id,pid:null,note:'',back:{type:'kf',view:'cal',cal:S.sheet&&S.sheet.cal}})}break;
     case 'kfwPick':{const s=S.sheet;s.note=$('#kfwn')?.value||'';s.pid=s.pid===id?null:id;S.still=true;renderSheet(false);break}
     case 'kfwBack':S.still=true;openSheet(S.sheet.back);break;
-    case 'kfwSave':{const s=S.sheet;if(S.canWrite!==true||!s.pid)break;const note=($('#kfwn')?.value||'').trim().slice(0,120),r=kwRange(s.mon);el.disabled=true;
+    case 'kfwSave':{const s=S.sheet;if(!canKf()||!s.pid)break;const note=($('#kfwn')?.value||'').trim().slice(0,120),r=kwRange(s.mon);el.disabled=true;
       try{await S.db.collection('entries').doc().set({playerId:s.pid,fineId:'kf-manual',title:'Kabinenfest',amount:0,qty:null,unit:null,col:'strafen',spieltag:false,kabinenfest:true,kfDone:false,kfWeek:s.mon,note:note||('Eingeplant für KW '+r.kw),date:today(),createdAt:new Date().toISOString(),createdBy:S.uid||null,paid:false,paidAt:null});
         toast(`Kabinenfest in KW ${r.kw}: ${kfWho({playerId:s.pid})?.name||''} 🍻`);S.still=true;openSheet(s.back)}catch(e){el.disabled=false;toast(errMsg(e))}break}
     case 'openPush':S.still=true;S.push={...(S.push||{}),ready:false};openSheet({type:'push'});pushLoad();break;
@@ -1739,7 +1743,7 @@ document.addEventListener('click',async ev=>{
       // wieder geöffnet: die Datenbank bucht verbrauchtes Guthaben zurück (wird beim nächsten Zahltag neu verrechnet)
       if(e.paid){try{await S.db.doc('entries/'+id).update({paid:false,paidAt:null,paidVia:null});logChange(`Bezahlt-Haken entfernt: ${pById(e.playerId)?.name||'?'} – ${e.title}`,e.amount);toast(e.creditUsed>0?'Wieder offen – Guthaben zurückgebucht':'Wieder offen')}catch(err){toast(errMsg(err))}break}
       setEntry(id,{paid:!e.paid,paidAt:e.paid?null:new Date().toISOString(),paidVia:e.paid?null:(isKW()?'kassenwart':'manuell')});break}
-    case 'kf':{const e=S.entries.find(x=>x.id===id);if(e)setEntry(id,{kfDone:!e.kfDone});break}
+    case 'kf':{const e=S.entries.find(x=>x.id===id);if(e&&canKf())kfPatch(id,{kfDone:!e.kfDone}).catch(err=>toast(errMsg(err)));break}
     case 'del':if(S.confirmDel===id){S.confirmDel=null;const de=S.entries.find(x=>x.id===id);try{await S.db.doc('entries/'+id).delete();if(de&&de.paid)logChange(`Bezahlte Strafe gelöscht: ${pById(de.playerId)?.name||'?'} – ${de.title}`,de.amount);toast(de&&de.paid&&de.creditUsed>0?'Eintrag gelöscht – Guthaben zurückgebucht':'Eintrag gelöscht')}catch(e){toast(errMsg(e))}}else{S.confirmDel=id;render();if(S.sheet)renderSheet(false)}break;
     case 'payAll':{if(!isKW()){toast('Nur Kassenwart und Admin können das');break}
       if(S.confirmPayAll!==id){S.confirmPayAll=id;renderSheet(false);clearTimeout(S._pat);S._pat=setTimeout(()=>{S.confirmPayAll=null;if(S.sheet)renderSheet(false)},4000);break}

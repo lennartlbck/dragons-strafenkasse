@@ -14,7 +14,7 @@ create table if not exists public.members (
   created_at timestamptz not null default now()
 );
 
--- Rollen: member (Spieler), kassenwart, admin, deckenzaehler (wie Spieler + „Fußball an der Decke“ selbst eintragen), wasserwart / aufraeumdienst (nur Bezeichnung), doenerwart (wie Spieler, hakt Döner-Zahlungen ab), trainer (wie Spieler, ändert alles im Kalender), mannschaftsverantwortlicher (wie Spieler, trägt Treffpunkte bei Spielen ein), trikotwart (wie Spieler, ändert als Einziger die Trikots)
+-- Rollen: member (Spieler), kassenwart, admin, deckenzaehler (wie Spieler + „Fußball an der Decke“ selbst eintragen), wasserwart / aufraeumdienst (nur Bezeichnung), kabinenfestwart (plant und hakt Kabinenfeste ab), doenerwart (wie Spieler, hakt Döner-Zahlungen ab), trainer (wie Spieler, ändert alles im Kalender), mannschaftsverantwortlicher (wie Spieler, trägt Treffpunkte bei Spielen ein), trikotwart (wie Spieler, ändert als Einziger die Trikots)
 -- Eine Person kann mehrere Rollen haben: `role` ist die Hauptrolle, `roles` die weiteren Rollen.
 alter table public.members add column if not exists roles text[] not null default '{}';
 do $$
@@ -23,8 +23,8 @@ begin
   for c in select conname from pg_constraint where conrelid = 'public.members'::regclass and contype = 'c' and pg_get_constraintdef(oid) like '%role%' loop
     execute format('alter table public.members drop constraint %I', c);
   end loop;
-  alter table public.members add constraint members_role_check check (role in ('member','kassenwart','admin','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart','wasserwart','aufraeumdienst'));
-  alter table public.members add constraint members_roles_check check (roles <@ array['kassenwart','admin','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart','wasserwart','aufraeumdienst']);
+  alter table public.members add constraint members_role_check check (role in ('member','kassenwart','admin','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart','wasserwart','aufraeumdienst','kabinenfestwart'));
+  alter table public.members add constraint members_roles_check check (roles <@ array['kassenwart','admin','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart','wasserwart','aufraeumdienst','kabinenfestwart']);
 end $$;
 
 create or replace function public.my_role() returns text
@@ -1191,3 +1191,28 @@ end $$;
 drop trigger if exists push_member_ins on public.members;
 create trigger push_member_ins after insert on public.members for each row execute function public.push_member_ins();
 revoke execute on function public.push_member_ins() from public, anon, authenticated;
+
+-- ---------- Kabinenfestwart: Kabinenfeste eintragen, abhaken, einplanen, Reihenfolge ändern ----------
+-- Er darf nur reine Kabinenfeste ohne Betrag anlegen (kf-manual, 0 €), eigene noch offene davon wieder löschen und bei Kabinenfest-Einträgen nur kfDone, kfOrder und kfWeek ändern.
+-- An Strafbeträge, Bezahlt-Status und alles andere kommt er nicht.
+drop policy if exists entries_kfw_ins on public.entries;
+create policy entries_kfw_ins on public.entries for insert with check (
+  public.has_role('kabinenfestwart') and id ~ '^[a-z0-9]{9,20}$' and data->>'fineId' = 'kf-manual'
+  and coalesce((data->>'kabinenfest')::boolean, false) and public.num_or0(data->>'amount') = 0
+  and not coalesce((data->>'paid')::boolean, false) and data->>'createdBy' = auth.uid()::text);
+-- eigene, noch nicht erledigte Kabinenfeste ohne Betrag wieder löschen (z. B. „Rückgängig“ nach dem Eintragen)
+drop policy if exists entries_kfw_del on public.entries;
+create policy entries_kfw_del on public.entries for delete using (
+  public.has_role('kabinenfestwart') and data->>'fineId' = 'kf-manual' and data->>'createdBy' = auth.uid()::text
+  and public.num_or0(data->>'amount') = 0 and not coalesce((data->>'paid')::boolean, false) and not coalesce((data->>'kfDone')::boolean, false));
+create or replace function public.kf_patch(doc_id text, patch jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not (public.can_book() or public.has_role('kabinenfestwart')) then raise exception 'Keine Berechtigung'; end if;
+  if jsonb_typeof(patch) <> 'object' or exists (select 1 from jsonb_object_keys(patch) k where k not in ('kfDone', 'kfOrder', 'kfWeek')) then raise exception 'Nur Kabinenfest-Felder'; end if;
+  if patch ? 'kfWeek' and patch->>'kfWeek' is not null and patch->>'kfWeek' !~ '^\d{4}-\d{2}-\d{2}$' then raise exception 'Ungültige Woche'; end if;
+  update public.entries set data = data || patch, updated_at = now()
+   where id = doc_id and coalesce((data->>'kabinenfest')::boolean, false);
+end $$;
+revoke execute on function public.kf_patch(text, jsonb) from public, anon;
+grant execute on function public.kf_patch(text, jsonb) to authenticated;
