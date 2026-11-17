@@ -20,6 +20,7 @@ die Edge Function erzeugt die VAPID-Schlüssel beim ersten Aufruf selbst, und di
 | Neue Strafe | der betroffene Spieler |
 | Zahltag gestartet | jeder, der etwas zahlen muss |
 | Zahltag endet in < 24 h (18 Uhr) | wer noch offen ist und nicht gemeldet hat |
+| Dienstag 12 Uhr | alle: heute bis 18 Uhr Döner bestellen |
 | Dienstag 17 Uhr | alle, die noch keinen Döner bestellt haben |
 | Dienstag 19:00 und 19:15 Uhr | der Dönerwart: „Döner bestellen“ (nur wenn jemand bestellt hat) |
 | Neues Fußballspiel / Runde vorbei | alle |

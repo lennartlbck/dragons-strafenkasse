@@ -488,7 +488,7 @@ begin
 exception when duplicate_object then null;
 end $$;
 
--- ---------- Döner-Bestellungen (jeden Dienstag bis 18 Uhr, deutsche Zeit) ----------
+-- ---------- Döner-Bestellungen (nur dienstags, bis 18 Uhr deutsche Zeit; 12 Uhr Erinnerung an alle) ----------
 -- Jeder freigeschaltete Spieler trägt nur seine eigene Bestellung ein und kann sie bis zum Bestellschluss ändern oder löschen.
 -- Danach ist die Liste fest. Niemand löscht fremde Bestellungen, auch nicht Admin oder Kassenwart.
 -- Ab Mittwoch räumt doener_cleanup() die Bestellungen vergangener Dienstage weg.
@@ -502,8 +502,8 @@ declare d date; n timestamp := now() at time zone 'Europe/Berlin';
 begin
   if w is null or w !~ '^\d{4}-\d{2}-\d{2}$' then return false; end if;
   begin d := w::date; exception when others then return false; end;
-  -- nur Dienstage, nur bis 18:00 Uhr und höchstens eine Woche im Voraus
-  return extract(isodow from d) = 2 and n < d + time '18:00' and d <= n::date + 7;
+  -- nur am Dienstag selbst (deutsche Zeit) und nur bis 18:00 Uhr
+  return extract(isodow from d) = 2 and d = n::date and n < d + time '18:00';
 end $$;
 revoke execute on function public.my_pid(), public.doener_open(text) from public, anon;
 grant execute on function public.my_pid(), public.doener_open(text) to authenticated;
@@ -766,6 +766,10 @@ create or replace function public.push_tick() returns void
 language plpgsql security definer set search_path = public as $$
 declare n timestamp := now() at time zone 'Europe/Berlin'; w text; c int; z record; r record; rest numeric;
 begin
+  -- Dienstag 12 Uhr: alle daran erinnern, dass heute bis 18 Uhr bestellt wird
+  if extract(isodow from n) = 2 and extract(hour from n) = 12 then
+    perform public.push_send('doener', null, null, '🥙 Heute Döner bestellen', 'Bis 18 Uhr in der App eintragen.', 'doener');
+  end if;
   if extract(isodow from n) = 2 and extract(hour from n) = 17 then
     w := to_char(n::date, 'YYYY-MM-DD');
     select count(*) into c from public.doener where data->>'week' = w;
@@ -920,13 +924,16 @@ do $$ begin alter publication supabase_realtime add table public.termine; except
 -- Mannschaftsverantwortlicher: darf bei Spielen NUR den Treffpunkt eintragen (über diese Funktion, nicht direkt in die Tabelle)
 create or replace function public.is_mv() returns boolean
 language sql stable security definer set search_path = public as $$ select public.has_role('mannschaftsverantwortlicher') $$;
-create or replace function public.termin_treffpunkt(doc_id text, meet text, meet_place text) returns void
+-- Treffpunkt (Uhrzeit, Ort) und Anreise (freier Text, z. B. Fahrgemeinschaften, Bus) für ein Spiel
+drop function if exists public.termin_treffpunkt(text, text, text);
+create or replace function public.termin_treffpunkt(doc_id text, meet text, meet_place text, travel text default null) returns void
 language plpgsql security definer set search_path = public as $$
 begin
   if not (public.can_termine() or public.is_mv()) then raise exception 'Keine Berechtigung'; end if;
   if coalesce(meet, '') <> '' and meet !~ '^\d{2}:\d{2}$' then raise exception 'Ungültige Uhrzeit'; end if;
   update public.termine
-     set data = data || jsonb_build_object('meet', nullif(meet, ''), 'meetPlace', nullif(left(coalesce(meet_place, ''), 120), '')), updated_at = now()
+     set data = data || jsonb_build_object('meet', nullif(meet, ''), 'meetPlace', nullif(left(coalesce(meet_place, ''), 120), ''),
+                                           'travel', nullif(left(coalesce(travel, ''), 300), '')), updated_at = now()
    where id = doc_id and data->>'type' = 'spiel';
 end $$;
 -- „Fertig“: eine einzige Benachrichtigung „Wochenplan“ an alle (statt einer pro Eintrag). Der Text wird hier aus den Terminen der Woche
@@ -959,6 +966,7 @@ begin
             mt := ' – Treffpunkt folgt';
           end if;
         end if;
+        if d >= today and nullif(r.data->>'travel', '') is not null then mt := mt || ' – Anreise: ' || left(regexp_replace(r.data->>'travel', '\s+', ' ', 'g'), 80); end if; -- Zeilenumbrüche würden den Wochenplan zerreißen
         lines := lines || (wd || ': Spiel ' || coalesce(r.data->>'start', '') || ' ' || coalesce(r.data->>'title', '') || mt);
       else
         lines := lines || (wd || ': ' || coalesce(r.data->>'start', '') || '–' || coalesce(r.data->>'end', '') || ' ' || coalesce(nullif(r.data->>'title', ''), 'Training'));
@@ -1012,8 +1020,8 @@ begin
 end $$;
 revoke execute on function public.baelle_speichern(jsonb) from public, anon;
 grant execute on function public.baelle_speichern(jsonb) to authenticated;
-revoke execute on function public.can_termine(), public.is_mv(), public.termin_treffpunkt(text, text, text), public.wochenplan_senden(text), public.baelle_erledigt(text) from public, anon;
-grant execute on function public.can_termine(), public.is_mv(), public.termin_treffpunkt(text, text, text), public.wochenplan_senden(text), public.baelle_erledigt(text) to authenticated;
+revoke execute on function public.can_termine(), public.is_mv(), public.termin_treffpunkt(text, text, text, text), public.wochenplan_senden(text), public.baelle_erledigt(text) from public, anon;
+grant execute on function public.can_termine(), public.is_mv(), public.termin_treffpunkt(text, text, text, text), public.wochenplan_senden(text), public.baelle_erledigt(text) to authenticated;
 
 -- ---------- Geburtstage (Tag und Monat) ----------
 -- Für alle freigeschalteten Mitglieder sichtbar; eintragen dürfen Kassenwart und Admin.
@@ -1216,3 +1224,77 @@ begin
 end $$;
 revoke execute on function public.kf_patch(text, jsonb) from public, anon;
 grant execute on function public.kf_patch(text, jsonb) to authenticated;
+
+-- ---------- Anzeigenhauptmeister (Statistik) ----------
+-- Wie viele Anzeigen jemand erstattet hat, pro Monat. Es zählen nur vom Kassenwart bestätigte (offene und abgelehnte nicht). Gibt nur Spieler-ID, Monat und Anzahl heraus, keine Inhalte.
+create or replace function public.anzeigen_rangliste() returns table(pid text, mon text, n int)
+language sql stable security definer set search_path = public as $$
+  select data->>'by', left(data->>'createdAt', 7), count(*)::int from public.anzeigen
+   where public.is_member() and data->>'status' = 'ok' and nullif(data->>'by', '') is not null
+   group by 1, 2
+$$;
+revoke execute on function public.anzeigen_rangliste() from public, anon;
+grant execute on function public.anzeigen_rangliste() to authenticated;
+
+-- ---------- Würfelliste: wer noch würfeln muss ----------
+-- data: name (Spieler oder freier Name), pid (wenn es ein Spieler ist), createdAt. Alle sehen die Liste, eintragen und abhaken dürfen Kassenwart und Admin.
+create table if not exists public.wuerfel (id text primary key, data jsonb not null default '{}', updated_at timestamptz not null default now(),
+  constraint wuerfel_form check (length(data::text) < 600 and length(coalesce(data->>'name', '')) between 1 and 80));
+alter table public.wuerfel enable row level security;
+drop policy if exists wuerfel_read on public.wuerfel;
+create policy wuerfel_read on public.wuerfel for select using (public.is_member());
+drop policy if exists wuerfel_write on public.wuerfel;
+create policy wuerfel_write on public.wuerfel for all using (public.can_book()) with check (public.can_book());
+do $$ begin alter publication supabase_realtime add table public.wuerfel; exception when duplicate_object then null; end $$;
+
+-- ---------- Umfrage bei Auswärtsfahrten: „Treffpunkt (Bus)“ oder „direkt“ ----------
+-- Die Frage hängt am Spiel (termine.data.poll), die Antworten stehen in „umfrage“ (eine Zeile pro Spieler und Spiel).
+-- Starten oder löschen dürfen Trainer, Mannschaftsverantwortlicher und Admin und legen fest, bis wann abgestimmt wird (poll.until);
+-- antworten darf jeder nur für sich selbst, bis zu diesem Zeitpunkt (spätestens am Spieltag).
+create table if not exists public.umfrage (id text primary key, data jsonb not null default '{}', updated_at timestamptz not null default now(),
+  constraint umfrage_form check (length(data::text) < 300 and data->>'choice' in ('treff', 'direkt')));
+alter table public.umfrage enable row level security;
+create or replace function public.umfrage_offen(doc text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.termine where id = doc and data->>'type' = 'spiel' and data ? 'poll'
+                   and data->>'date' >= to_char(now() at time zone 'Europe/Berlin', 'YYYY-MM-DD')
+                   and (data->'poll'->>'until' is null or now() < (data->'poll'->>'until')::timestamptz))
+$$;
+drop policy if exists umfrage_read on public.umfrage;
+create policy umfrage_read on public.umfrage for select using (public.is_member());
+drop policy if exists umfrage_ins on public.umfrage;
+create policy umfrage_ins on public.umfrage for insert with check (
+  public.is_member() and data->>'pid' = public.my_pid() and id = (data->>'doc') || '_' || (data->>'pid') and public.umfrage_offen(data->>'doc'));
+drop policy if exists umfrage_upd on public.umfrage;
+create policy umfrage_upd on public.umfrage for update
+  using (data->>'pid' = public.my_pid() and public.umfrage_offen(data->>'doc'))
+  with check (public.is_member() and data->>'pid' = public.my_pid() and id = (data->>'doc') || '_' || (data->>'pid') and public.umfrage_offen(data->>'doc'));
+drop policy if exists umfrage_del on public.umfrage;
+create policy umfrage_del on public.umfrage for delete using (data->>'pid' = public.my_pid() and public.umfrage_offen(data->>'doc'));
+do $$ begin alter publication supabase_realtime add table public.umfrage; exception when duplicate_object then null; end $$;
+-- Umfrage starten (frage, bis) oder löschen (frage leer). Beim Start bekommen alle eine Nachricht.
+drop function if exists public.termin_umfrage(text, text);
+create or replace function public.termin_umfrage(doc_id text, frage text, bis timestamptz default null) returns void
+language plpgsql security definer set search_path = public as $$
+declare t jsonb; f text := left(btrim(coalesce(frage, '')), 200);
+begin
+  if not (public.can_termine() or public.is_mv()) then raise exception 'Keine Berechtigung'; end if;
+  select data into t from public.termine where id = doc_id and data->>'type' = 'spiel';
+  if t is null then raise exception 'Spiel nicht gefunden'; end if;
+  if f = '' then
+    update public.termine set data = data - 'poll', updated_at = now() where id = doc_id;
+    delete from public.umfrage where data->>'doc' = doc_id;
+    return;
+  end if;
+  if bis is not null and bis <= now() then raise exception 'Das Ende der Umfrage muss in der Zukunft liegen'; end if;
+  update public.termine set data = data || jsonb_build_object('poll', jsonb_build_object('q', f,
+      'at', coalesce(t->'poll'->>'at', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
+      'until', to_char(bis at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))), updated_at = now()
+   where id = doc_id;
+  if not (t ? 'poll') then
+    perform public.push_send('umfrage', null, null, '🚐 Umfrage: ' || coalesce(t->>'title', 'Auswärtsspiel'),
+      f || ' – bitte in der App beim Spiel abstimmen' || coalesce(' (bis ' || public.berlin_txt(bis::text) || ')', '') || '.', 'umfrage-' || doc_id);
+  end if;
+end $$;
+revoke execute on function public.termin_umfrage(text, text, timestamptz), public.umfrage_offen(text) from public, anon;
+grant execute on function public.termin_umfrage(text, text, timestamptz), public.umfrage_offen(text) to authenticated;

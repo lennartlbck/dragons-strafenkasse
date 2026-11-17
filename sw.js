@@ -1,7 +1,41 @@
-// Service Worker der Dragons Kasse – nur für Push-Benachrichtigungen und die Zahl am App-Icon.
-// Absichtlich KEIN Zwischenspeicher für Seiten (kein fetch-Handler): Updates der App kommen wie bisher sofort an.
+// Service Worker der Dragons Kasse: App-Dateien auf dem Handy speichern, Push-Benachrichtigungen, Zahl am App-Icon.
+// Startseite: zuerst aus dem Netz (höchstens 1,5 s warten), sonst die gespeicherte – so kommen Updates beim nächsten Öffnen an.
+// app.js?v=…, Bibliothek, Schriften: aus dem Speicher (jede neue app.js hat eine neue Versionsnummer, alte werden gelöscht).
+// Bilder und Icons: sofort aus dem Speicher, im Hintergrund aktualisiert.
+// Daten von Supabase laufen nie über diesen Speicher.
+const SHELL = 'shell-v1';
+const IMMUTABLE = /\/(app\.js\?v=|vendor\/|fonts\/)/;
+const REFRESH = /\/(img\/|icon|apple-touch-icon)/; // sofort aus dem Speicher, im Hintergrund aktualisieren (Fotos können sich ändern)
 self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+self.addEventListener('activate', e => e.waitUntil((async () => {
+  for (const k of await caches.keys()) if (k !== SHELL && k !== 'badge') await caches.delete(k);
+  await self.clients.claim();
+})()));
+
+async function fromNetwork(req, cache) {
+  const res = await fetch(req);
+  if (res.ok && res.type === 'basic') {
+    // von app.js nur die aktuelle Version behalten
+    if (/\/app\.js\?v=/.test(req.url)) for (const k of await cache.keys()) if (/\/app\.js\?v=/.test(k.url) && k.url !== req.url) await cache.delete(k);
+    await cache.put(req, res.clone());
+  }
+  return res;
+}
+self.addEventListener('fetch', e => {
+  const req = e.request, url = new URL(req.url);
+  if (req.method !== 'GET' || url.origin !== location.origin || url.pathname.endsWith('/sw.js')) return;
+  e.respondWith((async () => {
+    const cache = await caches.open(SHELL);
+    if (IMMUTABLE.test(url.pathname + url.search)) return (await cache.match(req)) || fromNetwork(req, cache);
+    if (REFRESH.test(url.pathname)) { const saved = await cache.match(req), net = fromNetwork(req, cache); if (saved) { e.waitUntil(net.catch(() => {})); return saved; } return net; }
+    // Startseite und config.js: Netz zuerst, bei Funkloch oder langsamer Leitung die gespeicherte Fassung
+    const key = req.mode === 'navigate' ? new Request(new URL('./', self.registration.scope)) : req;
+    const net = fetch(req).then(async res => { if (res.ok && res.type === 'basic') await cache.put(key, res.clone()); return res; });
+    const saved = await cache.match(key);
+    if (!saved) return net;
+    return Promise.race([net.catch(() => saved), new Promise(r => setTimeout(() => r(saved), 1500))]);
+  })());
+});
 
 // Zahl am App-Icon: jede Push-Nachricht zählt eins hoch; die App setzt sie beim Öffnen zurück (Cache „badge“, Eintrag „n“).
 const BADGE = ['badge', 'n'];

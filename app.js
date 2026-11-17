@@ -73,7 +73,7 @@ async function payEntries(pid,ids,via){if(!ids.length)return{n:0,used:0};
 const sumAmt=es=>r2(es.reduce((a,e)=>a+(e.amount||0),0));
 const netTxt=n=>n>0?eur(n):n<0?'+ '+eur(-n):eur(0);
 // ---------- Backup ----------
-const BACKUP_TABLES=['players','fines','entries','bills','settings','zahltag','fees','receipts','members','kasse_intern','fussball','doener','geburt','trikotwash','geburtstage','schulden','anzeigen','berichte'];
+const BACKUP_TABLES=['players','fines','entries','bills','settings','zahltag','fees','receipts','members','kasse_intern','fussball','doener','geburt','trikotwash','geburtstage','schulden','anzeigen','berichte','wuerfel','umfrage'];
 const daysSince=iso=>iso?Math.floor((Date.now()-Date.parse(iso))/DAY):null;
 async function makeBackup(){
   const out={app:'Dragons Kasse',format:1,exportedAt:new Date().toISOString(),tables:{}},counts={};
@@ -127,7 +127,8 @@ function renderTabs(){
   if(!tabs.some(t=>t[0]===S.tab)&&S.tab!=='rechnungen')S.tab='erfassen'; // Rechnungen ist ein Unterbereich der Übersicht
   $('#tabs').innerHTML=tabs.map(([k,l])=>`<button data-act="tab" data-k="${k}" ${S.tab===k||(k==='uebersicht'&&S.tab==='rechnungen')?'aria-current="page"':''}>${ICONS[k]}${l}</button>`).join('');
 }
-function statusBanner(){
+function statusBanner(){if(S.refreshing&&S.stale)return `<div class="banner">Keine Verbindung – du siehst den zuletzt geladenen Stand.</div>`;return (S.refreshing&&S.status!=='nodb'?`<div class="syncnote" role="status">Wird aktualisiert …</div>`:'')+statusBanner2()}
+function statusBanner2(){
   if(S.status==='nodb')return `<div class="banner">Die Kasse ist gerade nicht erreichbar. Prüfe deine Internetverbindung und lade die Seite neu.</div>`;
   if(S.stale)return `<div class="banner">Die Daten sind gerade nicht erreichbar. Was du siehst, ist eventuell nicht aktuell.</div>`;
   if(S.amtFines)return `<div class="info">Als ${esc(S.amtRoles.join(' und '))} trägst du ${esc([...S.amtFines].map(id=>'„'+(S.fines.find(f=>f.id===id)?.title||id)+'“').join(', '))} ein. Alles andere macht der Kassenwart.</div>`;
@@ -152,14 +153,16 @@ function render(){
   if(S.sheet)renderSheet(true);
   checkPenalties();hydrateImgs();gbKfCheck();
 }
+// graue Platzhalter, solange (beim allerersten Start) noch keine Daten da sind
+const skel=(n=5)=>`<div class="skel" aria-busy="true" aria-label="Wird geladen">${'<i></i>'.repeat(n)}</div>`;
 function loadingOr(html,what){
-  if(S.status==='loading')return `<div class="empty">Lade ${what} …</div>`;
+  if(S.status==='loading')return skel();
   return html;
 }
 function fineList(){
   const q=S.q.trim().toLowerCase();
   const fines=S.fines.filter(f=>(!S.amtFines||S.amtFines.has(f.id))&&(!q||(f.title+' '+(f.hint||'')+' '+(f.cat||'')).toLowerCase().includes(q)));
-  if(S.status==='loading')return `<div class="empty" style="margin-top:12px">Lade Strafenkatalog …</div>`;
+  if(S.status==='loading')return skel();
   if(!S.fines.length)return `<div class="empty" style="margin-top:12px">Noch kein Strafenkatalog hinterlegt.${S.canEdit?' Lege unter „Verwalten“ die erste Strafe an.':''}</div>`;
   const groups={};for(const f of fines)(groups[f.cat||'Sonstiges']??=[]).push(f);
   const cats=Object.keys(groups).sort((a,b)=>{const ia=CAT_ORDER.indexOf(a),ib=CAT_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)});
@@ -444,7 +447,7 @@ async function saveEntry(){
   toast('Eintrag geändert');rcBack(s);
 }
 function rechnungen(){
-  if(S.status==='loading')return `<div class="empty">Lade Rechnungen …</div>`;
+  if(S.status==='loading')return skel();
   let h=(S.canWrite!==false?`<div class="toolbar" style="margin-top:0"><button class="btn primary" data-act="editBill" data-k="ausgabe">${I('plus')}Rechnung</button><button class="btn" data-act="editBill" data-k="einzahlung">${I('plus')}Einzahlung</button></div>`:'')+receiptsBlock();
   if(!S.bills.length)return h+`<div class="empty">Noch keine Rechnungen. Trag hier Ausgaben fürs Team ein – z. B. Bier, Duschdas oder Kerb-Tickets. Wer ausgelegt hat, bekommt den Betrag als Gutschrift; auf Wunsch wird die Rechnung als Sonderausgabe auf Spieler umgelegt.</div>`;
   const list=[...S.bills].sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.createdAt).localeCompare(String(a.createdAt)));
@@ -564,7 +567,7 @@ function kontenList(){
 }
 function sortBar(){return `<div class="sortbar"><span class="k">Sortieren</span><div class="seg" role="group" aria-label="Sortierung der Konten">${[['nr','Nummer'],['high','Betrag']].map(([k,l])=>`<button data-act="ksort" data-k="${k}" aria-pressed="${S.ksort===k}">${l}</button>`).join('')}</div></div>`}
 function uebersichtAll(){
-  if(S.status==='loading')return `<div class="empty">Lade Übersicht …</div>`;
+  if(S.status==='loading')return skel();
   const ou=uebersicht();
   return meLine()+`<h2 class="section-h">Monatsübersicht</h2>`+ou.top+kontenCopy()+`<h2 class="section-h">Konten</h2>`+kontenSeg()+(S.kview==='verlauf'?verlauf():S.kview==='statistik'?statistik():sortBar()+kontenList())+ou.bottom;
 }
@@ -644,18 +647,22 @@ function statistik(){
   const titles={};if(mo==='saison')for(const m of periods().filter(m=>m<curMonth()))for(const id of topIds(monthTotals(m)))titles[id]=(titles[id]||0)+1;
   const tl=rankTop(Object.entries(titles).map(([id,v])=>({id,v})).sort(byVal));
   const money=ent.filter(e=>MONEY_COLS.includes(colOf(e)));
+  // Anzeigenhauptmeister: wer am meisten bestätigte Anzeigen erstattet hat, Zahlen aus anzeigen_rangliste()
+  const az={};for(const r of S.anzRank||[])if(pById(r.pid)&&inPeriod(r.mon+'-01',mo))az[r.pid]=(az[r.pid]||0)+r.n;
+  const azl=rankTop(Object.entries(az).map(([id,v])=>({id,v})).sort(byVal),5);
   let h=`<div class="toolbar" style="margin-top:0"><div class="seg full" role="group" aria-label="Zeitraum">${[['saison','Saison 26/27'],['monat',monthName(curMonth())]].map(([k,l])=>`<button data-act="smode" data-k="${k}" aria-pressed="${S.smode===k}">${esc(l)}</button>`).join('')}</div></div>`;
-  if(!money.length&&!kfl.length)return h+`<div class="empty">Für diesen Zeitraum gibt es noch keine Strafen.</div>`;
+  if(!money.length&&!kfl.length&&!azl.length)return h+`<div class="empty">Für diesen Zeitraum gibt es noch keine Strafen.</div>`;
   h+=card('Größte Zahler','Strafen, Fußball und Bier zusammen – der Erste wird im nächsten Monat zum 🐲',bars(rankBy(r=>r.strafen+r.fussball+r.bier),eur));
   h+=card('Meiste Strafen','Nur Spalte „Strafen“',bars(rankBy(r=>r.strafen),eur));
   h+=card('Fußball an der Decke',null,bars(rankBy(r=>r.fussball),eur));
   h+=card('Bier',null,bars(rankBy(r=>r.bier),eur));
   if(kfl.length)h+=card('Kabinenfeste','Wer wie oft eines aufgebrummt bekommen hat',bars(kfl,v=>v+'×'));
+  if(azl.length)h+=card('Anzeigenhauptmeister 👮','Wer die meisten Anzeigen erstattet hat – es zählen nur vom Kassenwart bestätigte',bars(azl,v=>v+(v===1?' Anzeige':' Anzeigen')));
   if(mo==='saison'&&tl.length)h+=card('Drachen-Titel','Monate, in denen jemand am meisten gezahlt hat',bars(tl.filter(x=>x.rk<=5),v=>v+'×'));
   return h;
 }
 function verlauf(){
-  if(S.status==='loading')return `<div class="empty">Lade Verlauf …</div>`;
+  if(S.status==='loading')return skel();
   const list=S.entries;
   if(!list.length)return `<div class="empty">Noch keine Strafen eingetragen. Tippe unter „Eintragen“ auf eine Strafe und wähle die Person.</div>`;
   const kw=isKW(),swipeRow=e=>`<div class="swipe${S.confirmDel===e.id?' open':''}"><div class="swipe-act"><button data-act="del" data-id="${esc(e.id)}">${S.confirmDel===e.id?'Wirklich löschen?':'Löschen'}</button></div><div class="swipe-in">${entryRow(e,true,true)}</div></div>`;
@@ -669,7 +676,7 @@ function dragons(){const cm=curMonth(),y=+cm.slice(0,4),m=+cm.slice(5,7),pm=m===
   _drg={src:S.entries,cm,pm,v:new Set(topIds(monthTotals(pm)))};return _drg}
 const drg=id=>dragons().v.has(id)?' <span class="drg" role="img" aria-label="Drache des Monats" title="Drache des Monats">🐲</span>':'';
 function verwalten(){
-  if(S.status==='loading')return `<div class="empty">Lade …</div>`;
+  if(S.status==='loading')return skel();
   return S.canEdit?verwaltenAdmin():'';
 }
 // Ausklappbare Kachel (merkt sich offen/zu in S.mOpen, siehe toggle-Handler)
@@ -718,7 +725,8 @@ function berlinNow(){const p={};for(const x of new Intl.DateTimeFormat('en-CA',{
   return{date:`${p.year}-${p.month}-${p.day}`,h:+p.hour,wd:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(p.weekday)}}
 const addDays=(d,n)=>{const x=new Date(d+'T12:00:00Z');x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)};
 // Bestellt wird für den nächsten Dienstag (am Dienstag selbst für heute). Dienstag ab 18 Uhr ist die Liste zu. Ab Mittwoch gilt die nächste Woche, alte Bestellungen werden gelöscht.
-function doenerWeek(){const n=berlinNow();return{tue:addDays(n.date,(2-n.wd+7)%7),open:!(n.wd===2&&n.h>=18)}}
+// Eintragen nur am Dienstag selbst bis 18 Uhr (wie doener_open in schema.sql); closed = Dienstag nach 18 Uhr
+function doenerWeek(){const n=berlinNow();return{tue:addDays(n.date,(2-n.wd+7)%7),open:n.wd===2&&n.h<18,closed:n.wd===2&&n.h>=18}}
 const doenerList=w=>S.doener.filter(d=>d.week===w).sort((a,b)=>String(a.at).localeCompare(String(b.at)));
 const fbGames=()=>S.fussball.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.createdAt).localeCompare(String(a.createdAt)));
 const TEAMS=[['jung','Team Jung'],['alt','Team Alt']];
@@ -791,15 +799,16 @@ function doenerSheet(s){
   const w=doenerWeek(),list=doenerList(w.tue),me=myPid(),mine=list.find(d=>d.pid===me),canTick=isDoenerwart();
   // Bezahlt wird für den letzten Dienstag (Mittwoch/Donnerstag) oder für heute, falls heute Dienstag ist
   const pw=w.tue===berlinNow().date?w.tue:addDays(w.tue,-7),plist=pw===w.tue?list:doenerList(pw),mineP=plist.find(d=>d.pid===me),po=(mineP&&!mineP.paid)?mineP:mine; // po: die Bestellung, die bezahlt wird (offene vom letzten Dienstag, sonst die aktuelle)
-  const head=`<h2>Döner</h2><p>Bestellung für Dienstag, ${esc(dDE(w.tue).slice(0,6))} · ${w.open?'bis 18 Uhr eintragen':'Bestellschluss vorbei'}</p>`;
+  const head=`<h2>Döner</h2><p>Bestellung für Dienstag, ${esc(dDE(w.tue).slice(0,6))} · ${w.open?'heute bis 18 Uhr eintragen':w.closed?'Bestellschluss vorbei':'Eintragen am Dienstag'}</p>`;
   let body='',foot='';
-  if(!w.open)body+=`<div class="hint" style="margin-bottom:14px">Bestellschluss war heute um 18 Uhr. Ab morgen kannst du dich für nächsten Dienstag eintragen.</div>`;
+  if(!w.open)body+=`<div class="hint" style="margin-bottom:14px">${w.closed?'Bestellschluss war heute um 18 Uhr. Nächsten Dienstag geht es wieder.':'Eintragen geht nur am Dienstag, bis 18 Uhr. Um 12 Uhr kommt eine Erinnerung.'}</div>`;
   else if(me)body+=`<div class="fields"><div class="field"><label for="dtext">${mine?'Deine Bestellung':'Was möchtest du?'}</label><textarea id="dtext" rows="2" maxlength="200" placeholder="z. B. Döner mit allem, scharf, ohne Zwiebeln">${esc(s.draft??mine?.text??'')}</textarea></div></div>`;
   const dt=ppTarget(S.settings.doenerPaypal);
   if(po&&!po.paid&&dt){const amt=num(s.pay);body+=`<div class="paybox" style="margin-top:14px"><div class="pay-h"><span>Döner bezahlen</span></div><div class="field"><label for="dpay">Betrag (€)</label><input id="dpay" inputmode="decimal" value="${esc(s.pay||'')}" placeholder="z. B. 7,50"></div>
     <a class="btn paypal ${amt>0?'':'off'}" id="dpaylink" ${amt>0?`href="${esc(paypalUrl(amt,'',dt,'Döner Dragons – '+(pById(me)?.name||'')))}" target="_blank" rel="noopener"`:'aria-disabled="true"'}>Mit PayPal bezahlen${amt>0?' · '+eur(amt):''}</a>
     <div class="pp-addr"><span>An: <b>${esc(dt.v)}</b></span><button class="mini" data-act="copyTxt" data-v="${esc(dt.v)}">Kopieren</button></div></div>`}
-  if(po&&!po.paid){body+=`<button class="btn good" style="margin-top:10px;width:100%" data-act="doenerPaid" data-w="${esc(po.week)}">Ich habe bezahlt</button><p class="note" style="margin:6px 4px 0">Der Dönerwart bekommt eine Nachricht und hakt es ab.</p>`}
+  if(po&&!po.paid){body+=po.reportedAt?`<button class="btn" style="margin-top:10px;width:100%;opacity:.55" disabled>✓ Bezahlt gemeldet</button><p class="note" style="margin:6px 4px 0">Der Dönerwart hat eine Nachricht bekommen und hakt es ab.</p>`
+    :`<button class="btn good" style="margin-top:10px;width:100%" data-act="doenerPaid" data-w="${esc(po.week)}">Ich habe bezahlt</button><p class="note" style="margin:6px 4px 0">Der Dönerwart bekommt eine Nachricht und hakt es ab.</p>`}
   if(po&&po.paid)body+=`<div class="hint" style="margin-top:14px">Dein Döner ist als bezahlt abgehakt. 👍</div>`;
   const tickNote=`<p class="note" style="margin:6px 4px 0">Häkchen links: Zahlung ist angekommen.</p>`;
   const ordRow=(d,canDel)=>{const p=pById(d.pid);
@@ -818,13 +827,16 @@ function fbPickSheet(s){const e=s.back,l=teamName(s.team),used=new Set(e.goals.f
   const n=s.sel.size;
   return{head,body,foot:`<div class="split"><button class="btn" data-act="fbPickBack">Zurück</button><button class="btn primary" data-act="fbPickDone" ${n?'':'disabled'}>${n?n+' hinzufügen':'Spieler wählen'}</button></div>`}}
 /* ---------- Push-Benachrichtigungen (Web Push, kostenlos) ---------- */
-const PUSH_KINDS=[['strafe','Neue Strafen','Wenn für dich etwas eingetragen wird'],['zahltag','Zahltag','Beim Start und einen Tag vor dem Ende, falls noch etwas offen ist'],['doener','Döner','Bestell-Erinnerung (Di 17 Uhr), Zahlungs-Erinnerung (Mi 12 Uhr) und Hinweise für den Dönerwart'],['fussball','Fußball','Neue Spiele und das Ende einer Runde'],['geburtstag','Geburtstage','Glückwünsche an dich und wer heute Geburtstag hat'],['plan','Wochenplan','Wenn Trainer oder Mannschaftsverantwortlicher die Woche eingetragen haben'],['bericht','Berichte','Sonntag vor der Abgabe (12 Uhr) und am Abgabetag (9 Uhr), wenn du einen Bericht schreibst'],['anzeige','Anzeigen','Wenn jemand eine Anzeige erstattet'],['anmeldung','Neue Anmeldungen','Wenn sich jemand neu registriert und freigeschaltet werden möchte'],['meldung','Gemeldete Zahlungen','Wenn jemand „Ich habe bezahlt“ meldet']];
+const PUSH_KINDS=[['strafe','Neue Strafen','Wenn für dich etwas eingetragen wird'],['zahltag','Zahltag','Beim Start und einen Tag vor dem Ende, falls noch etwas offen ist'],['doener','Döner','Bestellen (Di 12 Uhr), Erinnerung (Di 17 Uhr), Zahlungs-Erinnerung (Mi 12 Uhr) und Hinweise für den Dönerwart'],['fussball','Fußball','Neue Spiele und das Ende einer Runde'],['geburtstag','Geburtstage','Glückwünsche an dich und wer heute Geburtstag hat'],['plan','Wochenplan','Wenn Trainer oder Mannschaftsverantwortlicher die Woche eingetragen haben'],['bericht','Berichte','Sonntag vor der Abgabe (12 Uhr) und am Abgabetag (9 Uhr), wenn du einen Bericht schreibst'],['umfrage','Umfragen','Wenn eine Umfrage zur Auswärtsfahrt startet'],['anzeige','Anzeigen','Wenn jemand eine Anzeige erstattet'],['anmeldung','Neue Anmeldungen','Wenn sich jemand neu registriert und freigeschaltet werden möchte'],['meldung','Gemeldete Zahlungen','Wenn jemand „Ich habe bezahlt“ meldet']];
 // Zahl am App-Icon (setzt sw.js bei jeder Push-Nachricht): beim Öffnen und beim Zurückwechseln in die App auf 0
 function clearBadge(){try{navigator.clearAppBadge&&navigator.clearAppBadge().catch(()=>{})}catch(e){}try{window.caches&&caches.open('badge').then(c=>c.delete('n')).catch(()=>{})}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')clearBadge()});
 const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 const pushSupported=()=>'serviceWorker' in navigator&&!!window.PushManager&&!!window.Notification;
+// Gespeicherter Datenstand auf dem Handy: pro Konto (kc:<uid>:<tabelle>), wird beim Abmelden gelöscht
+S.cached=new Set();const cacheKey=t=>'kc:'+S.uid+':'+t;
+function clearLocalData(){S.noSave=true;try{for(const k of Object.keys(localStorage))if(k.startsWith('kc:')||k.startsWith('me:'))localStorage.removeItem(k)}catch(e){}}
 function swReg(){if(!('serviceWorker' in navigator))return Promise.resolve(null);return S.swp??=navigator.serviceWorker.register('sw.js').catch(()=>null)}
 function b64uToU8(v){v=v.replace(/-/g,'+').replace(/_/g,'/');const b=atob(v+'==='.slice((v.length+3)%4));return Uint8Array.from(b,c=>c.charCodeAt(0))}
 async function pushLoad(){const st={sub:null,row:null,ready:true};
@@ -837,7 +849,7 @@ function pushSheet(){const st=S.push||{},head=`<h2>Benachrichtigungen</h2><p>Gil
   if(!pushSupported())body=isIOS()&&!isStandalone()
     ?`<div class="hint">Auf dem iPhone gehen Benachrichtigungen nur, wenn die Kasse auf dem <b>Home-Bildschirm</b> liegt:<br>In Safari unten auf <b>Teilen</b> tippen → <b>„Zum Home-Bildschirm“</b>. Danach die Kasse über das neue Icon öffnen und hier einschalten. Dafür braucht es iOS 16.4 oder neuer.</div>`
     :`<div class="hint">Dieser Browser kann keine Benachrichtigungen empfangen. Öffne die Kasse am Handy über das Icon auf dem Home-Bildschirm.</div>`;
-  else if(!st.ready)body=`<div class="empty">Lade …</div>`;
+  else if(!st.ready)body=skel();
   else if(Notification.permission==='denied')body=`<div class="hint">Benachrichtigungen sind für die Dragons Kasse blockiert. Auf dem iPhone: <b>Einstellungen → Mitteilungen → Dragons Kasse → Mitteilungen erlauben</b>. Danach hier noch einmal öffnen.</div>`;
   else if(!st.row){body=`<p class="note" style="margin:0 4px 12px">Schalte Benachrichtigungen ein, dann bekommst du eine Nachricht bei:</p>${list}<p class="note" style="margin:10px 4px 0">Danach kannst du einzelne Themen wieder abschalten.</p>`;
     foot=`<button class="btn primary" data-act="pushOn">🔔 Benachrichtigungen einschalten</button>`}
@@ -876,11 +888,12 @@ function menuSheet(){
   const item=(act,ic,t,sub)=>`<button class="menuitem" data-act="${act}"><span class="mi-ic" aria-hidden="true">${ic}</span><span class="mi-t"><b>${t}</b><small>${esc(sub)}</small></span>${I('chevR')}</button>`;
   return{head:`<h2>Mehr</h2>`,body:`<div class="menulist">`
     +item('openFussball','⚽','Fußball',last?`Siege in Runde ${fr.rounds.length+1}: Jung ${fr.cur.jung} : ${fr.cur.alt} Alt`:'Ergebnisse und Torschützen')
-    +item('openDoener','🥙','Döner',(w.open?'Bis Di 18 Uhr':'Bestellschluss vorbei')+' · '+n+' '+(n===1?'Bestellung':'Bestellungen'))
+    +item('openDoener','🥙','Döner',(w.open?'Heute bis 18 Uhr':w.closed?'Bestellschluss vorbei':'Bestellen am Dienstag')+' · '+n+' '+(n===1?'Bestellung':'Bestellungen'))
     +item('openBaelle','🏐','Bälle entharzen',(()=>{const c=baelleCur();return c?`Diese Woche: ${baelleNames(c)}${c.doneAt?' ✓':''}`:'Kein Plan für diese Woche'})())
     +item('openKf','🎉','Kabinenfest',(()=>{const l=kfList(),tw=kfThisWeek();return l.length?(tw.length?`Diese Woche: ${tw.map(e=>kfWho(e)?.name||'Unbekannt').join(', ')}`:'Diese Woche frei')+` · ${l.length} offen`:'Alles erledigt'})())
     +(canTrikot()?item('openTrikot','👕','Trikots',(()=>{const t=trikotList();return t.withD.length?`${t.withD.length} Spieler · jung bis alt`:'Spieler nach Alter sortiert'})()):'')
     +item('openBerichte','📝','Berichte',(()=>{const n=berichteNext(),me=myPid()&&n.find(x=>x.lage===myPid()||x.gruss===myPid());return me?`Du: ${me.lage===myPid()?'Lage der Liga':'Grußwort'} · Abgabe ${me.abgabe?dDE(me.abgabe).slice(0,6):'–'}`:n[0]?`Nächstes: ${n[0].gegner} · ${dDE(n[0].date).slice(0,6)}`:'Lage der Liga und Grußwort'})())
+    +item('openWuerfel','🎲','Würfelliste',(()=>{const n=(S.wuerfel||[]).length;return n?n+' '+(n===1?'muss':'müssen')+' noch würfeln':'Niemand muss würfeln'})())
     +item('openGb','🎂','Geburtstage',(()=>{const g=gbList().withB;if(!g.length)return 'Noch keine eingetragen';const x=g[0];return x.days===0?`Heute: ${x.p.name} 🎉`:`Nächster: ${x.p.name.split(' ')[0]} · ${mdDE(x.md)}`})())
     +item('openPush','🔔','Benachrichtigungen',S.push?.row?'An auf diesem Gerät':'Aus – hier einschalten')+`</div>`,foot:''}}
 // Rollen einer Person: mehrere ankreuzbar. Admin/Kassenwart vergibt nur der Admin.
@@ -905,6 +918,17 @@ function berichteSheet(){const me=myPid(),pn=id=>pById(id)?.name||'–',all=beri
   const fut=all.filter(x=>x.date>=today()),past=all.filter(x=>x.date<today());
   return{head:`<h2>Berichte</h2><p>Lage der Liga und Grußwort fürs Hallenheft</p>`,body:`<p class="note" style="margin:0 4px 10px">Wer schreibt, bekommt am Sonntag vor der Abgabe um 12 Uhr und am Abgabetag um 9 Uhr eine Erinnerung.</p>`
     +(all.length?(fut.length?`<div class="rows">${fut.map(row).join('')}</div>`:'')+(past.length?`<h3 class="sub-h">Vorbei</h3><div class="rows">${past.map(row).join('')}</div>`:''):`<div class="empty">Noch kein Plan eingetragen.</div>`),foot:''}}
+// Würfelliste: wer noch würfeln muss – Spieler oder freier Name. Eintragen und abhaken: Kassenwart und Admin.
+function wuerfelSheet(){const kw=S.canWrite===true,l=[...(S.wuerfel||[])].sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt)));
+  const add=kw?`<button class="btn primary block" style="margin-bottom:14px" data-act="wfNew">${I('plus')}Hinzufügen</button>`:'';
+  const row=x=>{const p=x.pid&&pById(x.pid);return `<div class="row">${p?avatar(p):'<span class="av">🎲</span>'}<div class="m"><b>${esc(p?p.name:x.name)}</b><i>seit ${esc(dDE(String(x.createdAt).slice(0,10)))}</i></div>${kw?`<button class="chipbtn" data-act="wfDone" data-id="${esc(x.id)}">${I('check')}Gewürfelt</button>`:''}</div>`};
+  return{head:`<h2>Würfelliste</h2><p>Wer noch würfeln muss</p>`,body:add+(l.length?`<div class="rows">${l.map(row).join('')}</div>`:`<div class="empty">Gerade muss niemand würfeln.</div>`),foot:''}}
+// Würfelliste ergänzen: Spieler antippen (mehrere möglich) oder einen freien Namen eingeben
+function wuerfelAddSheet(s){const on=new Set((S.wuerfel||[]).map(x=>x.pid).filter(Boolean)),n=s.sel.size;
+  return{head:`<h2>Würfelliste</h2><p>Wer muss würfeln? Spieler antippen oder Namen eingeben</p>`,
+    body:`<div class="grid">${sortedPlayers(false).map(p=>`<button class="pick" data-act="wfPick" data-id="${esc(p.id)}" aria-pressed="${s.sel.has(p.id)}" ${on.has(p.id)?'disabled':''}>${p.number!=null?`<span class="no">${p.number}</span>`:''}${avatar(p)}<b>${esc(p.name.split(' ')[0])}</b><small>${on.has(p.id)?'steht schon drauf':esc(p.name.split(' ').slice(1).join(' '))}</small><span class="ok">${ICONS.check}</span></button>`).join('')}</div>
+      <div class="field" style="margin-top:14px"><label for="wfn">Oder Namen eingeben (z. B. Gast)</label><input id="wfn" maxlength="80" autocomplete="off" value="${esc(s.name||'')}"></div>`,
+    foot:`<button class="btn primary" data-act="wfSave">${n?n+' Spieler hinzufügen':'Hinzufügen'}</button>`}}
 function textSheet(s){return{head:`<h2>Text zum Kopieren</h2><p>Lange drücken → Alles auswählen → Kopieren</p>`,body:`<textarea id="cp" rows="14" readonly style="width:100%;font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink)">${esc(s.txt||'')}</textarea>`,foot:''}}
 async function copyOut(txt){
   try{await navigator.clipboard.writeText(txt);toast('Kopiert – jetzt in die Gruppe einfügen')}catch(e){openSheet({type:'text',txt});const t=$('#cp');if(t){t.focus();t.select()}}}
@@ -979,7 +1003,7 @@ function kalMonat(){
 function kalSpiele(){
   const all=S.termine.filter(x=>x.type==='spiel').sort((a,b)=>(a.date+(a.start||'')).localeCompare(b.date+(b.start||''))),td=tdIso();
   const row=x=>{const [,m,d]=x.date.split('-'),mt=meetTxt(x);
-    return `<div class="row tap" data-act="terminView" data-id="${esc(x.id)}" role="button" tabindex="0"><div class="kdate"><b>${+d}.</b><small>${WD_SHORT[wdIdx(x.date)]} ${esc(MONTHS[+m-1].slice(0,3))}</small></div><div class="m"><b class="wrapb">${esc(x.title)}</b><i class="wrap">${esc(x.start?x.start+' Uhr':'')}${x.place?' · '+esc(x.place):''}</i>${mt?`<i class="wrap meet">${esc(mt)}</i>`:''}<div class="tags"><span class="tag ${isHome(x)?'ok':''}">${isHome(x)?'Heimspiel':'Auswärts'}</span></div></div>${I('chevR')}</div>`};
+    return `<div class="row tap" data-act="terminView" data-id="${esc(x.id)}" role="button" tabindex="0"><div class="kdate"><b>${+d}.</b><small>${WD_SHORT[wdIdx(x.date)]} ${esc(MONTHS[+m-1].slice(0,3))}</small></div><div class="m"><b class="wrapb">${esc(x.title)}</b><i class="wrap">${esc(x.start?x.start+' Uhr':'')}${x.place?' · '+esc(x.place):''}</i>${mt?`<i class="wrap meet">${esc(mt)}</i>`:''}<div class="tags"><span class="tag ${isHome(x)?'ok':''}">${isHome(x)?'Heimspiel':'Auswärts'}</span>${x.poll&&x.date>=tdIso()&&!(x.poll.until&&Date.parse(x.poll.until)<=Date.now())&&!(S.umfrage||[]).some(a=>a.doc===x.id&&a.pid===myPid())?'<span class="tag kf">🚐 Umfrage – noch abstimmen</span>':''}</div></div>${I('chevR')}</div>`};
   const up=all.filter(x=>x.date>=td),past=all.filter(x=>x.date<td).reverse();
   return (canTermin()?`<button class="btn" style="margin:12px 0 0;width:100%" data-act="spielNew">${I('plus')}Spiel hinzufügen</button>`:'')
     +(!all.length?`<div class="empty" style="margin-top:12px">Noch keine Spiele eingetragen.</div>`:'')
@@ -987,7 +1011,7 @@ function kalSpiele(){
     +(past.length?`<h3 class="sub-h">Gespielt · ${past.length}</h3><div class="rows">${past.map(row).join('')}</div>`:'')}
 function kalender(){
   const v=S.kalView||'woche';
-  return `<div class="toolbar" style="margin-top:0"><div class="seg full" role="group" aria-label="Ansicht">${[['woche','Woche'],['monat','Monat'],['spiele','Spiele']].map(([k,l])=>`<button data-act="kalview" data-k="${k}" aria-pressed="${v===k}">${l}</button>`).join('')}</div></div>`+(S.status==='loading'?`<div class="empty">Lade Kalender …</div>`:v==='spiele'?kalSpiele():v==='monat'?kalMonat():kalWoche())}
+  return `<div class="toolbar" style="margin-top:0"><div class="seg full" role="group" aria-label="Ansicht">${[['woche','Woche'],['monat','Monat'],['spiele','Spiele']].map(([k,l])=>`<button data-act="kalview" data-k="${k}" aria-pressed="${v===k}">${l}</button>`).join('')}</div></div>`+(S.status==='loading'?skel():v==='spiele'?kalSpiele():v==='monat'?kalMonat():kalWoche())}
 // Bausteine der Termin-Formulare
 const timePair=(a,b,x,y)=>`<div class="two"><div class="field"><label for="${a}">Von</label><input id="${a}" type="time" value="${esc(x||'')}"></div><div class="field"><label for="${b}">Bis</label><input id="${b}" type="time" value="${esc(y||'')}"></div></div>`;
 const delFoot=(act,key,id,cancel,save)=>`<div class="split">${id?`<button class="btn danger" data-act="${act}" data-id="${esc(id)}">${S.confirmDel===key+id?'Wirklich löschen?':'Löschen'}</button>`:`<button class="btn" data-act="${cancel}">Abbrechen</button>`}<button class="btn primary" data-act="${save}">Speichern</button></div>`;
@@ -1006,10 +1030,27 @@ function terminViewSheet(s){const x=terminById(s.id);
   if(!x)return{head:`<h2>Termin</h2>`,body:`<div class="empty">Diesen Termin gibt es nicht mehr.</div>`,foot:''};
   const sp=x.type==='spiel',mt=meetTxt(x),q=x.place?encodeURIComponent(x.place):'';
   const map=(name,url)=>`<a class="btn" style="width:100%;justify-content:center;text-align:center" href="${esc(url+q)}" target="_blank" rel="noopener">${name}</a>`;
-  let body=`<div class="credbox"><div><span>Art</span><b>${sp?(isHome(x)?'Heimspiel':'Auswärtsspiel'):'Training'}</b></div>${mt?`<div><span>Treffpunkt</span><b>${esc(mt.replace(/^Treffpunkt /,''))}</b></div>`:''}${x.place?`<div><span>Ort</span><b>${esc(x.place)}</b></div>`:''}</div>`;
-  if(sp&&!isHome(x)&&canPlan()&&x.date>=tdIso())body+=`<h3 class="sub-h">Treffpunkt eintragen</h3><div class="two"><div class="field"><label for="vmeet">Uhrzeit</label><input id="vmeet" type="time" value="${esc(x.meet||'')}"></div><div class="field"><label for="vmeetp">Ort</label><input id="vmeetp" maxlength="120" value="${esc(x.meetPlace||'')}" autocomplete="off"></div></div><button class="btn primary block" data-act="meetSave" data-id="${esc(x.id)}">Treffpunkt speichern</button>`;
+  let body=`<div class="credbox"><div><span>Art</span><b>${sp?(isHome(x)?'Heimspiel':'Auswärtsspiel'):'Training'}</b></div>${mt?`<div><span>Treffpunkt</span><b>${esc(mt.replace(/^Treffpunkt /,''))}</b></div>`:''}${x.place?`<div><span>Ort</span><b>${esc(x.place)}</b></div>`:''}${sp&&x.travel?`<div><span>Anreise</span><b style="white-space:pre-line;text-align:right">${esc(x.travel)}</b></div>`:''}</div>`;
+  // Trainer und Mannschaftsverantwortlicher: Treffpunkt (nur auswärts) und Anreise eintragen
+  if(sp&&canPlan()&&x.date>=tdIso())body+=`<h3 class="sub-h">${isHome(x)?'Anreise eintragen':'Treffpunkt und Anreise eintragen'}</h3>${isHome(x)?'':`<div class="two"><div class="field"><label for="vmeet">Uhrzeit</label><input id="vmeet" type="time" value="${esc(x.meet||'')}"></div><div class="field"><label for="vmeetp">Ort</label><input id="vmeetp" maxlength="120" value="${esc(x.meetPlace||'')}" autocomplete="off"></div></div>`}<div class="field" style="margin-bottom:12px"><label for="vtravel">Anreise</label><textarea id="vtravel" rows="2" maxlength="300" placeholder="z. B. Fahrgemeinschaften ab Halle, Bus um 17:15 Uhr">${esc(x.travel||'')}</textarea></div><button class="btn primary block" data-act="meetSave" data-id="${esc(x.id)}">Speichern</button>`;
+  body+=pollBlock(x);
   if(x.place)body+=`<h3 class="sub-h">Anfahrt</h3><div class="split">${map('Apple Karten','https://maps.apple.com/?q=')}${map('Google Maps','https://www.google.com/maps/search/?api=1&query=')}</div>`;
   return{head:`<h2>${esc(x.title||(sp?'Spiel':'Training'))}</h2><p>${WD_LONG[wdIdx(x.date)]}, ${esc(dDE(x.date))} · ${esc(tRange(x))}${x.start?' Uhr':''}</p>`,body,foot:canTermin()?`<button class="btn" data-act="terminEdit" data-id="${esc(x.id)}">Bearbeiten</button>`:''}}
+// Umfrage bei Auswärtsfahrten: Trainer/MV/Admin starten sie, jeder wählt „Treffpunkt (Bus)“ oder „direkt“ – bis zum Spieltag änderbar
+const POLL_OPTS=[['treff','🚐 Zum Treffpunkt (Bus)'],['direkt','🚗 Ich fahre direkt']];
+// Vorschlag fürs Ende: Vortag 20 Uhr (für <input type="datetime-local">, Ortszeit)
+const pollDefaultEnd=x=>{const d=new Date(x.date+'T20:00');d.setDate(d.getDate()-1);return isoD(d)+'T20:00'};
+function pollBlock(x){if(x.type!=='spiel'||isHome(x))return '';const me=myPid(),can=canPlan()&&x.date>=tdIso(),open=x.date>=tdIso()&&!(x.poll?.until&&Date.parse(x.poll.until)<=Date.now());
+  if(!x.poll)return can?`<h3 class="sub-h">Umfrage</h3><div class="field" style="margin-bottom:10px"><label for="pollq">Frage an die Mannschaft</label><textarea id="pollq" rows="2" maxlength="200">Wer kommt zum Treffpunkt und braucht einen Platz im 9er-Bus?</textarea></div>
+    <div class="field" style="margin-bottom:10px"><label for="pollend">Abstimmen bis</label><input id="pollend" type="datetime-local" value="${esc(pollDefaultEnd(x))}" min="${esc(new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,16))}"></div><button class="btn block" data-act="pollStart" data-id="${esc(x.id)}">🚐 Umfrage starten</button>`:'';
+  const ans=(S.umfrage||[]).filter(a=>a.doc===x.id),mine=ans.find(a=>a.pid===me),who=c=>ans.filter(a=>a.choice===c).map(a=>pById(a.pid)).filter(Boolean);
+  const names=l=>l.length?esc(l.map(shortName).join(', ')):'–',miss=(S.members||[]).filter(m=>m.approved&&m.player_id&&!ans.some(a=>a.pid===m.player_id)).map(m=>pById(m.player_id)).filter(Boolean); // nur wer abstimmen kann (freigeschaltetes Konto)
+  const end=x.poll.until?new Date(x.poll.until):null,endTxt=end?`${WD_SHORT[(end.getDay()+6)%7]} ${dDE(isoD(end)).slice(0,6)} ${String(end.getHours()).padStart(2,'0')}:${String(end.getMinutes()).padStart(2,'0')} Uhr`:'';
+  return `<h3 class="sub-h">Umfrage</h3><div class="stcard" style="margin:0"><p style="margin:0 0 4px;font-weight:600">${esc(x.poll.q)}</p><p class="note" style="margin:0 0 10px">${open?(endTxt?'Abstimmen bis '+esc(endTxt):'Abstimmen bis zum Spieltag'):'Umfrage beendet – das ist das Ergebnis.'}</p>`
+    +(open&&me?`<div class="seg full" role="group" aria-label="Deine Antwort" style="margin-bottom:12px">${POLL_OPTS.map(([k,l])=>`<button data-act="pollVote" data-id="${esc(x.id)}" data-k="${k}" aria-pressed="${mine?.choice===k}">${l}</button>`).join('')}</div>`:'')
+    +`<div class="rows">${POLL_OPTS.map(([k,l])=>`<div class="row"><div class="m"><b>${l} · ${who(k).length}</b><i class="wrap">${names(who(k))}</i></div></div>`).join('')}`
+    +(can?`<div class="row"><div class="m"><b>Noch nicht abgestimmt · ${miss.length}</b><i class="wrap">${names(miss)}</i></div></div>`:'')+`</div>`
+    +(can?`<button class="linkbtn" data-act="pollDel" data-id="${esc(x.id)}">${S.confirmDel==='pl'+x.id?'Wirklich löschen? Alle Antworten gehen verloren.':'Umfrage löschen'}</button>`:'')+`</div>`}
 function terminSheet(s){const t=s.t,sp=t.type==='spiel';
   return{head:`<h2>${s.id?(sp?'Spiel bearbeiten':'Training bearbeiten'):(sp?'Spiel hinzufügen':'Training hinzufügen')}</h2>`,
     body:`<div class="fields"><div class="field"><label for="tdate">Datum</label><input id="tdate" type="date" value="${esc(t.date||'')}"></div>${timePair('tstart','tend',t.start,t.end)}
@@ -1017,6 +1058,7 @@ function terminSheet(s){const t=s.t,sp=t.type==='spiel';
     <div class="field"><label for="tplace">Ort (optional)</label><input id="tplace" maxlength="120" value="${esc(t.place||'')}" autocomplete="off"></div>
     ${sp?`<div class="field"><label for="thome">Heim oder Auswärts</label><select id="thome"><option value="1" ${isHome(t)?'selected':''}>Heimspiel</option><option value="0" ${isHome(t)?'':'selected'}>Auswärts</option></select></div>
     <div class="two"><div class="field"><label for="tmeet">Treffpunkt Uhrzeit (Auswärts)</label><input id="tmeet" type="time" value="${esc(t.meet||'')}"></div><div class="field"><label for="tmeetp">Treffpunkt Ort</label><input id="tmeetp" maxlength="120" value="${esc(t.meetPlace||'')}" autocomplete="off"></div></div>
+    <div class="field"><label for="ttravel">Anreise (optional)</label><textarea id="ttravel" rows="2" maxlength="300" placeholder="z. B. Fahrgemeinschaften ab Halle, Bus um 17:15 Uhr">${esc(t.travel||'')}</textarea></div>
     <div class="hint">Heimspiele: Treffpunkt ist automatisch 1:30 h vor Spielbeginn. Auswärts trägst du ihn hier in der Spielwoche ein, bis dahin steht „wird in der Spielwoche bekannt gegeben“.</div>`:''}</div>`,
     foot:delFoot('terminDel','tm',s.id,'terminCancel','terminSave')}}
 // Hilfen für Speichern und Löschen: Knopf sperren, Fehler als Hinweis zeigen (true bei Erfolg); Funktion über die Datenbank (liefert {data} oder null); zweiter Tipp bestätigt
@@ -1098,7 +1140,7 @@ async function baelleSwap(ia,pa,ib,pb){if(!isAdmin())return;const A=S.termine.fi
   if(await baelleApply({disabled:false},{[ia]:A.pids.map(p=>p===pa?pb:p),[ib]:B.pids.map(p=>p===pb?pa:p)})){S.still=true;renderSheet(false)}}
 function openSheet(s){const sb=$('#sheetRoot .sheet-b');if(sb)sb.scrollTop=0;S.sheet=s;S.confirmDel=null;S.confirmPayAll=null;document.body.classList.add('locked');renderSheet(false)}
 // Kreuz oben rechts: in Unterseiten einen Schritt zurück (Spiel → Fußball); aus einem Bereich (Fußball, Döner …) zurück zur Übersicht
-const SHEET_PARENT={fbEdit:'fussball',fbRound:'fussball',fbGame:'fussball',trikotEdit:'trikot',gbEdit:'gb',gbPick:'gb'};
+const SHEET_PARENT={wuerfelAdd:'wuerfel',fbEdit:'fussball',fbRound:'fussball',fbGame:'fussball',trikotEdit:'trikot',gbEdit:'gb',gbPick:'gb'};
 const fbFrom=()=>S.sheet&&S.sheet.type==='fbRound'?{type:'fbRound',no:S.sheet.no}:null; // Herkunft merken, damit „zurück“ in die Runde führt
 function stepBack(){const s=S.sheet;if(!s)return;
   if(s.type==='anzNew'&&(s.pid||s.fid)){s.note=$('#ann')?.value??s.note;if(s.fid)s.fid=null;else s.pid=null;S.still=true;renderSheet(false);return} // Details → Strafe → Person → schließen
@@ -1118,7 +1160,7 @@ function renderSheet(refresh){
   if(s.type==='doener'){const t=$('#dtext'),pp=$('#dpay');if(t)s.draft=t.value;if(pp)s.pay=pp.value}
   const keepScroll=root.querySelector('.sheet-b')?.scrollTop||0;
   let head='',body='',foot='';
-  const sub={menu:menuSheet,doener:doenerSheet,fussball:fussballSheet,fbEdit:fbEditSheet,fbRound:fbRoundSheet,fbGame:fbGameSheet,fbPick:fbPickSheet,push:pushSheet,trikot:trikotSheet,trikotEdit:trikotEditSheet,termin:terminSheet,terminView:terminViewSheet,usual:usualSheet,usualItem:usualItemSheet,baelle:baelleSheet,baelleEdit:baelleEditSheet,text:textSheet,gb:gbSheet,gbEdit:gbEditSheet,gbPick:gbPickSheet,kfWeekAdd:kfWeekAddSheet,roles:rolesSheet,schulden:schuldenSheet,anzNew:anzNewSheet,anzView:anzViewSheet,berichte:berichteSheet}[s.type];
+  const sub={menu:menuSheet,doener:doenerSheet,fussball:fussballSheet,fbEdit:fbEditSheet,fbRound:fbRoundSheet,fbGame:fbGameSheet,fbPick:fbPickSheet,push:pushSheet,trikot:trikotSheet,trikotEdit:trikotEditSheet,termin:terminSheet,terminView:terminViewSheet,usual:usualSheet,usualItem:usualItemSheet,baelle:baelleSheet,baelleEdit:baelleEditSheet,text:textSheet,gb:gbSheet,gbEdit:gbEditSheet,gbPick:gbPickSheet,kfWeekAdd:kfWeekAddSheet,roles:rolesSheet,schulden:schuldenSheet,anzNew:anzNewSheet,anzView:anzViewSheet,berichte:berichteSheet,wuerfel:wuerfelSheet,wuerfelAdd:wuerfelAddSheet}[s.type];
   if(sub){({head,body,foot}=sub(s))}
   else if(s.type==='fine'&&countFine(s.fine)){
     const d=deckeSheet(s);head=d.head;body=d.body;foot=d.foot;
@@ -1488,12 +1530,12 @@ document.addEventListener('click',async ev=>{
   const el=ev.target.closest('[data-act]');if(!el)return;const act=el.dataset.act,id=el.dataset.id;
   if(act==='scrim'&&ev.target!==el)return;
   switch(act){
-    case 'tab':S.tab=el.dataset.k;try{localStorage.setItem('tab',S.tab)}catch(e){}$('#view').innerHTML='';render();scrollTo(0,0);break;
+    case 'tab':S.tab=el.dataset.k;if(S.tab==='verwalten'&&S.loadMembers)S.loadMembers();try{localStorage.setItem('tab',S.tab)}catch(e){}$('#view').innerHTML='';render();scrollTo(0,0);break;
     case 'fine':{const f=S.fines.find(x=>x.id===id);if(f)openSheet({type:'fine',fine:f,sel:new Set(S.preselect?[S.preselect]:[]),qty:f.per&&!f.base?1:0,touched:false,amount:0,spieltag:false,kf:!!f.kabinenfest&&S.canWrite===true,note:'',date:today()});S.preselect=null;break}
     case 'free':openSheet({type:'fine',fine:{id:null,title:'Sonstiges',base:0,per:0,hint:'Freier Betrag, z. B. Würfelergebnis oder Beitrag, der nicht im Katalog steht. Beschreibe ihn in der Notiz.'},sel:new Set(S.preselect?[S.preselect]:[]),qty:0,touched:true,amount:0,spieltag:false,kf:false,note:'',date:today(),col:'strafen'});S.preselect=null;break;
     case 'fav':{const i=S.favs.indexOf(id);if(i>=0)S.favs.splice(i,1);else S.favs.push(id);saveFavs();const fl=$('#finelist');if(fl)fl.innerHTML=fineList();break}
     case 'ksort':S.ksort=el.dataset.k;try{localStorage.setItem('ksort',S.ksort)}catch(e){}render();break;
-    case 'kview':S.kview=el.dataset.k;render();break;
+    case 'kview':S.kview=el.dataset.k;if(S.kview==='statistik')S.loadAnzRank?.();render();break;
     case 'smode':S.smode=el.dataset.k;render();break;
     case 'bmon':{S.bClosed[el.dataset.m]=!S.bClosed[el.dataset.m];render();break}
     case 'month':{const ps=periods();let i=S.month==='saison'?ps.length:ps.indexOf(S.month);i+=Number(el.dataset.d);S.month=i>=ps.length?'saison':ps[Math.max(0,i)];render();break}
@@ -1535,7 +1577,7 @@ document.addEventListener('click',async ev=>{
     case 'kwReset':{const d={...S.settings};delete d.kassenwartUid;try{await S.db.doc('settings/kasse').set(d);toast('Kassenwart zurückgesetzt')}catch(e){toast(errMsg(e))}break}
     case 'startZahltag':startZahltag();break;
     case 'logout':try{const reg=await swReg(),sub=reg&&await reg.pushManager.getSubscription();if(sub){await S.sb.from('push_subs').delete().eq('endpoint',sub.endpoint);await sub.unsubscribe()}}catch(e){} // Gerät soll nach dem Abmelden keine Nachrichten mehr bekommen
-      await S.sb.auth.signOut();location.reload();break;
+      clearLocalData();await S.sb.auth.signOut();location.reload();break;
     case 'pushOn':{const perm=Notification.requestPermission();el.disabled=true; // Erlaubnis direkt beim Tippen anfragen (iOS verlangt das)
       try{if(await perm!=='granted'){toast('Ohne deine Erlaubnis geht es leider nicht');await pushLoad();break}
         const reg=await swReg();if(!reg)throw new Error('Service Worker fehlt');
@@ -1570,6 +1612,14 @@ document.addEventListener('click',async ev=>{
       closeSheet();toast('Anzeige abgelehnt')}catch(e){toast(errMsg(e))}break;
     case 'anzDel':{const a=(S.anzeigen||[]).find(x=>x.id===id);if(!a)break;if(S.confirmDel!=='ad'+id){S.confirmDel='ad'+id;S.still=true;renderSheet(false);break}S.confirmDel=null;
       try{await S.db.doc('anzeigen/'+id).delete();if(a.path)try{await S.sb.storage.from('anzeigen').remove([a.path])}catch(_){}closeSheet();toast('Anzeige zurückgezogen')}catch(e){toast(errMsg(e))}break}
+    case 'openWuerfel':S.still=true;openSheet({type:'wuerfel'});break;
+    case 'wfNew':if(S.canWrite)openSheet({type:'wuerfelAdd',sel:new Set(),name:''});break;
+    case 'wfPick':{const s=S.sheet;s.name=$('#wfn')?.value||'';s.sel.has(id)?s.sel.delete(id):s.sel.add(id);S.still=true;renderSheet(false);break}
+    case 'wfSave':{if(!S.canWrite)break;const s=S.sheet,v=$('#wfn').value.trim().slice(0,80),now=new Date().toISOString();
+      const fp=v&&S.players.find(x=>x.name.toLowerCase()===v.toLowerCase()),items=[...[...s.sel].map(id=>({name:pById(id)?.name||id,pid:id})),...(v?[{name:fp?fp.name:v,pid:fp?fp.id:null}]:[])];
+      if(!items.length){toast('Bitte Spieler antippen oder einen Namen eingeben');break}el.disabled=true;
+      try{await Promise.all(items.map(x=>S.db.collection('wuerfel').add({...x,createdAt:now})));toast(items.length===1?items[0].name+' muss würfeln 🎲':items.length+' müssen würfeln 🎲');S.still=true;openSheet({type:'wuerfel'})}catch(e){el.disabled=false;toast(errMsg(e))}break}
+    case 'wfDone':try{await S.db.doc('wuerfel/'+id).delete();S.still=true;renderSheet(false)}catch(e){toast(errMsg(e))}break;
     case 'openBerichte':S.still=true;openSheet({type:'berichte'});break;
     case 'openSchulden':if(hasRole('kassenwart'))openSheet({type:'schulden'});break;
     case 'schuldAdd':{const name=$('#sdn').value.trim(),amount=Math.round(num($('#sda').value)*100)/100,note=$('#sdt').value.trim()||null;
@@ -1691,8 +1741,14 @@ document.addEventListener('click',async ev=>{
     case 'kalmonth':{const n=bToday(),c=S.kalM||{y:n.getFullYear(),m:n.getMonth()},x=new Date(c.y,c.m+ +el.dataset.d,1);S.kalM=+el.dataset.d?{y:x.getFullYear(),m:x.getMonth()}:null;render();break}
     case 'kaldayopen':S.kalMon=monIso(el.dataset.d);S.kalView='woche';render();scrollTo(0,0);break;
     case 'kalnav':S.confirmPlan=null;S.kalMon=addDays(S.kalMon||monIso(tdIso()),7*+el.dataset.d);render();break;
-    case 'meetSave':{if(!canPlan())break;const meet=$('#vmeet').value,mp=$('#vmeetp').value.trim();
-      if(await rpcRun(el,'termin_treffpunkt',{doc_id:id,meet,meet_place:mp})){S.termine=S.termine.map(t=>t.id===id?{...t,meet:meet||null,meetPlace:mp||null}:t);toast('Treffpunkt gespeichert. Mit „Fertig“ im Wochenplan melden.');S.still=true;renderSheet(false);render()}break}
+    case 'pollStart':{if(!canPlan())break;const q=$('#pollq').value.trim(),ev=$('#pollend').value,end=ev?new Date(ev):null;if(!q){toast('Bitte eine Frage eingeben');break}
+      if(!end||isNaN(end)||end<=new Date()){toast('Bitte wählen, bis wann abgestimmt werden kann (in der Zukunft)');break}
+      if(await rpcRun(el,'termin_umfrage',{doc_id:id,frage:q,bis:end.toISOString()})){S.termine=S.termine.map(t=>t.id===id?{...t,poll:{q:q.slice(0,200),at:new Date().toISOString(),until:end.toISOString()}}:t);toast('Umfrage gestartet – alle bekommen eine Nachricht');S.still=true;renderSheet(false)}break}
+    case 'pollDel':if(!canPlan()||!sure('pl'+id))break;if(await rpcRun(el,'termin_umfrage',{doc_id:id,frage:''})){S.termine=S.termine.map(t=>{if(t.id!==id)return t;const {poll,...r}=t;return r});S.umfrage=(S.umfrage||[]).filter(a=>a.doc!==id);toast('Umfrage gelöscht');S.still=true;renderSheet(false)}break;
+    case 'pollVote':{const me=myPid();if(!me)break;const choice=el.dataset.k;
+      try{await S.db.doc('umfrage/'+id+'_'+me).set({doc:id,pid:me,choice,at:new Date().toISOString()});S.still=true;renderSheet(false)}catch(e){toast(errMsg(e))}break}
+    case 'meetSave':{if(!canPlan())break;const meet=$('#vmeet')?.value||'',mp=($('#vmeetp')?.value||'').trim(),travel=$('#vtravel').value.trim().slice(0,300);
+      if(await rpcRun(el,'termin_treffpunkt',{doc_id:id,meet,meet_place:mp,travel})){S.termine=S.termine.map(t=>t.id===id?{...t,meet:meet||null,meetPlace:mp||null,travel:travel||null}:t);toast('Treffpunkt gespeichert. Mit „Fertig“ im Wochenplan melden.');S.still=true;renderSheet(false);render()}break}
     case 'planSend':{if(!canPlan())break;const mon=el.dataset.mon;
       if(S.confirmPlan!==mon){S.confirmPlan=mon;render();break}
       S.confirmPlan=null;const r=await rpcRun(el,'wochenplan_senden',{mon});
@@ -1710,7 +1766,7 @@ document.addEventListener('click',async ev=>{
     case 'terminSave':{if(!canTermin())break;const s=S.sheet,t=s.t,sp=t.type==='spiel',date=$('#tdate').value,start=$('#tstart').value,end=$('#tend').value,title=$('#ttitle').value.trim().slice(0,120);
       const bad=!/^\d{4}-\d{2}-\d{2}$/.test(date)?'Bitte ein Datum wählen':sp&&!title?'Bitte das Spiel eintragen, z. B. TSG Münster - Gegner':start&&end&&end<=start?'Das Ende muss nach dem Beginn liegen':'';if(bad){toast(bad);break}
       const home=sp&&$('#thome').value==='1',d={type:t.type,date,start:start||null,end:end||null,title:title||(sp?'Spiel':'Training'),place:$('#tplace').value.trim().slice(0,120)||null,
-        ...(sp?{home,meet:home?null:$('#tmeet').value||null,meetPlace:home?null:$('#tmeetp').value.trim().slice(0,120)||null}:{})};
+        ...(sp?{home,meet:home?null:$('#tmeet').value||null,meetPlace:home?null:$('#tmeetp').value.trim().slice(0,120)||null,travel:$('#ttravel').value.trim().slice(0,300)||null}:{})};
       if(await run(el,()=>S.db.doc('termine/'+(s.id||((sp?'spiel-':'tr-')+date+'-'+Date.now().toString(36)))).set(d))){toast('Gespeichert');if(!sp)S.kalMon=monIso(date);closeSheet();render()}break}
     case 'terminDel':{const x=canTermin()&&terminById(id); // Löscht man das letzte Training eines Tages, merkt sich eine Absage den leeren Tag
       if(x&&sure('tm'+id)&&await run(el,async()=>{await S.db.doc('termine/'+id).delete();if(x.type==='training'&&!S.termine.some(t=>t.date===x.date&&t.type==='training'&&t.id!==id))await S.db.doc('termine/cx-'+x.date).set({type:'cancel',date:x.date})})){toast('Termin gelöscht');closeSheet()}break}
@@ -1827,17 +1883,21 @@ function makeDb(sb){
   const toDoc=(id,data)=>({id,exists:data!=null,data:()=>data??undefined,metadata:{fromCache:false,hasPendingWrites:false}});
   function table(t){
     if(subs[t])return subs[t];
-    const st=subs[t]={rows:new Map(),ls:new Set(),loaded:false};
-    const emit=e=>{for(const f of st.ls)f(e)};
+    const st=subs[t]={rows:new Map(),ls:new Set(),loaded:false},ck=cacheKey(t);let sv;
+    // letzter Stand vom Handy: sofort anzeigen, bis die frischen Daten da sind
+    try{const c=JSON.parse(localStorage.getItem(ck)||'null');if(Array.isArray(c)){st.rows=new Map(c);st.loaded=true;S.cached.add(t);S.refreshing=true}}catch(e){}
+    const save=()=>{clearTimeout(sv);sv=setTimeout(()=>{if(S.noSave)return;try{localStorage.setItem(ck,JSON.stringify([...st.rows]))}catch(e){}},1000)};
+    const emit=e=>{if(!e&&st.loaded)save();for(const f of st.ls)f(e)};
     const load=async()=>{const all=[];for(let from=0;;from+=1000){const {data,error}=await sb.from(t).select('id,data').order('id').range(from,from+999);if(error){emit(error);return}all.push(...data);if(data.length<1000)break}
-      st.rows=new Map(all.map(r=>[r.id,r.data]));st.loaded=true;emit()};
+      st.rows=new Map(all.map(r=>[r.id,r.data]));st.loaded=true;if(S.cached.delete(t)&&!S.cached.size){S.refreshing=false;renderSoon()}emit()};
     let tm;const reload=()=>{clearTimeout(tm);tm=setTimeout(load,200)};
     sb.channel('rt-'+t).on('postgres_changes',{event:'*',schema:'public',table:t},pl=>{
       if(pl.eventType==='DELETE')st.rows.delete(pl.old.id);else st.rows.set(pl.new.id,pl.new.data);if(st.loaded)emit()}).subscribe(x=>{if(x==='SUBSCRIBED'&&st.loaded)reload()});
-    st.load=load;load();
-    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')reload()});
+    st.load=load;st.reload=reload;load();
     return st;
   }
+  // Zurück aus dem Hintergrund: nur nach mehr als einer Minute alles neu laden (sonst reicht die Live-Verbindung; reißt sie ab, lädt das Wiederverbinden ohnehin neu)
+  let hiddenAt=0;document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){hiddenAt=Date.now();return}if(Date.now()-hiddenAt>60000)for(const t in subs)subs[t].reload()});
   const local=(t,id,d)=>{const st=subs[t];if(st){if(d===null)st.rows.delete(id);else st.rows.set(id,d);for(const f of st.ls)f()}};
   function docRef(t,id){id=id||(Date.now().toString(36)+Math.random().toString(36).slice(2,10));
     return{id,path:t+'/'+id,
@@ -1904,10 +1964,13 @@ async function boot(){
   const {data:{session}}=await sb.auth.getSession();
   if(!session){authScreen('login');return}
   S.uid=session.user.id;S.email=session.user.email;S.favs=loadFavs();
-  const {data:me,error}=await sb.from('members').select('*').eq('user_id',S.uid).maybeSingle();
+  let me=null,error=null;const mk='me:'+S.uid;try{me=JSON.parse(localStorage.getItem(mk)||'null')}catch(e){}
+  const fresh=sb.from('members').select('*').eq('user_id',S.uid).maybeSingle().then(r=>{if(r.data&&!S.noSave)try{localStorage.setItem(mk,JSON.stringify(r.data))}catch(e){}return r});
+  // freigeschaltet und schon einmal gespeichert: sofort starten, Rolle/Freischaltung prüft loadMembers gleich danach
+  if(!me||!me.approved){({data:me,error}=await fresh)}
   if(error){authScreen('login','Verbindung fehlgeschlagen: '+error.message);return}
   if(!me||!me.approved){const {data:pl}=await sb.from('players').select('id,data');S.players=(pl||[]).map(r=>({id:r.id,...r.data}));S.me=me||null;if(!me){const {data:tk}=await sb.rpc('taken_players');S.taken=new Set(tk||[])}authScreen(me?'pending':'link');return}
-  S.me=me;setPerms();clearBadge();if(pushSupported())swReg();
+  S.me=me;setPerms();clearBadge();
   if(started){render();return}started=true;S.status='loading';
   const db=makeDb(sb);S.db=db;$('#view').innerHTML='';render();
   const timer=setTimeout(()=>{S.stale=true;if(S.status==='loading')S.status='ready';render()},10000);
@@ -1935,15 +1998,27 @@ async function boot(){
   db.collection('termine').onSnapshot(s=>{S.termine=s.docs.map(d=>({id:d.id,...d.data()}));renderSoon()},()=>{});
   db.collection('doener').onSnapshot(s=>{S.doener=s.docs.map(d=>({id:d.id,...d.data()}));renderSoon()},()=>{});
   db.collection('geburtstage').onSnapshot(s=>{S.gb=Object.fromEntries(s.docs.map(d=>[d.id,d.data().md]));S.gbLoaded=true;renderSoon()},()=>{});
-  db.collection('anzeigen').onSnapshot(s=>{S.anzeigen=s.docs.map(d=>({id:d.id,...d.data()}));renderSoon();if(S.sheet&&S.sheet.type==='anzView')renderSheet(true)},()=>{});
+  const loadAnzRank=()=>sb.rpc('anzeigen_rangliste').then(({data})=>{if(data){S.anzRank=data;renderSoon()}},()=>{});
+  // Rangliste „Anzeigenhauptmeister“: Spieler sehen fremde Anzeigen nicht live – beim Öffnen der Statistik und jede Minute, solange sie offen ist, neu laden
+  S.loadAnzRank=loadAnzRank;setInterval(()=>{if(document.visibilityState==='visible'&&S.tab==='uebersicht'&&S.kview==='statistik')loadAnzRank()},60000);
+  db.collection('anzeigen').onSnapshot(s=>{S.anzeigen=s.docs.map(d=>({id:d.id,...d.data()}));loadAnzRank();renderSoon();if(S.sheet&&S.sheet.type==='anzView')renderSheet(true)},()=>{});
+  db.collection('umfrage').onSnapshot(s=>{S.umfrage=s.docs.map(d=>({id:d.id,...d.data()}));renderSoon()},()=>{});
+  db.collection('wuerfel').onSnapshot(s=>{S.wuerfel=s.docs.map(d=>({id:d.id,...d.data()}));renderSoon();if(S.sheet&&S.sheet.type==='wuerfel')renderSheet(true)},()=>{});
   db.collection('berichte').onSnapshot(s=>{S.berichte=s.docs.map(d=>({id:d.id,...d.data()}));renderSoon()},()=>{});
   db.collection('fussball').onSnapshot(s=>{S.fussball=s.docs.map(d=>({id:d.id,...d.data()}));renderSoon()},()=>{});
   const loadMembers=async()=>{const {data}=await sb.from('members').select('*');S.members=data||[];const mine=S.members.find(m=>m.user_id===S.uid);
-    if(mine&&(rolesOf(mine).join()!==rolesOf(S.me).join()||!mine.approved))return location.reload();render()}; // neue Rolle: neu laden, damit Abos und geladene Daten zur Rolle passen
+    if(data&&!mine){clearLocalData();return location.reload()} // Konto entfernt: gespeicherten Stand verwerfen
+    if(mine&&!S.noSave)try{localStorage.setItem('me:'+S.uid,JSON.stringify(mine))}catch(e){}
+    // neue Rolle oder gesperrt: gespeicherte Daten verwerfen und neu laden, damit Abos und Daten zur Rolle passen
+    if(mine&&(rolesOf(mine).join()!==rolesOf(S.me).join()||!mine.approved)){clearLocalData();try{localStorage.setItem('me:'+S.uid,JSON.stringify(mine))}catch(e){}return location.reload()}
+    render()};
 
   loadMembers();sb.channel('rt-members').on('postgres_changes',{event:'*',schema:'public',table:'members'},loadMembers).subscribe();
+  // Die Live-Verbindung reißt im Hintergrund ab (iOS): beim Zurückkehren in die App und beim Öffnen von „Verwalten“ neu laden
+  S.loadMembers=loadMembers;document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')loadMembers()});
 }
 (function init(){
+  swReg(); // App-Dateien auf dem Handy speichern (und Push)
   const C=window.KASSE_CONFIG||{};
   if(!window.supabase||!C.url||!C.key){S.status='nodb';render();return}
   S.sb=window.supabase.createClient(C.url,C.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});

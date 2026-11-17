@@ -56,6 +56,9 @@
 
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
+.syncnote{font-size:13px;color:var(--muted);text-align:center;margin:-2px 0 10px}
+.skel{display:grid;gap:10px;margin-top:6px}.skel i{display:block;height:56px;border-radius:var(--r-sm);background:linear-gradient(90deg,var(--line) 25%,var(--surface) 50%,var(--line) 75%);background-size:200% 100%;animation:skel 1.3s ease-in-out infinite}
+@keyframes skel{to{background-position:-200% 0}}@media (prefers-reduced-motion:reduce){.skel i{animation:none}}
 /* kein Nachziehen über den Rand (iOS-Gummiband); Hintergrund bleibt wie im Kopf festgelegt (oben blau, sonst hell) */
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:pan-x pan-y;overscroll-behavior-y:none}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45;overscroll-behavior-y:none}
@@ -567,7 +570,7 @@ details.bank summary{cursor:pointer;font-weight:600;color:var(--brand);min-heigh
 .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
 /* iOS: Zeit-/Datumsfelder halten sich sonst nicht an die Spaltenbreite und überlappen */
 .field{min-width:0}
-.field input[type=time],.field input[type=date]{-webkit-appearance:none;appearance:none;min-width:0;max-width:100%;display:block}
+.field input[type=time],.field input[type=date],.field input[type=datetime-local]{-webkit-appearance:none;appearance:none;min-width:0;max-width:100%;display:block}
 .field input::-webkit-date-and-time-value{text-align:left}
 .stepper{display:flex;align-items:center;gap:8px}
 .stepper button{width:48px;height:48px;flex:none;border-radius:var(--r-sm);border:1px solid var(--line-strong);background:var(--surface);display:grid;place-items:center}
@@ -599,6 +602,6 @@ details.bank summary{cursor:pointer;font-weight:600;color:var(--brand);min-heigh
 <script src="config.js"></script>
 <script src="vendor/supabase-2.45.4.min.js"></script>
 
-<script src="app.js?v=f04bb605"></script>
+<script src="app.js?v=d213a43c"></script>
 </body>
 </html>
