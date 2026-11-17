@@ -819,6 +819,9 @@ function fbPickSheet(s){const e=s.back,l=teamName(s.team),used=new Set(e.goals.f
   return{head,body,foot:`<div class="split"><button class="btn" data-act="fbPickBack">Zurück</button><button class="btn primary" data-act="fbPickDone" ${n?'':'disabled'}>${n?n+' hinzufügen':'Spieler wählen'}</button></div>`}}
 /* ---------- Push-Benachrichtigungen (Web Push, kostenlos) ---------- */
 const PUSH_KINDS=[['strafe','Neue Strafen','Wenn für dich etwas eingetragen wird'],['zahltag','Zahltag','Beim Start und einen Tag vor dem Ende, falls noch etwas offen ist'],['doener','Döner','Bestell-Erinnerung (Di 17 Uhr), Zahlungs-Erinnerung (Mi 12 Uhr) und Hinweise für den Dönerwart'],['fussball','Fußball','Neue Spiele und das Ende einer Runde'],['geburtstag','Geburtstage','Glückwünsche an dich und wer heute Geburtstag hat'],['plan','Wochenplan','Wenn Trainer oder Mannschaftsverantwortlicher die Woche eingetragen haben'],['bericht','Berichte','Sonntag vor der Abgabe (12 Uhr) und am Abgabetag (9 Uhr), wenn du einen Bericht schreibst'],['anzeige','Anzeigen','Wenn jemand eine Anzeige erstattet'],['anmeldung','Neue Anmeldungen','Wenn sich jemand neu registriert und freigeschaltet werden möchte'],['meldung','Gemeldete Zahlungen','Wenn jemand „Ich habe bezahlt“ meldet']];
+// Zahl am App-Icon (setzt sw.js bei jeder Push-Nachricht): beim Öffnen und beim Zurückwechseln in die App auf 0
+function clearBadge(){try{navigator.clearAppBadge&&navigator.clearAppBadge().catch(()=>{})}catch(e){}try{window.caches&&caches.open('badge').then(c=>c.delete('n')).catch(()=>{})}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')clearBadge()});
 const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 const pushSupported=()=>'serviceWorker' in navigator&&!!window.PushManager&&!!window.Notification;
@@ -1904,7 +1907,7 @@ async function boot(){
   const {data:me,error}=await sb.from('members').select('*').eq('user_id',S.uid).maybeSingle();
   if(error){authScreen('login','Verbindung fehlgeschlagen: '+error.message);return}
   if(!me||!me.approved){const {data:pl}=await sb.from('players').select('id,data');S.players=(pl||[]).map(r=>({id:r.id,...r.data}));S.me=me||null;if(!me){const {data:tk}=await sb.rpc('taken_players');S.taken=new Set(tk||[])}authScreen(me?'pending':'link');return}
-  S.me=me;setPerms();if(pushSupported())swReg();
+  S.me=me;setPerms();clearBadge();if(pushSupported())swReg();
   if(started){render();return}started=true;S.status='loading';
   const db=makeDb(sb);S.db=db;$('#view').innerHTML='';render();
   const timer=setTimeout(()=>{S.stale=true;if(S.status==='loading')S.status='ready';render()},10000);
