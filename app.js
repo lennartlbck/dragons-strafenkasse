@@ -73,7 +73,7 @@ async function payEntries(pid,ids,via){if(!ids.length)return{n:0,used:0};
 const sumAmt=es=>r2(es.reduce((a,e)=>a+(e.amount||0),0));
 const netTxt=n=>n>0?eur(n):n<0?'+ '+eur(-n):eur(0);
 // ---------- Backup ----------
-const BACKUP_TABLES=['players','fines','entries','bills','settings','zahltag','fees','receipts','members','kasse_intern','fussball','doener','geburt','trikotwash','geburtstage','schulden'];
+const BACKUP_TABLES=['players','fines','entries','bills','settings','zahltag','fees','receipts','members','kasse_intern','fussball','doener','geburt','trikotwash','geburtstage','schulden','anzeigen','berichte'];
 const daysSince=iso=>iso?Math.floor((Date.now()-Date.parse(iso))/DAY):null;
 async function makeBackup(){
   const out={app:'Dragons Kasse',format:1,exportedAt:new Date().toISOString(),tables:{}},counts={};
@@ -116,7 +116,7 @@ function avatar(p,cls=''){if(!p)return `<span class="av ${cls}">?</span>`;
   if(p.img)return `<span class="av ${cls}"><img src="${esc(p.img)}" alt="" loading="lazy"></span>`;
   const ini=p.name.split(/\s+/).map(w=>w[0]).slice(0,2).join('');return `<span class="av ${cls}">${esc(ini)}</span>`}
 S.termine=[];S.kalView='woche';S.kalMon=null;S.kalM=null;
-const ROLES=[['member','Spieler'],['kassenwart','Kassenwart'],['admin','Admin'],['deckenzaehler','Deckenzähler'],['doenerwart','Dönerwart'],['trainer','Trainer'],['mannschaftsverantwortlicher','Mannschaftsverantwortlicher'],['trikotwart','Trikotwart']];
+const ROLES=[['member','Spieler'],['kassenwart','Kassenwart'],['admin','Admin'],['deckenzaehler','Deckenzähler'],['doenerwart','Dönerwart'],['trainer','Trainer'],['mannschaftsverantwortlicher','Mannschaftsverantwortlicher'],['trikotwart','Trikotwart'],['wasserwart','Wasserwart'],['aufraeumdienst','Aufräumdienst']];
 const roleName=r=>(ROLES.find(x=>x[0]===r)||[0,r])[1];
 const pLabel=p=>p?(p.role==='Spieler'&&p.number!=null?'#'+p.number+' · ':'')+(p.role&&p.role!=='Spieler'?p.role:'Spieler'):'';
 
@@ -130,7 +130,7 @@ function renderTabs(){
 function statusBanner(){
   if(S.status==='nodb')return `<div class="banner">Die Kasse ist gerade nicht erreichbar. Prüfe deine Internetverbindung und lade die Seite neu.</div>`;
   if(S.stale)return `<div class="banner">Die Daten sind gerade nicht erreichbar. Was du siehst, ist eventuell nicht aktuell.</div>`;
-  if(S.onlyDecke)return `<div class="info">Als Deckenzähler trägst du „Fußball an der Decke“ ein. Alles andere macht der Kassenwart.</div>`;
+  if(S.amtFines)return `<div class="info">Als ${esc(S.amtRoles.join(' und '))} trägst du ${esc([...S.amtFines].map(id=>'„'+(S.fines.find(f=>f.id===id)?.title||id)+'“').join(', '))} ein. Alles andere macht der Kassenwart.</div>`;
   if(S.canWrite===false)return `<div class="info">Du siehst die Kasse und kannst bezahlen. Strafen und Rechnungen trägt der Kassenwart ein. Fotos von Rechnungen kannst du unter „Rechnungen“ hochladen.</div>`;
   return '';
 }
@@ -141,8 +141,8 @@ function render(){
   renderTabs();
   const v=$('#view');
   if(S.tab==='erfassen'){
-    if(!$('#finelist')){v.innerHTML=`<h1 class="ltitle">Eintragen</h1><div id="bn"></div><label class="search">${I('search')}<input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Strafe suchen" value="${esc(S.q)}" aria-label="Strafe suchen"></label><div id="finelist"></div>`}
-    $('#bn').innerHTML=statusBanner();
+    if(!$('#finelist')){v.innerHTML=`<h1 class="ltitle">Eintragen</h1><div id="anz"></div><div id="bn"></div><label class="search">${I('search')}<input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Strafe suchen" value="${esc(S.q)}" aria-label="Strafe suchen"></label><div id="finelist"></div>`}
+    $('#anz').innerHTML=anzeigenBlock();$('#bn').innerHTML=statusBanner();
     $('#finelist').innerHTML=fineList();
   } else{const sx=v.querySelector('.tablewrap')?.scrollLeft||0;
     const title=(S.tab==='rechnungen'?`<button class="chipbtn" data-act="tab" data-k="uebersicht">${I('chevL')}Übersicht</button>`:'')+`<h1 class="ltitle">${TITLES[S.tab]}</h1>`;
@@ -158,13 +158,13 @@ function loadingOr(html,what){
 }
 function fineList(){
   const q=S.q.trim().toLowerCase();
-  const fines=S.fines.filter(f=>(!S.onlyDecke||f.id===DECKE_FINE)&&(!q||(f.title+' '+(f.hint||'')+' '+(f.cat||'')).toLowerCase().includes(q)));
+  const fines=S.fines.filter(f=>(!S.amtFines||S.amtFines.has(f.id))&&(!q||(f.title+' '+(f.hint||'')+' '+(f.cat||'')).toLowerCase().includes(q)));
   if(S.status==='loading')return `<div class="empty" style="margin-top:12px">Lade Strafenkatalog …</div>`;
   if(!S.fines.length)return `<div class="empty" style="margin-top:12px">Noch kein Strafenkatalog hinterlegt.${S.canEdit?' Lege unter „Verwalten“ die erste Strafe an.':''}</div>`;
   const groups={};for(const f of fines)(groups[f.cat||'Sonstiges']??=[]).push(f);
   const cats=Object.keys(groups).sort((a,b)=>{const ia=CAT_ORDER.indexOf(a),ib=CAT_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)});
   let h='';
-  if(!q&&!S.onlyDecke)h+=`<button class="free" data-act="free">${I('plus')} Freier Betrag (Sonstiges, Würfeln …)</button>`;
+  if(!q&&!S.amtFines)h+=`<button class="free" data-act="free">${I('plus')} Freier Betrag (Sonstiges, Würfeln …)</button>`;
   if(!cats.length)h+=`<div class="empty" style="margin-top:12px">Keine Strafe passt zu „${esc(S.q)}“.</div>`;
   const byOrder=(a,b)=>(a.order??0)-(b.order??0);
   const row=f=>{const fav=S.favs.includes(f.id);return `<div class="finerow"><button class="star" data-act="fav" data-id="${esc(f.id)}" aria-pressed="${fav}" aria-label="${esc(f.title)} ${fav?'aus den Favoriten entfernen':'zu den Favoriten hinzufügen'}">${I(fav?'starFill':'star')}</button><button class="fine" data-act="fine" data-id="${esc(f.id)}"><span class="t"><b>${esc(f.title)}</b>${f.hint?`<i>${esc(f.hint)}</i>`:''}</span><span class="price">${esc(priceLabel(f))}</span>${I('chevR').replace('class="ico"','class="ico chev"')}</button></div>`};
@@ -188,15 +188,17 @@ const purpose=p=>'Mannschaftskasse Dragons '+p.name;
 const toPay=b=>Math.max(0,Math.round((b.open-b.credit)*100)/100);
 const DAY=864e5,KW_DEFAULT='p29',LATE_FEE=10;
 const myPid=()=>S.me?S.me.player_id:null;
-function setPerms(){const mgr=hasRole('admin','kassenwart');S.canEdit=mgr;S.canWrite=mgr;S.onlyDecke=!mgr&&hasRole('deckenzaehler')}
+// Ämter mit Strafrechten (wie amt_fine in schema.sql): nur diese Strafen dürfen sie selbst eintragen
+const AMT_FINES={deckenzaehler:['f26'],wasserwart:['f44','f45'],aufraeumdienst:['f25']};
+function setPerms(){const mgr=hasRole('admin','kassenwart'),a=Object.entries(AMT_FINES).filter(([r])=>hasRole(r));S.canEdit=mgr;S.canWrite=mgr;
+  S.amtFines=!mgr&&a.length?new Set(a.flatMap(x=>x[1])):null;S.amtRoles=a.map(x=>roleName(x[0]))}
 const favKey=()=>'favs-'+(S.uid||'x');
 function loadFavs(){try{const v=JSON.parse(localStorage.getItem(favKey())||'[]');return Array.isArray(v)?v:[]}catch(e){return[]}}
 function saveFavs(){try{localStorage.setItem(favKey(),JSON.stringify(S.favs))}catch(e){}}
-const DECKE_FINE='f26';
 // Strafen mit Zwei-Schritt-Ablauf: Spieler wählen → Weiter → Anzahl pro Spieler
 const COUNT_FLOW={f26:'Deckentreffer',f02:'Bier',f03:'Radler'};
 const countFine=f=>!!f&&f.id in COUNT_FLOW;
-const canEnter=f=>S.canWrite===true||(!!S.onlyDecke&&!!f&&f.id===DECKE_FINE);
+const canEnter=f=>S.canWrite===true||!!(S.amtFines&&f&&S.amtFines.has(f.id));
 const kwPid=()=>S.settings.kassenwartPlayer||KW_DEFAULT;
 // Hauptrolle (role) plus weitere Rollen (roles); 'member' zählt nicht als Rolle
 const rolesOf=m=>m?[m.role,...(m.roles||[])].filter(r=>r&&r!=='member'):[];
@@ -327,6 +329,63 @@ function uebersicht(){
   return {top,bottom:h};
 }
 
+/* ---------- Anzeigen ---------- */
+// Jeder kann jemanden mit Foto und vorgeschlagener Strafe anzeigen; der Kassenwart trägt die Strafe ein oder lehnt ab.
+const anzOpen=()=>(S.anzeigen||[]).filter(a=>(a.status||'neu')==='neu').sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+function anzRow(a){const p=pById(a.playerId),by=pById(a.by);
+  return `<div class="row tap" role="button" tabindex="0" data-act="anzView" data-id="${esc(a.id)}">${a.path?`<img class="rthumb" data-bucket="anzeigen" data-path="${esc(a.path)}" alt="Foto">`:avatar(p)}<div class="m"><b>${esc((a.nr?'#'+a.nr+' ':'')+(p?p.name:'Unbekannt')+': '+(a.title||''))}</b><i>${esc('von '+(by?by.name:'?')+' · '+dDE(String(a.createdAt).slice(0,10))+' · '+eur(a.amount||0))}</i></div>${I('chevR').replace('class="ico"','class="ico chev"')}</div>`}
+function anzeigenBlock(){if(S.status==='loading')return '';
+  const open=anzOpen(),kw=S.canWrite===true,mine=open.filter(a=>a.uid===S.uid);
+  let h=`<button class="btn primary" style="width:100%;margin:0 0 12px" data-act="anzNew">${I('camera')}Anzeige erstatten</button>`;
+  if(kw&&open.length)h+=`<h2 class="section-h" style="margin-top:0">Offene Anzeigen · ${open.length}</h2><div class="rows" style="margin-bottom:14px">${open.map(anzRow).join('')}</div>`;
+  else if(!kw&&mine.length)h+=`<h2 class="section-h" style="margin-top:0">Deine offenen Anzeigen · ${mine.length}</h2><div class="rows" style="margin-bottom:14px">${mine.map(anzRow).join('')}</div>`;
+  return h}
+// nur diese Strafen kann man anzeigen: Flasche nicht beschriftet, Vergessen von Eigentum, Flasche nicht leer getrunken, Amt vernachlässigt, in der Halle nicht aufgeräumt
+const ANZ_FINES=['f44','f43','f45','f50','f25'];
+const anzFines=()=>S.fines.filter(f=>ANZ_FINES.includes(f.id)).sort((a,b)=>{const ia=CAT_ORDER.indexOf(a.cat),ib=CAT_ORDER.indexOf(b.cat);return (ia<0?99:ia)-(ib<0?99:ib)||(a.order??0)-(b.order??0)});
+// Anzeige in drei Schritten: Wen? (Kader mit Fotos, Suche nach Nummer) → Welche Strafe? (wie der Katalog) → Details mit Foto
+function anzNewSheet(s){const p=pById(s.pid),f=S.fines.find(x=>x.id===s.fid),step=!p?'wer':!f?'was':'details';
+  const who=p?`<div class="row" style="margin-bottom:10px">${avatar(p)}<div class="m"><b>${esc(p.name)}</b><i>${p.number!=null?'#'+p.number:''}</i></div><button class="chipbtn" data-act="anzStep" data-k="wer">ändern</button></div>`:'';
+  const foto=`<label class="btn filebtn" for="anfile">${I('camera')}${s.blob?'Anderes Foto wählen':'Foto aufnehmen oder auswählen'}</label><input id="anfile" type="file" accept="image/*" hidden>${s.preview?`<img class="rbig" src="${esc(s.preview)}" alt="Vorschau" ${step==='wer'?'style="max-height:160px;object-fit:cover"':''}>`:''}`;
+  if(step==='wer')return{head:`<h2>Anzeige erstatten</h2><p>Foto hinzufügen und antippen, wen du anzeigst</p>`,
+    body:`<div class="fields" style="margin-bottom:14px">${foto}</div>
+      <label class="search" style="margin:0 0 12px">${I('search')}<input id="annr" type="search" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="Nummer suchen (z. B. von der Flasche)" aria-label="Nummer suchen"></label>
+      <div style="min-height:100dvh"><div class="grid" id="anzgrid">${sortedPlayers(false).filter(x=>x.id!==myPid()).map(x=>`<button class="pick" data-act="anzPick" data-id="${esc(x.id)}" data-no="${x.number??''}">${x.number!=null?`<span class="no">${x.number}</span>`:''}${avatar(x)}<b>${esc(x.name.split(' ')[0])}</b><small>${esc(x.name.split(' ').slice(1).join(' '))}</small></button>`).join('')}</div>
+      <div class="empty" id="anznone" hidden>Niemand mit dieser Nummer.</div></div>`,foot:''};
+  if(step==='was'){const fs=anzFines(),groups={};for(const x of fs)(groups[x.cat||'Sonstiges']??=[]).push(x);
+    return{head:`<h2>Anzeige erstatten</h2><p>Welche Strafe?</p>`,
+      body:who+`<div id="anzfines">`
+        +Object.entries(groups).map(([c,l])=>`<h2 class="section-h">${esc(c)}</h2><div class="fines">${l.map(x=>`<button class="fine" data-act="anzFine" data-id="${esc(x.id)}"><span class="t"><b>${esc(x.title)}</b>${x.hint?`<i>${esc(x.hint)}</i>`:''}</span><span class="price">${esc(priceLabel(x))}</span>${I('chevR').replace('class="ico"','class="ico chev"')}</button>`).join('')}</div>`).join('')+`</div>`,foot:''}}
+  return{head:`<h2>Anzeige erstatten</h2><p>Was ist passiert?</p>`,
+    body:who+`<div class="row" style="margin-bottom:12px"><div class="m"><b>${esc(f.title)}</b><i>${esc(priceLabel(f))}</i></div><button class="chipbtn" data-act="anzStep" data-k="was">ändern</button></div>
+      <div class="fields"><div class="field"><label for="ann">Beschreibung (optional)</label><input id="ann" maxlength="200" value="${esc(s.note||'')}" placeholder="z. B. Matte nach dem Training liegen gelassen"></div>
+      ${foto}</div>`,
+    foot:`<button class="btn primary" id="ansave" data-act="anzSave">Anzeige abschicken</button>`}}
+function anzViewSheet(s){const a=(S.anzeigen||[]).find(x=>x.id===s.id);if(!a)return{head:'<h2>Anzeige</h2>',body:'<div class="empty">Diese Anzeige gibt es nicht mehr.</div>',foot:''};
+  const p=pById(a.playerId),by=pById(a.by),kw=S.canWrite===true,open=(a.status||'neu')==='neu';
+  return{head:`<h2>${esc((p?p.name:'Unbekannt')+': '+(a.title||''))}</h2><p>${esc('Angezeigt von '+(by?by.name:'?')+' am '+dDE(String(a.createdAt).slice(0,10)))}</p>`,
+    body:(a.nr?`<div class="row" style="margin-bottom:12px"><div class="m"><b>Gesuchte Nummer</b></div><div class="r"><strong class="num" style="font-size:22px">#${esc(a.nr)}</strong></div></div>`:'')+(a.path?`<img class="rbig" data-bucket="anzeigen" data-path="${esc(a.path)}" alt="Foto zur Anzeige">`:'<p class="note">Kein Foto.</p>')+(a.note?`<p style="margin:12px 4px 0">${esc(a.note)}</p>`:'')
+      +(kw&&open?`<div class="field" style="margin-top:14px"><label for="ana">Betrag (€)</label><input id="ana" inputmode="decimal" value="${esc(String(a.amount||0).replace('.',','))}"></div>`:`<p class="note" style="margin-top:12px">${open?'Wartet auf den Kassenwart.':a.status==='ok'?'Strafe eingetragen.':'Abgelehnt.'}</p>`),
+    foot:kw&&open?`<div class="split"><button class="btn danger" data-act="anzNo" data-id="${esc(a.id)}">${S.confirmDel==='an'+a.id?'Wirklich ablehnen?':'Ablehnen'}</button><button class="btn primary" id="anok" data-act="anzOk" data-id="${esc(a.id)}">Strafe eintragen</button></div>`
+      :(open&&a.uid===S.uid?`<button class="btn danger" data-act="anzDel" data-id="${esc(a.id)}">${S.confirmDel==='ad'+a.id?'Wirklich zurückziehen?':'Anzeige zurückziehen'}</button>`:'')}}
+async function anzSave(el){const s=S.sheet,pid=s.pid,f=S.fines.find(x=>x.id===s.fid);
+  if(!pid){toast('Bitte antippen, wen du anzeigst');return}if(!f){toast('Bitte eine Strafe auswählen');return}
+  el.disabled=true;let path=null;
+  try{
+    if(s.blob){path=`${S.uid}/${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}.${({'image/png':'png','image/webp':'webp'})[s.blob.type]||'jpg'}`;
+      const up=await S.sb.storage.from('anzeigen').upload(path,s.blob,{contentType:s.blob.type||'image/jpeg'});if(up.error)throw up.error}
+    try{await S.db.doc('anzeigen/a'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)).set({uid:S.uid,by:myPid(),playerId:pid,nr:s.nr||null,fineId:f.id,title:f.title,amount:f.base||f.per||0,note:$('#ann').value.trim()||null,path,status:'neu',createdAt:new Date().toISOString()})}
+    catch(e){if(path)try{await S.sb.storage.from('anzeigen').remove([path])}catch(_){}throw e}
+    closeSheet();toast('Anzeige abgeschickt – der Kassenwart prüft sie');
+  }catch(e){el.disabled=false;toast(errMsg(e))}}
+// Kassenwart: Strafe aus der Anzeige eintragen (wie beim normalen Eintragen) und die Anzeige als erledigt markieren
+async function anzOk(el,a){const f=S.fines.find(x=>x.id===a.fineId)||{},amount=Math.round(num($('#ana').value)*100)/100,by=pById(a.by),now=new Date().toISOString(),eid='anz-'+a.id;
+  if(!(amount>=0)){toast('Bitte einen Betrag eingeben');return}el.disabled=true;
+  try{await S.db.doc('entries/'+eid).set({playerId:a.playerId,fineId:a.fineId||null,title:a.title,amount,qty:null,unit:null,col:f.col||COL_BY_FINE[a.fineId]||'strafen',spieltag:false,kabinenfest:!!f.kabinenfest,kfDone:false,
+      note:'Anzeige von '+(by?by.name:'?')+(a.nr?' (Nummer '+a.nr+')':'')+(a.note?': '+a.note:''),date:String(a.createdAt).slice(0,10),createdAt:now,createdBy:S.uid||null,paid:false,paidAt:null,anzeige:a.id});
+    await S.db.doc('anzeigen/'+a.id).update({status:'ok',entryId:eid,doneAt:now});closeSheet();toast('Strafe eingetragen')}
+  catch(e){el.disabled=false;toast(errMsg(e))}}
+
 /* ---------- Rechnungen ---------- */
 function receiptsBlock(){
   const open=[...S.receipts].filter(r=>r.status!=='verbucht').sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
@@ -337,10 +396,11 @@ function receiptsBlock(){
 }
 async function hydrateImgs(){
   const els=[...document.querySelectorAll('img[data-path]:not([src])')];if(!els.length||!S.sb)return;
-  if(S.rcFailAt&&Date.now()-S.rcFailAt<30000&&els.every(e=>!(S.rcUrls[e.dataset.path]&&S.rcUrls[e.dataset.path].exp>Date.now())))return;
-  const need=[...new Set(els.map(e=>e.dataset.path))].filter(x=>!(S.rcUrls[x]&&S.rcUrls[x].exp>Date.now()));
-  if(need.length){try{const {data,error}=await S.sb.storage.from('belege').createSignedUrls(need,3600);if(error)throw error;S.rcFailAt=0;(data||[]).forEach(d=>{if(d.signedUrl)S.rcUrls[d.path]={u:d.signedUrl,exp:Date.now()+3500e3}})}catch(e){S.rcFailAt=Date.now()}}
-  els.forEach(e=>{const c=S.rcUrls[e.dataset.path];if(c)e.src=c.u});
+  const key=e=>(e.dataset.bucket||'belege')+':'+e.dataset.path,fresh=k=>S.rcUrls[k]&&S.rcUrls[k].exp>Date.now();
+  if(S.rcFailAt&&Date.now()-S.rcFailAt<30000&&els.every(e=>!fresh(key(e))))return;
+  const need={};for(const e of els)if(!fresh(key(e)))(need[e.dataset.bucket||'belege']??=new Set()).add(e.dataset.path);
+  await Promise.all(Object.entries(need).map(async([b,ps])=>{try{const {data,error}=await S.sb.storage.from(b).createSignedUrls([...ps],3600);if(error)throw error;S.rcFailAt=0;(data||[]).forEach(d=>{if(d.signedUrl)S.rcUrls[b+':'+d.path]={u:d.signedUrl,exp:Date.now()+3500e3}})}catch(e){S.rcFailAt=Date.now()}}));
+  els.forEach(e=>{const c=S.rcUrls[key(e)];if(c)e.src=c.u});
 }
 // Eingaben im Personen-Fenster merken, bevor es für die Foto-Vorschau neu aufgebaut wird
 function keepPlayer(){const p=S.sheet.player;p.name=$('#pn').value;p.role=$('#pr').value;p.number=$('#pno').value;p.active=$('#pa').checked}
@@ -754,7 +814,7 @@ function fbPickSheet(s){const e=s.back,l=teamName(s.team),used=new Set(e.goals.f
   const n=s.sel.size;
   return{head,body,foot:`<div class="split"><button class="btn" data-act="fbPickBack">Zurück</button><button class="btn primary" data-act="fbPickDone" ${n?'':'disabled'}>${n?n+' hinzufügen':'Spieler wählen'}</button></div>`}}
 /* ---------- Push-Benachrichtigungen (Web Push, kostenlos) ---------- */
-const PUSH_KINDS=[['strafe','Neue Strafen','Wenn für dich etwas eingetragen wird'],['zahltag','Zahltag','Beim Start und einen Tag vor dem Ende, falls noch etwas offen ist'],['doener','Döner','Bestell-Erinnerung (Di 17 Uhr), Zahlungs-Erinnerung (Mi 12 Uhr) und Hinweise für den Dönerwart'],['fussball','Fußball','Neue Spiele und das Ende einer Runde'],['geburtstag','Geburtstage','Glückwünsche an dich und wer heute Geburtstag hat'],['plan','Wochenplan','Wenn Trainer oder Mannschaftsverantwortlicher die Woche eingetragen haben'],['bericht','Berichte','Sonntag vor der Abgabe (12 Uhr) und am Abgabetag (9 Uhr), wenn du einen Bericht schreibst'],['meldung','Gemeldete Zahlungen','Wenn jemand „Ich habe bezahlt“ meldet']];
+const PUSH_KINDS=[['strafe','Neue Strafen','Wenn für dich etwas eingetragen wird'],['zahltag','Zahltag','Beim Start und einen Tag vor dem Ende, falls noch etwas offen ist'],['doener','Döner','Bestell-Erinnerung (Di 17 Uhr), Zahlungs-Erinnerung (Mi 12 Uhr) und Hinweise für den Dönerwart'],['fussball','Fußball','Neue Spiele und das Ende einer Runde'],['geburtstag','Geburtstage','Glückwünsche an dich und wer heute Geburtstag hat'],['plan','Wochenplan','Wenn Trainer oder Mannschaftsverantwortlicher die Woche eingetragen haben'],['bericht','Berichte','Sonntag vor der Abgabe (12 Uhr) und am Abgabetag (9 Uhr), wenn du einen Bericht schreibst'],['anzeige','Anzeigen','Wenn jemand eine Anzeige erstattet'],['anmeldung','Neue Anmeldungen','Wenn sich jemand neu registriert und freigeschaltet werden möchte'],['meldung','Gemeldete Zahlungen','Wenn jemand „Ich habe bezahlt“ meldet']];
 const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 const pushSupported=()=>'serviceWorker' in navigator&&!!window.PushManager&&!!window.Notification;
@@ -765,7 +825,7 @@ async function pushLoad(){const st={sub:null,row:null,ready:true};
     if(sub){st.sub=sub;const {data}=await S.sb.from('push_subs').select('endpoint,prefs').eq('endpoint',sub.endpoint).maybeSingle();st.row=data||null}}}catch(e){}
   S.push=st;if(S.sheet&&(S.sheet.type==='push'||S.sheet.type==='menu')){S.still=true;renderSheet(false)}}
 function pushSheet(){const st=S.push||{},head=`<h2>Benachrichtigungen</h2><p>Gilt für dieses Gerät</p>`;let body='',foot='';
-  const kinds=PUSH_KINDS.filter(k=>k[0]!=='meldung'||isKW());
+  const kinds=PUSH_KINDS.filter(k=>k[0]==='anmeldung'?isAdmin():(k[0]!=='meldung'&&k[0]!=='anzeige')||isKW());
   const list=`<div class="rows">`+kinds.map(([k,t,d])=>`<div class="row"><div class="m"><b>${t}</b><i class="wrap">${d}</i></div></div>`).join('')+`</div>`;
   if(!pushSupported())body=isIOS()&&!isStandalone()
     ?`<div class="hint">Auf dem iPhone gehen Benachrichtigungen nur, wenn die Kasse auf dem <b>Home-Bildschirm</b> liegt:<br>In Safari unten auf <b>Teilen</b> tippen → <b>„Zum Home-Bildschirm“</b>. Danach die Kasse über das neue Icon öffnen und hier einschalten. Dafür braucht es iOS 16.4 oder neuer.</div>`
@@ -1034,23 +1094,24 @@ function openSheet(s){const sb=$('#sheetRoot .sheet-b');if(sb)sb.scrollTop=0;S.s
 const SHEET_PARENT={fbEdit:'fussball',fbRound:'fussball',fbGame:'fussball',trikotEdit:'trikot',gbEdit:'gb',gbPick:'gb'};
 const fbFrom=()=>S.sheet&&S.sheet.type==='fbRound'?{type:'fbRound',no:S.sheet.no}:null; // Herkunft merken, damit „zurück“ in die Runde führt
 function stepBack(){const s=S.sheet;if(!s)return;
+  if(s.type==='anzNew'&&(s.pid||s.fid)){s.note=$('#ann')?.value??s.note;if(s.fid)s.fid=null;else s.pid=null;S.still=true;renderSheet(false);return} // Details → Strafe → Person → schließen
   if(s.back){S.still=true;openSheet(s.back);return} // z. B. Torschützen → Spiel, Spiel → Runde
   const par=SHEET_PARENT[s.type];if(par){S.still=true;openSheet({type:par});return}
   closeSheet()}
-function closeSheet(){S.sheet=null;$('#sheetRoot').innerHTML='';document.body.classList.remove('locked')}
+function closeSheet(){if(S.sheet&&S.sheet.preview)URL.revokeObjectURL(S.sheet.preview);S.sheet=null;$('#sheetRoot').innerHTML='';document.body.classList.remove('locked')}
 function baseAmount(s){if(s.touched)return num(s.amount);const f=s.fine;return (f.base||0)+(f.per||0)*(s.qty||0)}
 function fineAmount(s){return baseAmount(s)*(s.spieltag?2:1)}
 const TEAM_ENT=[{id:'team-alt',name:'Team Alt',role:'Mannschaft',team:true},{id:'team-jung',name:'Team Jung',role:'Mannschaft',team:true}];
 const canSpieltag=f=>(f.cat||'')!=='Beiträge & Getränke'&&f.id!=='kf-manual';
 function renderSheet(refresh){
   const s=S.sheet,root=$('#sheetRoot');if(!s)return;
-  if(refresh&&(s.type==='fine'||s.type==='editFine'||s.type==='editPlayer'||s.type==='bill'||s.type==='settings'||s.type==='editEntry'||s.type==='receipt'||s.type==='fbEdit'||s.type==='termin'||s.type==='usualItem'))return; // Formulare nicht unter den Fingern neu bauen
+  if(refresh&&(s.type==='fine'||s.type==='editFine'||s.type==='editPlayer'||s.type==='bill'||s.type==='settings'||s.type==='editEntry'||s.type==='receipt'||s.type==='anzNew'||s.type==='fbEdit'||s.type==='termin'||s.type==='usualItem'))return; // Formulare nicht unter den Fingern neu bauen
   // Neue Server-Daten, während jemand in einem Feld des Fensters tippt: nicht neu aufbauen, sonst ist die Eingabe weg
   {const a=document.activeElement;if(refresh&&a&&root.contains(a)&&(a.tagName==='TEXTAREA'||a.tagName==='SELECT'||(a.tagName==='INPUT'&&!/^(checkbox|radio|button|submit)$/i.test(a.type)))){S.still=false;return}}
   if(s.type==='doener'){const t=$('#dtext'),pp=$('#dpay');if(t)s.draft=t.value;if(pp)s.pay=pp.value}
   const keepScroll=root.querySelector('.sheet-b')?.scrollTop||0;
   let head='',body='',foot='';
-  const sub={menu:menuSheet,doener:doenerSheet,fussball:fussballSheet,fbEdit:fbEditSheet,fbRound:fbRoundSheet,fbGame:fbGameSheet,fbPick:fbPickSheet,push:pushSheet,trikot:trikotSheet,trikotEdit:trikotEditSheet,termin:terminSheet,terminView:terminViewSheet,usual:usualSheet,usualItem:usualItemSheet,baelle:baelleSheet,baelleEdit:baelleEditSheet,text:textSheet,gb:gbSheet,gbEdit:gbEditSheet,gbPick:gbPickSheet,kfWeekAdd:kfWeekAddSheet,roles:rolesSheet,schulden:schuldenSheet,berichte:berichteSheet}[s.type];
+  const sub={menu:menuSheet,doener:doenerSheet,fussball:fussballSheet,fbEdit:fbEditSheet,fbRound:fbRoundSheet,fbGame:fbGameSheet,fbPick:fbPickSheet,push:pushSheet,trikot:trikotSheet,trikotEdit:trikotEditSheet,termin:terminSheet,terminView:terminViewSheet,usual:usualSheet,usualItem:usualItemSheet,baelle:baelleSheet,baelleEdit:baelleEditSheet,text:textSheet,gb:gbSheet,gbEdit:gbEditSheet,gbPick:gbPickSheet,kfWeekAdd:kfWeekAddSheet,roles:rolesSheet,schulden:schuldenSheet,anzNew:anzNewSheet,anzView:anzViewSheet,berichte:berichteSheet}[s.type];
   if(sub){({head,body,foot}=sub(s))}
   else if(s.type==='fine'&&countFine(s.fine)){
     const d=deckeSheet(s);head=d.head;body=d.body;foot=d.foot;
@@ -1066,7 +1127,7 @@ function renderSheet(refresh){
     body+=`<div class="two"><div class="field"><label for="amt">Betrag pro Person (€)</label><input id="amt" inputmode="decimal" value="${String(baseAmount(s)).replace('.',',')}"></div><div class="field"><label for="dt">Datum</label><input id="dt" type="date" value="${esc(s.date)}"></div></div>`;
     if(!f.id)body+=`<div class="field"><label for="colsel">Spalte in der Übersicht</label><select id="colsel">${COLS.map(([k,l])=>`<option value="${k}" ${s.col===k?'selected':''}>${l}</option>`).join('')}</select></div>`;
     if(canSpieltag(f))body+=`<label class="check"><input type="checkbox" id="spt" ${s.spieltag?'checked':''}> Spieltag – Strafe zählt doppelt</label><p class="note" id="sptinfo" style="margin:-6px 4px 0" ${s.spieltag?'':'hidden'}></p>`;
-    body+=`<label class="check"><input type="checkbox" id="kfc" ${s.kf?'checked':''}> Zusätzlich Kabinenfest fällig</label>`;
+    if(S.canWrite)body+=`<label class="check"><input type="checkbox" id="kfc" ${s.kf?'checked':''}> Zusätzlich Kabinenfest fällig</label>`;
     body+=`<div class="field"><label for="nt">Notiz (optional)</label><input id="nt" value="${esc(s.note)}" placeholder="${f.wuerfeln?'z. B. gewürfelt: 4':'z. B. Training Dienstag'}"></div>`;
     body+=`<p class="note" style="margin:0">Jede Strafe kann gewürfelt werden – das Ergebnis einfach als Betrag eintragen.</p></div>`;
     foot=`<button class="btn primary" id="submit" data-act="submitFine"></button>`;
@@ -1421,7 +1482,7 @@ document.addEventListener('click',async ev=>{
   if(act==='scrim'&&ev.target!==el)return;
   switch(act){
     case 'tab':S.tab=el.dataset.k;try{localStorage.setItem('tab',S.tab)}catch(e){}$('#view').innerHTML='';render();scrollTo(0,0);break;
-    case 'fine':{const f=S.fines.find(x=>x.id===id);if(f)openSheet({type:'fine',fine:f,sel:new Set(S.preselect?[S.preselect]:[]),qty:f.per&&!f.base?1:0,touched:false,amount:0,spieltag:false,kf:!!f.kabinenfest,note:'',date:today()});S.preselect=null;break}
+    case 'fine':{const f=S.fines.find(x=>x.id===id);if(f)openSheet({type:'fine',fine:f,sel:new Set(S.preselect?[S.preselect]:[]),qty:f.per&&!f.base?1:0,touched:false,amount:0,spieltag:false,kf:!!f.kabinenfest&&S.canWrite===true,note:'',date:today()});S.preselect=null;break}
     case 'free':openSheet({type:'fine',fine:{id:null,title:'Sonstiges',base:0,per:0,hint:'Freier Betrag, z. B. Würfelergebnis oder Beitrag, der nicht im Katalog steht. Beschreibe ihn in der Notiz.'},sel:new Set(S.preselect?[S.preselect]:[]),qty:0,touched:true,amount:0,spieltag:false,kf:false,note:'',date:today(),col:'strafen'});S.preselect=null;break;
     case 'fav':{const i=S.favs.indexOf(id);if(i>=0)S.favs.splice(i,1);else S.favs.push(id);saveFavs();const fl=$('#finelist');if(fl)fl.innerHTML=fineList();break}
     case 'ksort':S.ksort=el.dataset.k;try{localStorage.setItem('ksort',S.ksort)}catch(e){}render();break;
@@ -1490,6 +1551,18 @@ document.addEventListener('click',async ev=>{
       if(sel.includes('kassenwart'))for(const m of S.members)if(!error&&m.user_id!==s.uid&&rolesOf(m).includes('kassenwart'))({error}=await S.sb.from('members').update(splitRoles(rolesOf(m).filter(r=>r!=='kassenwart'))).eq('user_id',m.user_id));
       if(!error)({error}=await S.sb.from('members').update(splitRoles(sel)).eq('user_id',s.uid));el.disabled=false;
       if(error){toast(error.message);break}toast('Rollen gespeichert');closeSheet();break}
+    case 'anzNew':openSheet({type:'anzNew'});break;
+    case 'anzView':openSheet({type:'anzView',id});break;
+    case 'anzSave':anzSave(el);break;
+    case 'anzPick':S.sheet.pid=id;S.sheet.nr=$('#annr')?.value.trim()||null;S.still=true;renderSheet(false);break;
+    case 'anzFine':S.sheet.fid=id;S.still=true;renderSheet(false);break;
+    case 'anzStep':{const s=S.sheet;s.note=$('#ann')?.value??s.note;if(el.dataset.k==='wer'){s.pid=null;s.fid=null}else s.fid=null;S.still=true;renderSheet(false);break}
+    case 'anzOk':{const a=(S.anzeigen||[]).find(x=>x.id===id);if(a&&S.canWrite)anzOk(el,a);break}
+    case 'anzNo':if(S.confirmDel!=='an'+id){S.confirmDel='an'+id;S.still=true;renderSheet(false);break}S.confirmDel=null;try{const a=(S.anzeigen||[]).find(x=>x.id===id);await S.db.doc('anzeigen/'+id).update({status:'nein',doneAt:new Date().toISOString(),path:null});
+      if(a&&a.path)try{await S.sb.storage.from('anzeigen').remove([a.path])}catch(_){} // abgelehnt: Foto nicht aufbewahren
+      closeSheet();toast('Anzeige abgelehnt')}catch(e){toast(errMsg(e))}break;
+    case 'anzDel':{const a=(S.anzeigen||[]).find(x=>x.id===id);if(!a)break;if(S.confirmDel!=='ad'+id){S.confirmDel='ad'+id;S.still=true;renderSheet(false);break}S.confirmDel=null;
+      try{await S.db.doc('anzeigen/'+id).delete();if(a.path)try{await S.sb.storage.from('anzeigen').remove([a.path])}catch(_){}closeSheet();toast('Anzeige zurückgezogen')}catch(e){toast(errMsg(e))}break}
     case 'openBerichte':S.still=true;openSheet({type:'berichte'});break;
     case 'openSchulden':if(hasRole('kassenwart'))openSheet({type:'schulden'});break;
     case 'schuldAdd':{const name=$('#sdn').value.trim(),amount=Math.round(num($('#sda').value)*100)/100,note=$('#sdt').value.trim()||null;
@@ -1693,6 +1766,8 @@ document.addEventListener('click',async ev=>{
 document.addEventListener('input',ev=>{
   const t=ev.target,s=S.sheet;
   if(t.id==='q'){S.q=t.value;$('#finelist').innerHTML=fineList();return}
+  if(t.id==='annr'){const v=t.value.replace(/\D/g,'');if(v!==t.value)t.value=v;let n=0;
+    document.querySelectorAll('#anzgrid .pick').forEach(b=>{const show=!v||b.dataset.no===v;b.hidden=!show;n+=show});$('#anznone').hidden=n>0;return}
   if(t.id==='rpm'){S.rpm=t.value;return}
   if(s&&s.type==='doener'&&t.id==='dpay'){s.pay=t.value;const a=num(t.value),l=$('#dpaylink'),dt=ppTarget(S.settings.doenerPaypal);
     if(l&&dt){if(a>0){l.href=paypalUrl(a,'',dt,'Döner Dragons – '+(pById(myPid())?.name||''));l.target='_blank';l.rel='noopener';l.removeAttribute('aria-disabled');l.classList.remove('off');l.textContent='Mit PayPal bezahlen · '+eur(a)}
@@ -1718,6 +1793,8 @@ document.addEventListener('change',async ev=>{const t=ev.target;
   if(t.id==='pfile'&&S.sheet&&S.sheet.type==='editPlayer'){const s=S.sheet,f=t.files&&t.files[0];if(!f)return;keepPlayer();
     const b=await shrinkImage(f,400);if(!b||b.size>1048576){toast(b?'Das Foto ist zu groß (höchstens 1 MB)':'Das Foto konnte nicht gelesen werden');return}
     if(s.preview)URL.revokeObjectURL(s.preview);s.blob=b;s.preview=URL.createObjectURL(b);s.photoDel=false;renderSheet(false);return}
+  if(t.id==='anfile'&&S.sheet&&S.sheet.type==='anzNew'){const s=S.sheet,f=t.files&&t.files[0];if(!f)return;s.note=$('#ann')?.value||'';
+    const b=await shrinkImage(f);if(!b){toast('Das Foto konnte nicht gelesen werden');return}if(s.preview)URL.revokeObjectURL(s.preview);s.blob=b;s.preview=URL.createObjectURL(b);renderSheet(false);return}
   if(t.id==='rcfile'&&S.sheet&&S.sheet.type==='receipt'){const s=S.sheet,f=t.files&&t.files[0];if(!f)return;
     s.note=$('#rcn')?.value||'';s.amount=$('#rca')?.value||'';s.date=$('#rcd')?.value||today();
     const b=await shrinkImage(f);if(!b){toast('Das Foto konnte nicht gelesen werden');return}
@@ -1851,6 +1928,7 @@ async function boot(){
   db.collection('termine').onSnapshot(s=>{S.termine=s.docs.map(d=>({id:d.id,...d.data()}));renderSoon()},()=>{});
   db.collection('doener').onSnapshot(s=>{S.doener=s.docs.map(d=>({id:d.id,...d.data()}));renderSoon()},()=>{});
   db.collection('geburtstage').onSnapshot(s=>{S.gb=Object.fromEntries(s.docs.map(d=>[d.id,d.data().md]));S.gbLoaded=true;renderSoon()},()=>{});
+  db.collection('anzeigen').onSnapshot(s=>{S.anzeigen=s.docs.map(d=>({id:d.id,...d.data()}));renderSoon();if(S.sheet&&S.sheet.type==='anzView')renderSheet(true)},()=>{});
   db.collection('berichte').onSnapshot(s=>{S.berichte=s.docs.map(d=>({id:d.id,...d.data()}));renderSoon()},()=>{});
   db.collection('fussball').onSnapshot(s=>{S.fussball=s.docs.map(d=>({id:d.id,...d.data()}));renderSoon()},()=>{});
   const loadMembers=async()=>{const {data}=await sb.from('members').select('*');S.members=data||[];const mine=S.members.find(m=>m.user_id===S.uid);

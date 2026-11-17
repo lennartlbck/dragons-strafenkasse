@@ -24,6 +24,8 @@ die Edge Function erzeugt die VAPID-Schlüssel beim ersten Aufruf selbst, und di
 | Dienstag 19:00 und 19:15 Uhr | der Dönerwart: „Döner bestellen“ (nur wenn jemand bestellt hat) |
 | Neues Fußballspiel / Runde vorbei | alle |
 | „Ich habe bezahlt“ gemeldet | Kassenwart und Admin |
+| Neue Anzeige | der Kassenwart |
+| Neue Anmeldung (Name gewählt) | der Admin |
 | Döner: „Ich habe bezahlt“ | der Dönerwart (Rolle „Dönerwart“ unter Verwalten → Mitglieder & Rollen) |
 | Mittwoch 12 Uhr | alle, die am Dienstag Döner bestellt haben und noch nicht als bezahlt abgehakt sind |
 | Kalender: „Fertig“ im Wochenplan | alle (eine Nachricht pro Woche, kein Einzel-Alarm je Eintrag) |

@@ -14,7 +14,7 @@ create table if not exists public.members (
   created_at timestamptz not null default now()
 );
 
--- Rollen: member (Spieler), kassenwart, admin, deckenzaehler (wie Spieler, nur mit eigenem Namen), doenerwart (wie Spieler, hakt Döner-Zahlungen ab), trainer (wie Spieler, ändert alles im Kalender), mannschaftsverantwortlicher (wie Spieler, trägt Treffpunkte bei Spielen ein), trikotwart (wie Spieler, ändert als Einziger die Trikots)
+-- Rollen: member (Spieler), kassenwart, admin, deckenzaehler / wasserwart / aufraeumdienst (wie Spieler + bestimmte Strafen selbst eintragen), doenerwart (wie Spieler, hakt Döner-Zahlungen ab), trainer (wie Spieler, ändert alles im Kalender), mannschaftsverantwortlicher (wie Spieler, trägt Treffpunkte bei Spielen ein), trikotwart (wie Spieler, ändert als Einziger die Trikots)
 -- Eine Person kann mehrere Rollen haben: `role` ist die Hauptrolle, `roles` die weiteren Rollen.
 alter table public.members add column if not exists roles text[] not null default '{}';
 do $$
@@ -23,8 +23,8 @@ begin
   for c in select conname from pg_constraint where conrelid = 'public.members'::regclass and contype = 'c' and pg_get_constraintdef(oid) like '%role%' loop
     execute format('alter table public.members drop constraint %I', c);
   end loop;
-  alter table public.members add constraint members_role_check check (role in ('member','kassenwart','admin','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart'));
-  alter table public.members add constraint members_roles_check check (roles <@ array['kassenwart','admin','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart']);
+  alter table public.members add constraint members_role_check check (role in ('member','kassenwart','admin','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart','wasserwart','aufraeumdienst'));
+  alter table public.members add constraint members_roles_check check (roles <@ array['kassenwart','admin','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart','wasserwart','aufraeumdienst']);
 end $$;
 
 create or replace function public.my_role() returns text
@@ -91,27 +91,36 @@ begin
   end loop;
 end $$;
 
--- Deckenzähler: darf NUR „Fußball an der Decke“ (fineId f26) für andere eintragen und eigene, unbezahlte Einträge zurücknehmen
+-- Ämter mit Strafrechten: Deckenzähler („Fußball an der Decke“ f26), Wasserwart (Flaschen f44, f45), Aufräumdienst (nicht aufgeräumt f25).
+-- Sie dürfen NUR diese Strafen für andere eintragen (ohne Kabinenfest, höchstens 50 €) und eigene, unbezahlte Einträge zurücknehmen.
 create or replace function public.is_decke() returns boolean language sql stable security definer set search_path = public as $$ select public.has_role('deckenzaehler') $$;
+create or replace function public.amt_fine(fid text) returns boolean language sql stable security definer set search_path = public as $$
+  select (fid = 'f26' and public.has_role('deckenzaehler')) or (fid in ('f44', 'f45') and public.has_role('wasserwart')) or (fid = 'f25' and public.has_role('aufraeumdienst'))
+$$;
 drop policy if exists entries_decke_ins on public.entries;
-create policy entries_decke_ins on public.entries for insert with check (
-  public.is_decke() and data->>'fineId' = 'f26' and data->>'createdBy' = auth.uid()::text
+drop policy if exists entries_decke_upd on public.entries;
+drop policy if exists entries_decke_del on public.entries;
+drop policy if exists entries_amt_ins on public.entries;
+-- id nur im Format, das die App vergibt: so kann niemand feste Kennungen (verzug-…, kf-gb-…, anz-…) vorab belegen und damit Verzugsstrafen oder Kabinenfeste verhindern
+create policy entries_amt_ins on public.entries for insert with check (
+  id ~ '^[a-z0-9]{9,20}$' and coalesce(data->>'playerId', '') !~ '^team-'
+  and public.amt_fine(data->>'fineId') and data->>'createdBy' = auth.uid()::text
   and not coalesce((data->>'paid')::boolean, false) and not coalesce((data->>'kabinenfest')::boolean, false)
   and (data->>'amount')::numeric between 0 and 50);
-drop policy if exists entries_decke_upd on public.entries;
-create policy entries_decke_upd on public.entries for update
-  using (public.is_decke() and data->>'fineId' = 'f26' and data->>'createdBy' = auth.uid()::text and not coalesce((data->>'paid')::boolean, false))
-  with check (public.is_decke() and data->>'fineId' = 'f26' and data->>'createdBy' = auth.uid()::text and not coalesce((data->>'paid')::boolean, false)
-  and (data->>'amount')::numeric between 0 and 50);
-drop policy if exists entries_decke_del on public.entries;
-create policy entries_decke_del on public.entries for delete
-  using (public.is_decke() and data->>'fineId' = 'f26' and data->>'createdBy' = auth.uid()::text and not coalesce((data->>'paid')::boolean, false));
+drop policy if exists entries_amt_upd on public.entries;
+create policy entries_amt_upd on public.entries for update
+  using (public.amt_fine(data->>'fineId') and data->>'createdBy' = auth.uid()::text and not coalesce((data->>'paid')::boolean, false))
+  with check (public.amt_fine(data->>'fineId') and data->>'createdBy' = auth.uid()::text and not coalesce((data->>'paid')::boolean, false)
+  and not coalesce((data->>'kabinenfest')::boolean, false) and (data->>'amount')::numeric between 0 and 50);
+drop policy if exists entries_amt_del on public.entries;
+create policy entries_amt_del on public.entries for delete
+  using (public.amt_fine(data->>'fineId') and data->>'createdBy' = auth.uid()::text and not coalesce((data->>'paid')::boolean, false));
 
 -- Teil-Update eines Dokuments (RLS gilt, weil security invoker)
 create or replace function public.doc_patch(t text, doc_id text, patch jsonb) returns void
 language plpgsql security invoker set search_path = public as $$
 begin
-  if t not in ('players','fines','entries','bills','settings','zahltag','receipts','schulden') then raise exception 'unknown table'; end if;
+  if t not in ('players','fines','entries','bills','settings','zahltag','receipts','schulden','anzeigen') then raise exception 'unknown table'; end if;
   execute format('update public.%I set data = data || $1, updated_at = now() where id = $2', t) using patch, doc_id;
 end $$;
 
@@ -1121,3 +1130,64 @@ begin
 exception when others then raise warning 'bericht_tick: %', sqlerrm;
 end $$;
 revoke execute on function public.bericht_tick(date, boolean) from public, anon, authenticated;
+
+-- ---------- Anzeigen: Spieler melden einen Verstoß (mit Foto), der Kassenwart trägt die Strafe ein oder lehnt ab ----------
+-- data: uid, by (Spieler-ID des Anzeigenden), playerId (angezeigt), nr (gesuchte Nummer, freiwillig), fineId, title, amount, note, path (Foto im Bucket „anzeigen“), status neu|ok|nein, createdAt.
+-- Sehen dürfen Kassenwart, Admin und wer die Anzeige erstellt hat. Der Angezeigte erfährt es erst über die eingetragene Strafe.
+create table if not exists public.anzeigen (id text primary key, data jsonb not null default '{}', updated_at timestamptz not null default now(),
+  constraint anzeigen_form check (length(data::text) < 2000 and coalesce(data->>'status', 'neu') in ('neu', 'ok', 'nein')));
+alter table public.anzeigen enable row level security;
+drop policy if exists anzeigen_read on public.anzeigen;
+create policy anzeigen_read on public.anzeigen for select using (public.can_book() or (public.is_member() and data->>'uid' = auth.uid()::text));
+drop policy if exists anzeigen_ins on public.anzeigen;
+create policy anzeigen_ins on public.anzeigen for insert with check (
+  public.is_member() and data->>'uid' = auth.uid()::text and coalesce(data->>'status', 'neu') = 'neu'
+  and data->>'by' is not distinct from public.my_pid() and nullif(data->>'playerId', '') is not null
+  and (data->>'nr' is null or data->>'nr' ~ '^\d{1,3}$') -- gesuchte Nummer (z. B. von der Flasche), freiwillig
+  and data->>'fineId' in ('f25', 'f43', 'f44', 'f45', 'f50') -- nur: in der Halle nicht aufgeräumt, Eigentum vergessen, Flasche nicht beschriftet / nicht leer, Amt vernachlässigt
+  and (data->>'path' is null or data->>'path' like auth.uid()::text || '/%'));
+drop policy if exists anzeigen_upd on public.anzeigen;
+create policy anzeigen_upd on public.anzeigen for update using (public.can_book()) with check (public.can_book());
+drop policy if exists anzeigen_del on public.anzeigen;
+create policy anzeigen_del on public.anzeigen for delete using (public.can_book() or (data->>'uid' = auth.uid()::text and coalesce(data->>'status', 'neu') = 'neu'));
+do $$ begin alter publication supabase_realtime add table public.anzeigen; exception when duplicate_object then null; end $$;
+-- Fotos: privat, max. 5 MB, nur Bilder; Pfad immer <user-id>/<datei>
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('anzeigen', 'anzeigen', false, 5242880, array['image/jpeg','image/png','image/webp'])
+on conflict (id) do update set public = false, file_size_limit = 5242880, allowed_mime_types = excluded.allowed_mime_types;
+drop policy if exists anzeigen_foto_read on storage.objects;
+create policy anzeigen_foto_read on storage.objects for select using (bucket_id = 'anzeigen' and (public.can_book() or (storage.foldername(name))[1] = auth.uid()::text));
+drop policy if exists anzeigen_foto_ins on storage.objects;
+create policy anzeigen_foto_ins on storage.objects for insert with check (bucket_id = 'anzeigen' and public.is_member() and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists anzeigen_foto_del on storage.objects;
+create policy anzeigen_foto_del on storage.objects for delete using (bucket_id = 'anzeigen' and (public.can_book() or (storage.foldername(name))[1] = auth.uid()::text));
+-- Neue Anzeige → Push an den Kassenwart
+create or replace function public.push_anzeige_ins() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  perform public.push_send('anzeige', null, array['kassenwart'], '📸 Neue Anzeige',
+    coalesce((select data->>'name' from public.players where id = new.data->>'by'), 'Jemand') || ' zeigt '
+    || coalesce((select data->>'name' from public.players where id = new.data->>'playerId'), 'jemanden') || ' an: '
+    || coalesce(new.data->>'title', 'Strafe') || ' – bitte prüfen.', 'anzeige');
+  return null;
+exception when others then raise warning 'push_anzeige_ins: %', sqlerrm; return null;
+end $$;
+drop trigger if exists push_anzeige_ins on public.anzeigen;
+create trigger push_anzeige_ins after insert on public.anzeigen for each row execute function public.push_anzeige_ins();
+revoke execute on function public.push_anzeige_ins() from public, anon, authenticated;
+
+-- ---------- Neue Anmeldung → Push an den Admin ----------
+-- Sobald ein neues Konto seinen Namen gewählt hat (Zeile in members, noch nicht freigeschaltet).
+create or replace function public.push_member_ins() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if not new.approved then
+    perform public.push_send('anmeldung', null, array['admin'], '👤 Neue Anmeldung',
+      coalesce((select data->>'name' from public.players where id = new.player_id), 'Jemand') || ' möchte freigeschaltet werden.', 'anmeldung-' || new.user_id); -- gleiche Person ersetzt die alte Nachricht
+  end if;
+  return null;
+exception when others then raise warning 'push_member_ins: %', sqlerrm; return null;
+end $$;
+drop trigger if exists push_member_ins on public.members;
+create trigger push_member_ins after insert on public.members for each row execute function public.push_member_ins();
+revoke execute on function public.push_member_ins() from public, anon, authenticated;
