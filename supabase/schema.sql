@@ -564,8 +564,8 @@ begin
   if not exists (select 1 from public.members where 'doenerwart' = any(roles || role) and approved) then raise exception 'Es ist noch kein Dönerwart festgelegt'; end if;
   update public.doener set data = data || jsonb_build_object('reportedAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')) where id = w || '_' || pid;
   select data->>'name' into nm from public.players where id = pid;
-  return public.push_send('doener', null, array['doenerwart'], '💶 Döner bezahlt gemeldet',
-    coalesce(nm, 'Jemand') || ' sagt: Döner bezahlt (' || t || ') – bitte abhaken.', 'doener-bezahlt');
+  return public.push_send('doener', null, array['doenerwart'], '💶 Döner bezahlt',
+    coalesce(nm, 'Jemand') || ' hat bezahlt – bitte abhaken.', 'doener-bezahlt');
 end $$;
 -- Schutz: „bezahlt“ (paid/paidAt) setzen oder entfernen darf nur der Dönerwart. Bei allen anderen werden die beiden
 -- Felder beim Speichern auf den bisherigen Stand zurückgesetzt (Spieler ändern nur ihren Bestelltext).
@@ -626,6 +626,21 @@ create table if not exists public.push_subs (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- Verlauf: jede Benachrichtigung landet für jedes Mitglied, an das sie geht, im eigenen Verlauf (auch wenn Benachrichtigungen aus sind).
+-- Lesen nur die eigenen, schreiben nur push_send(); push_tick() löscht alles, was älter als 30 Tage ist.
+create table if not exists public.push_verlauf (
+  id      bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  kind    text not null,
+  title   text not null check (length(title) < 300),
+  body    text check (length(body) < 1000),
+  tag     text check (length(tag) < 200), -- z. B. umfrage-<Spiel>: daraus springt die App an die richtige Stelle
+  at      timestamptz not null default now()
+);
+create index if not exists push_verlauf_user on public.push_verlauf (user_id, at desc);
+alter table public.push_verlauf enable row level security;
+drop policy if exists push_verlauf_read on public.push_verlauf;
+create policy push_verlauf_read on public.push_verlauf for select using (user_id = auth.uid());
 alter table public.push_subs enable row level security;
 drop policy if exists push_subs_read on public.push_subs;
 create policy push_subs_read on public.push_subs for select using (user_id = auth.uid());
@@ -681,6 +696,12 @@ create or replace function public.push_send(kind text, pids text[], roles text[]
 language plpgsql security definer set search_path = public as $$
 declare subs jsonb; n int;
 begin
+  if kind <> 'test' then
+    insert into public.push_verlauf (user_id, kind, title, body, tag)
+    select m.user_id, push_send.kind, push_send.title, left(push_send.body, 999), left(push_send.tag, 199) from public.members m
+     where m.approved and (pids is null or m.player_id = any(pids))
+       and (push_send.roles is null or (m.roles || m.role) && push_send.roles) and (uid is null or m.user_id = uid);
+  end if;
   select coalesce(jsonb_agg(jsonb_build_object('endpoint', s.endpoint, 'p256dh', s.p256dh, 'auth', s.auth)), '[]'::jsonb), count(*)
     into subs, n
     from public.push_subs s join public.members m on m.user_id = s.user_id and m.approved
@@ -702,13 +723,13 @@ begin
   if new.id like 'kf-gb-%' then
     return null; -- Geburtstags-Kabinenfest: dafür gibt es schon die Geburtstagsnachricht
   elsif new.id like 'kf-fb-%' then
-    perform public.push_send('fussball', null, null, '⚽ Runde vorbei!',
-      case pid when 'team-jung' then 'Team Jung' when 'team-alt' then 'Team Alt' else 'Ein Team' end || ' schmeißt ein Kabinenfest 🍻 – ' || coalesce(d->>'note', ''), 'fussball');
+    perform public.push_send('fussball', null, null, '⚽ Runde vorbei',
+      case pid when 'team-jung' then 'Team Jung' when 'team-alt' then 'Team Alt' else 'Ein Team' end || ' schmeißt ein Kabinenfest 🍻', 'fussball');
   elsif pid is not null and pid not like 'team-%' and not coalesce((d->>'paid')::boolean, false) then
     amt := public.num_or0(d->>'amount');
     perform public.push_send('strafe', array[pid], null,
-      case when amt > 0 then 'Neue Strafe' when coalesce((d->>'kabinenfest')::boolean, false) then '🍻 Kabinenfest' else 'Neuer Eintrag' end,
-      case when amt > 0 then coalesce(d->>'title', 'Strafe') || ': ' || public.eur_txt(amt)
+      case when amt > 0 then '💸 Du hast eine neue Strafe' when coalesce((d->>'kabinenfest')::boolean, false) then '🍻 Du hast ein Kabinenfest' else 'Neuer Eintrag' end,
+      case when amt > 0 then coalesce(d->>'title', 'Strafe') || ' · ' || public.eur_txt(amt)
                              || case when coalesce((d->>'kabinenfest')::boolean, false) then ' + Kabinenfest' else '' end
            else coalesce(nullif(d->>'note', ''), d->>'title', 'Kabinenfest') end);
   end if;
@@ -725,8 +746,8 @@ declare r record;
 begin
   if coalesce((new.data->>'active')::boolean, false) then
     for r in select key, value from jsonb_each_text(coalesce(new.data->'due', '{}'::jsonb)) loop
-      perform public.push_send('zahltag', array[r.key], null, '💶 Zahltag!',
-        'Du musst ' || public.eur_txt(public.num_or0(r.value)) || ' bis ' || public.berlin_txt(new.data->>'endsAt') || ' zahlen.', 'zahltag');
+      perform public.push_send('zahltag', array[r.key], null, '💶 Zahltag',
+        public.eur_txt(public.num_or0(r.value)) || ' bis ' || public.berlin_txt(new.data->>'endsAt') || ' zahlen', 'zahltag');
     end loop;
   end if;
   return null;
@@ -741,7 +762,7 @@ language plpgsql security definer set search_path = public as $$
 declare j int := coalesce((new.data->>'jung')::int, 0); a int := coalesce((new.data->>'alt')::int, 0);
 begin
   perform public.push_send('fussball', null, null, '⚽ Neues Spiel',
-    'Jung ' || j || ' : ' || a || ' Alt' || case when j > a then ' – Sieg für Team Jung' when a > j then ' – Sieg für Team Alt' else '' end, 'fussball');
+    'Jung ' || j || ' : ' || a || ' Alt', 'fussball');
   return null;
 exception when others then raise warning 'push_fussball_ins: %', sqlerrm; return null;
 end $$;
@@ -757,7 +778,7 @@ begin
    where data->>'playerId' = pid and coalesce((data->>'reported')::boolean, false) and not coalesce((data->>'paid')::boolean, false);
   select data->>'name' into nm from public.players where id = pid;
   perform public.push_send('meldung', null, array['kassenwart', 'admin'], '💸 Zahlung gemeldet',
-    coalesce(nm, 'Jemand') || ' hat ' || public.eur_txt(s) || ' als bezahlt gemeldet – bitte prüfen.', 'meldung');
+    coalesce(nm, 'Jemand') || ' · ' || public.eur_txt(s) || ' – bitte bestätigen', 'meldung');
 exception when others then raise warning 'push_meldung: %', sqlerrm;
 end $$;
 
@@ -766,9 +787,10 @@ create or replace function public.push_tick() returns void
 language plpgsql security definer set search_path = public as $$
 declare n timestamp := now() at time zone 'Europe/Berlin'; w text; c int; z record; r record; rest numeric;
 begin
+  delete from public.push_verlauf where at < now() - interval '30 days';
   -- Dienstag 12 Uhr: alle daran erinnern, dass heute bis 18 Uhr bestellt wird
   if extract(isodow from n) = 2 and extract(hour from n) = 12 then
-    perform public.push_send('doener', null, null, '🥙 Heute Döner bestellen', 'Bis 18 Uhr in der App eintragen.', 'doener');
+    perform public.push_send('doener', null, null, '🥙 Heute Döner bestellen', 'Bis 18 Uhr eintragen', 'doener');
   end if;
   if extract(isodow from n) = 2 and extract(hour from n) = 17 then
     w := to_char(n::date, 'YYYY-MM-DD');
@@ -776,15 +798,14 @@ begin
     perform public.push_send('doener',
       array(select m.player_id from public.members m where m.approved and m.player_id is not null
               and not exists (select 1 from public.doener d where d.id = w || '_' || m.player_id)),
-      null, '🥙 Döner bis 18 Uhr bestellen',
-      case when c = 0 then 'Noch hat niemand bestellt.' when c = 1 then '1 hat schon bestellt.' else c || ' haben schon bestellt.' end, 'doener');
+      null, '🥙 Döner bis 18 Uhr', 'Du hast noch nicht bestellt', 'doener');
   end if;
   -- Mittwoch 12 Uhr: wer am gestrigen Dienstag Döner bestellt hat, noch nicht abgehakt ist und noch nicht „Ich habe bezahlt“ gemeldet hat
   if extract(isodow from n) = 3 and extract(hour from n) = 12 then
     w := to_char(n::date - 1, 'YYYY-MM-DD');
     perform public.push_send('doener',
       array(select d.data->>'pid' from public.doener d where d.data->>'week' = w and not coalesce((d.data->>'paid')::boolean, false) and not (d.data ? 'reportedAt')),
-      null, '🥙 Döner noch nicht bezahlt', 'Du hast den Döner von gestern noch nicht bezahlt. Bitte per PayPal bezahlen und in der App „Ich habe bezahlt“ tippen.', 'doener-erinnerung');
+      null, '🥙 Döner noch offen', 'Bitte den Döner von gestern bezahlen', 'doener-erinnerung');
   end if;
   if extract(hour from n) = 9 then
     perform public.geburtstag_tick(n::date);
@@ -807,7 +828,7 @@ begin
            and not coalesce((e.data->>'paid')::boolean, false) and not coalesce((e.data->>'reported')::boolean, false);
         if rest > 0 then
           perform public.push_send('zahltag', array[r.key], null, '⏰ Zahltag endet bald',
-            'Du hast noch ' || public.eur_txt(rest) || ' offen – bitte bis ' || public.berlin_txt(z.data->>'endsAt') || ' bezahlen.', 'zahltag-erinnerung');
+            'Noch ' || public.eur_txt(rest) || ' offen – bis ' || public.berlin_txt(z.data->>'endsAt') || ' zahlen', 'zahltag-erinnerung');
         end if;
       end loop;
     end loop;
@@ -856,7 +877,7 @@ begin
   if c = 0 then return; end if;
   perform public.push_send('doener', null, array['doenerwart'],
     case when extract(minute from n) < 15 then '🥙 Döner bestellen' else '🥙 Erinnerung: Döner bestellen' end,
-    case when c = 1 then '1 Bestellung' else c || ' Bestellungen' end || ' – bitte jetzt die Döner bestellen.', 'doener-wart');
+    case when c = 1 then '1 Bestellung' else c || ' Bestellungen' end || ' – jetzt bestellen', 'doener-wart');
 exception when others then raise warning 'doener_wart_tick: %', sqlerrm;
 end $$;
 revoke execute on function public.doener_wart_tick() from public, anon, authenticated;
@@ -982,17 +1003,19 @@ begin
 end $$;
 create or replace function public.wd_kurz(d date) returns text
 language sql immutable as $$ select (array['Mo','Di','Mi','Do','Fr','Sa','So'])[extract(isodow from d)::int] || ' ' || to_char(d, 'DD.MM') $$;
--- Tage ab heute, die sich seit der letzten Meldung geändert haben (mit altem Stand). null = Woche noch nie mit Tagesstand gemeldet.
-create or replace function public.wochenplan_aenderungen(mon text, tage jsonb) returns text[]
+-- Tage ab heute, die sich seit der letzten Meldung geändert haben: [{"d": "2026-11-25", "t": "Mi 25.11: 18:00–19:30 Halle (statt …)"}, …].
+-- null = Woche noch nie mit Tagesstand gemeldet.
+drop function if exists public.wochenplan_aenderungen(text, jsonb);
+create function public.wochenplan_aenderungen(mon text, tage jsonb) returns jsonb
 language plpgsql stable security definer set search_path = public as $$
-declare old jsonb; d date; cur text; prev text; chg text[] := '{}'; today date := (now() at time zone 'Europe/Berlin')::date;
+declare old jsonb; d date; cur text; prev text; chg jsonb := '[]'; today date := (now() at time zone 'Europe/Berlin')::date;
 begin
   select data->'days' into old from public.termine where id = 'plan-' || mon and data->>'type' = 'plan';
   if old is null then return null; end if;
   for d in select generate_series(greatest(mon::date, today), mon::date + 6, interval '1 day')::date loop
     cur := tage->>(d::text); prev := nullif(old->>(d::text), '');
     if coalesce(prev, '') <> cur then
-      chg := chg || (public.wd_kurz(d) || ': ' || coalesce(nullif(cur, ''), 'fällt aus') || coalesce(' (statt ' || prev || ')', ''));
+      chg := chg || jsonb_build_object('d', d::text, 't', public.wd_kurz(d) || ': ' || coalesce(nullif(cur, ''), 'fällt aus') || coalesce(' (statt ' || prev || ')', ''));
     end if;
   end loop;
   return chg;
@@ -1000,31 +1023,38 @@ end $$;
 -- Für den Knopf im Kalender: gibt es etwas zu melden? (noch nie gemeldet = ja)
 create or replace function public.wochenplan_geaendert(mon text) returns boolean
 language plpgsql stable security definer set search_path = public as $$
-declare c text[];
+declare c jsonb;
 begin
   if not (public.can_termine() or public.is_mv()) then raise exception 'Keine Berechtigung'; end if;
   c := public.wochenplan_aenderungen(mon, public.wochenplan_tage(mon));
-  return c is null or cardinality(c) > 0;
+  return c is null or jsonb_array_length(c) > 0;
 end $$;
--- Erste Meldung einer Woche: kompletter Plan. Danach („Änderungen melden“) nur die geänderten Tage. Der gemeldete Stand steht in plan-<mon>.days.
+-- Erste Meldung einer Woche: „Neue Woche“ mit den Uhrzeiten (Mo 19:45 · Sa Spiel 18:00). Danach nur die geänderten Tage.
+-- plan-<mon> merkt sich den gemeldeten Stand je Tag (days), die Art (kind: neu/aenderung) und wann welcher Tag zuletzt geändert gemeldet wurde
+-- (changedAt, sammelt sich bis zur nächsten „Neuen Woche“) – daraus setzt die App die roten Punkte an den Tagen.
 create or replace function public.wochenplan_senden(mon text) returns int
 language plpgsql security definer set search_path = public as $$
-declare n int; nm text; tage jsonb; chg text[]; body text;
+declare n int; nm text; tage jsonb; chg jsonb; body text; jetzt text := to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'); ca jsonb;
 begin
   if not (public.can_termine() or public.is_mv()) then raise exception 'Keine Berechtigung'; end if;
   tage := public.wochenplan_tage(mon);
   chg := public.wochenplan_aenderungen(mon, tage);
-  if cardinality(chg) = 0 then raise exception 'Seit der letzten Meldung hat sich nichts geändert'; end if;
+  if jsonb_array_length(chg) = 0 then raise exception 'Seit der letzten Meldung hat sich nichts geändert'; end if;
+  ca := case when chg is null then '{}'::jsonb else coalesce((select data->'changedAt' from public.termine where id = 'plan-' || mon), '{}')
+                || (select jsonb_object_agg(x->>'d', jetzt) from jsonb_array_elements(chg) x) end;
   select data->>'name' into nm from public.players where id = public.my_pid();
   if chg is null then
-    body := left(coalesce((select string_agg(public.wd_kurz(k::date) || ': ' || v, E'\n' order by k) from jsonb_each_text(tage) e(k, v) where v <> ''), 'Diese Woche ist nichts geplant.'), 400);
-    n := public.push_send('plan', null, null, '📅 Wochenplan KW ' || to_char(mon::date, 'IW'), body, 'wochenplan');
+    body := coalesce((select string_agg(left(public.wd_kurz(k::date), 2) || ' ' || z, ' · ' order by k)
+      from (select k, (select string_agg(substring(x from '^(?:Spiel )?\d\d:\d\d') || coalesce(' (Treffpunkt ' || substring(x from '^Spiel .* – Treffpunkt (\d\d:\d\d)') || ')', ''), ' + ') from regexp_split_to_table(v, ' · ') x where x ~ '^(Spiel )?\d\d:\d\d') z
+              from jsonb_each_text(tage) e(k, v)) y where z is not null), 'Diese Woche ist nichts geplant');
+    n := public.push_send('plan', null, null, '📅 Neue Woche · KW ' || to_char(mon::date, 'IW'), body, 'wochenplan');
   else
-    body := left(array_to_string(chg, E'\n'), 400);
-    n := public.push_send('plan', null, null, '📅 Änderung · KW ' || to_char(mon::date, 'IW'), body, 'wochenplan-aenderung');
+    body := left((select string_agg(x->>'t', E'\n') from jsonb_array_elements(chg) x), 400);
+    n := public.push_send('plan', null, null, case when jsonb_array_length(chg) = 1 then '📅 Termin geändert' else '📅 ' || jsonb_array_length(chg) || ' Termine geändert' end, body, 'wochenplan-aenderung');
   end if;
   insert into public.termine (id, data)
-    values ('plan-' || mon, jsonb_build_object('type', 'plan', 'mon', mon, 'sentAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'by', nm, 'days', tage))
+    values ('plan-' || mon, jsonb_build_object('type', 'plan', 'mon', mon, 'sentAt', jetzt, 'by', nm, 'days', tage,
+      'kind', case when chg is null then 'neu' else 'aenderung' end, 'changedAt', ca))
   on conflict (id) do update set data = excluded.data, updated_at = now();
   return n;
 end $$;
@@ -1110,11 +1140,11 @@ begin
     end;
     if r.pid <> all(stumm) then
       perform public.push_send('geburtstag', array[r.pid], null, '🎉 Alles Gute zum Geburtstag!',
-        'Die ganze Mannschaft wünscht dir alles Gute, ' || split_part(r.nm, ' ', 1) || '! 🐉', 'gb-' || r.pid);
+        'Die Mannschaft gratuliert, ' || split_part(r.nm, ' ', 1) || '! 🐉', 'gb-' || r.pid);
     end if;
     perform public.push_send('geburtstag',
       array(select m.player_id from public.members m where m.approved and m.player_id is not null and m.player_id <> r.pid and m.player_id <> all(stumm)),
-      null, '🎂 ' || r.nm || ' hat heute Geburtstag', 'Gratulier doch kurz in der Gruppe!', 'gb-' || r.pid);
+      null, '🎂 ' || r.nm || ' hat Geburtstag', 'Gratulier kurz in der Gruppe', 'gb-' || r.pid);
   end loop;
 exception when others then raise warning 'geburtstag_tick: %', sqlerrm;
 end $$;
@@ -1172,9 +1202,8 @@ begin
       if nullif(r.data->>k, '') is not null then
         perform public.push_send('bericht', array[r.data->>k], null,
           case when abgabetag then '📝 Heute Abgabe: Bericht' else '📝 Bericht schreiben' end,
-          'Du schreibst ' || case k when 'lage' then '„Lage der Liga“' else 'das Grußwort' end || ' fürs Heimspiel gegen '
-          || coalesce(r.data->>'gegner', '?') || ' am ' || to_char((r.data->>'date')::date, 'DD.MM.')
-          || case when abgabetag then ' – bitte heute abgeben.' else ' – Abgabe bis ' || to_char(a, 'DD.MM.') || '.' end, 'bericht-' || r.id);
+          case k when 'lage' then 'Lage der Liga' else 'Grußwort' end || ' · gegen ' || coalesce(r.data->>'gegner', '?')
+          || case when abgabetag then ' · heute abgeben' else ' · Abgabe ' || to_char(a, 'DD.MM.') end, 'bericht-' || r.id);
       end if;
     end loop;
   end loop;
@@ -1218,8 +1247,8 @@ language plpgsql security definer set search_path = public as $$
 begin
   perform public.push_send('anzeige', null, array['kassenwart'], '📸 Neue Anzeige',
     coalesce((select data->>'name' from public.players where id = new.data->>'by'), 'Jemand') || ' zeigt '
-    || coalesce((select data->>'name' from public.players where id = new.data->>'playerId'), 'jemanden') || ' an: '
-    || coalesce(new.data->>'title', 'Strafe') || ' – bitte prüfen.', 'anzeige');
+    || coalesce((select data->>'name' from public.players where id = new.data->>'playerId'), 'jemanden') || ' an · '
+    || coalesce(new.data->>'title', 'Strafe'), 'anzeige');
   return null;
 exception when others then raise warning 'push_anzeige_ins: %', sqlerrm; return null;
 end $$;
@@ -1234,7 +1263,7 @@ language plpgsql security definer set search_path = public as $$
 begin
   if not new.approved then
     perform public.push_send('anmeldung', null, array['admin'], '👤 Neue Anmeldung',
-      coalesce((select data->>'name' from public.players where id = new.player_id), 'Jemand') || ' möchte freigeschaltet werden.', 'anmeldung-' || new.user_id); -- gleiche Person ersetzt die alte Nachricht
+      coalesce((select data->>'name' from public.players where id = new.player_id), 'Jemand') || ' wartet auf Freischaltung', 'anmeldung-' || new.user_id); -- gleiche Person ersetzt die alte Nachricht
   end if;
   return null;
 exception when others then raise warning 'push_member_ins: %', sqlerrm; return null;
@@ -1335,8 +1364,8 @@ begin
       'until', to_char(bis at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))), updated_at = now()
    where id = doc_id;
   if not (t ? 'poll') then
-    perform public.push_send('umfrage', null, null, '🚐 Umfrage: ' || coalesce(t->>'title', 'Auswärtsspiel'),
-      f || ' – bitte in der App beim Spiel abstimmen' || coalesce(' (bis ' || public.berlin_txt(bis::text) || ')', '') || '.', 'umfrage-' || doc_id);
+    perform public.push_send('umfrage', null, null, '🚐 Umfrage · ' || coalesce(t->>'title', 'Auswärtsspiel'),
+      f || coalesce(' · bis ' || public.berlin_txt(bis::text), ''), 'umfrage-' || doc_id);
   end if;
 end $$;
 revoke execute on function public.termin_umfrage(text, text, timestamptz), public.umfrage_offen(text) from public, anon;

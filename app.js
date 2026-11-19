@@ -121,11 +121,49 @@ const roleName=r=>(ROLES.find(x=>x[0]===r)||[0,r])[1];
 const pLabel=p=>p?(p.role==='Spieler'&&p.number!=null?'#'+p.number+' · ':'')+(p.role&&p.role!=='Spieler'?p.role:'Spieler'):'';
 
 /* ---------- Rendering ---------- */
+// ---------- Rote Punkte: Neues wie bei den Benachrichtigungen ----------
+// Jede Stelle hat einen Zeitpunkt der letzten Neuigkeit. Ist er jünger als „zuletzt angesehen“ (pro Gerät gemerkt), gibt es einen Punkt an der Stelle
+// und am Reiter. Angesehen gilt eine Stelle beim Öffnen (Konto, Zahlungen, Menüpunkt, Kachel, Spiel) oder beim Verlassen des Reiters (Rest).
+let _seen=null;
+const seenMap=()=>{if(!_seen){try{_seen=JSON.parse(localStorage.getItem('seen:'+S.uid)||'null')}catch(e){}if(!_seen||!_seen._){_seen={_:new Date().toISOString()};saveSeen()}}return _seen}; // erster Start: nichts Altes als neu
+const saveSeen=()=>{try{localStorage.setItem('seen:'+S.uid,JSON.stringify(_seen))}catch(e){}};
+const seenAt=k=>seenMap()[k]||seenMap()._;
+const latest=a=>a.reduce((x,y)=>y&&y>x?y:x,'');
+const at=(d,h)=>new Date(d+'T'+h+':00').toISOString();
+function spots(){if(S.status==='loading')return [];const me=myPid(),meName=pById(me)?.name,td=tdIso(),bn=berlinNow(),byOther=(t,by)=>by&&by!==S.uid?t:'';
+  return [
+    ['konto','uebersicht',me&&latest(S.entries.filter(e=>e.playerId===me&&e.createdBy!==S.uid&&!String(e.id).startsWith('kf-gb-')).map(e=>e.createdAt))], // neue Strafe für mich (Geburtstags-Kabinenfest ohne eigene Nachricht)
+    ['rechnungen','uebersicht',S.canWrite===true&&latest([...S.receipts.map(r=>byOther(r.createdAt,r.uid)),...(S.bills||[]).map(b=>byOther(b.createdAt,b.createdBy))])], // Beleg hochgeladen / Rechnung eingetragen
+    ['zahlungen','uebersicht',isKW()&&latest(S.entries.filter(e=>e.reported&&!e.paid).map(e=>e.reportedAt))], // Zahlung gemeldet
+    ['zahltag','uebersicht',zOpen()&&zt().startedAt],
+    ['m:doener','uebersicht',latest([bn.wd===3&&bn.h>=12&&me&&doenerList(addDays(td,-1)).some(d=>d.pid===me&&!d.paid&&!d.reportedAt)&&at(td,'12'), // Mi 12 Uhr: Döner von gestern noch nicht bezahlt
+      ...(hasRole('doenerwart')?(S.doener||[]).map(d=>d.reportedAt):[])])],
+    ['m:fussball','uebersicht',latest((S.fussball||[]).map(g=>g.createdAt))],
+    ['m:gb','uebersicht',gbList().withB.some(x=>x.days===0)&&at(td,'09')],
+    ['anz','erfassen',S.canWrite===true&&latest(anzOpen().map(a=>a.createdAt))], // neue Anzeige
+    ['vt-mitglieder','verwalten',isAdmin()&&latest((S.members||[]).filter(m=>!m.approved).map(m=>m.created_at))], // neue Anmeldung
+    ['plan','kalender',latest(S.termine.filter(x=>x.type==='plan'&&x.by!==meName).map(x=>x.sentAt))], // Wochenplan
+    ...S.termine.filter(x=>x.poll&&x.type==='spiel'&&pollOpen(x)).map(x=>['poll:'+x.id,'kalender',x.poll.at])] // Umfrage
+    .filter(([k,,t])=>t&&t>seenAt(k))}
+// beim Öffnen einer Stelle bzw. Verlassen eines Reiters
+function markSeen(keys){const m=seenMap(),now=new Date().toISOString(),ks=keys.filter(k=>S.dots?.has(k));if(!ks.length)return;ks.forEach(k=>m[k]=now);saveSeen();
+  renderTabs();ks.forEach(k=>document.querySelectorAll(`.idot[data-k="${CSS.escape(k)}"]`).forEach(e=>e.remove())); // Punkte sofort weg, ohne alles neu zu zeichnen
+  if(![...S.dots].some(k=>k.startsWith('m:')))document.querySelector('.menubtn .tdot')?.remove()}
+// Reiter wechseln (Tab-Leiste und Sprung aus dem Verlauf)
+function goTab(k){markSeen(leaveKeys());S.tab=k;if(k==='verwalten'&&S.loadMembers)S.loadMembers();try{localStorage.setItem('tab',k)}catch(e){}$('#view').innerHTML='';render();scrollTo(0,0)}
+const LEAVE={uebersicht:['zahltag'],rechnungen:['rechnungen'],erfassen:['anz'],kalender:['plan']};
+const leaveKeys=()=>LEAVE[S.tab]||[];
+const isNewAt=(k,t,by)=>!!S.dots?.has(k)&&!!t&&t>seenAt(k)&&!!by&&by!==S.uid; // diese Zeile ist neu (von jemand anderem)
+// Kalender: geänderte Tage der letzten Meldung „Termin geändert“ (bei „Neue Woche“ nur der Punkt am Reiter)
+const calcPlanDays=()=>{const me=pById(myPid())?.name,sa=seenAt('plan');return new Set(S.termine.filter(x=>x.type==='plan'&&x.by!==me).flatMap(x=>Object.entries(x.changedAt||{}).filter(([,t])=>t>sa).map(([d])=>d)))};
+const planDays=()=>S.planDays||new Set(); // einmal pro Bildaufbau in renderTabs berechnet
+const idot=(k,pre)=>S.dots?.has(k)?`<span class="idot${pre?' pre':''}" data-k="${esc(k)}" role="img" aria-label="neu"></span>`:''; // pre: vor dem Text (bei abgeschnittenen Zeilen)
 function renderTabs(){
   const tabs=[['kalender','Kalender'],['uebersicht','Übersicht'],['erfassen','Eintragen']];
   if(S.canEdit||isKW())tabs.push(['verwalten','Verwalten']);
   if(!tabs.some(t=>t[0]===S.tab)&&S.tab!=='rechnungen')S.tab='erfassen'; // Rechnungen ist ein Unterbereich der Übersicht
-  $('#tabs').innerHTML=tabs.map(([k,l])=>`<button data-act="tab" data-k="${k}" ${S.tab===k||(k==='uebersicht'&&S.tab==='rechnungen')?'aria-current="page"':''}>${ICONS[k]}${l}</button>`).join('');
+  const cur=S.tab==='rechnungen'?'uebersicht':S.tab,sp=spots();S.dots=new Set(sp.map(x=>x[0]));S.planDays=S.dots.has('plan')?calcPlanDays():null;const dt=new Set(sp.filter(x=>x[1]!==cur).map(x=>x[1]));
+  $('#tabs').innerHTML=tabs.map(([k,l])=>{const d=dt.has(k);return `<button data-act="tab" data-k="${k}" ${k===cur?'aria-current="page"':''}${d?` aria-label="${l}, etwas neu"`:''}>${ICONS[k]}${d?'<i class="tdot" aria-hidden="true"></i>':''}${l}</button>`}).join('');
 }
 function statusBanner(){if(S.refreshing&&S.stale)return `<div class="banner">Keine Verbindung – du siehst den zuletzt geladenen Stand.</div>`;return (S.refreshing&&S.status!=='nodb'?`<div class="syncnote" role="status">Wird aktualisiert …</div>`:'')+statusBanner2()}
 function statusBanner2(){
@@ -147,7 +185,7 @@ function render(){
     $('#finelist').innerHTML=fineList();
   } else{const sx=v.querySelector('.tablewrap')?.scrollLeft||0;
     const title=(S.tab==='rechnungen'?`<button class="chipbtn" data-act="tab" data-k="uebersicht">${I('chevL')}Übersicht</button>`:'')+`<h1 class="ltitle">${TITLES[S.tab]}</h1>`;
-    const html=(S.tab==='uebersicht'?`<div class="ltrow">${title}<button class="iconbtn round menubtn" data-act="openMenu" aria-label="Menü: Döner, Fußball, Kabinenfest, Trikots und Benachrichtigungen" aria-haspopup="dialog">${I('menu')}</button></div>`:title)+(S.tab==='kalender'?'':statusBanner())+(S.tab==='uebersicht'?zahltagBanner():'')+(S.tab==='uebersicht'?uebersichtAll():S.tab==='rechnungen'?rechnungen():S.tab==='kalender'?kalender():verwalten());
+    const html=(S.tab==='uebersicht'?`<div class="ltrow">${title}<button class="iconbtn round menubtn" data-act="openMenu" aria-label="Menü: Döner, Fußball, Kabinenfest, Trikots und Benachrichtigungen" aria-haspopup="dialog">${I('menu')}${[...(S.dots||[])].some(k=>k.startsWith('m:'))?'<i class="tdot" aria-hidden="true"></i>':''}</button></div>`:title)+(S.tab==='kalender'?'':statusBanner())+(S.tab==='uebersicht'?zahltagBanner():'')+(S.tab==='uebersicht'?uebersichtAll():S.tab==='rechnungen'?rechnungen():S.tab==='kalender'?kalender():verwalten());
     // nur neu aufbauen, wenn sich wirklich etwas geändert hat (sonst ruckelt die Seite bei jeder Server-Meldung)
     if(v.__html!==html||!v.__node||v.firstElementChild!==v.__node){v.innerHTML=html;v.__html=html;v.__node=v.firstElementChild;const tw=v.querySelector('.tablewrap');if(tw)tw.scrollLeft=sx}}
   if(S.sheet)renderSheet(true);
@@ -269,7 +307,7 @@ function payBox(p,b){
 function zahltagBanner(){
   let h='';
   if(zOpen()){const z=zt(),me=myPid();
-    h+=`<div class="zahltag" role="status">${ICONS.clock}<b>Zahltag · ${esc(leftTxt(Date.parse(z.endsAt)-Date.now()))}</b><span>bis ${esc(dtDE(z.endsAt))} – danach automatisch ${eur(LATE_FEE)} Verzug.</span>${me?`<button class="btn" data-act="person" data-id="${esc(me)}">Mein Konto &amp; bezahlen</button>`:''}</div>`}
+    h+=`<div class="zahltag" role="status">${ICONS.clock}<b>Zahltag · ${esc(leftTxt(Date.parse(z.endsAt)-Date.now()))}${idot('zahltag')}</b><span>bis ${esc(dtDE(z.endsAt))} – danach automatisch ${eur(LATE_FEE)} Verzug.</span>${me?`<button class="btn" data-act="person" data-id="${esc(me)}">Mein Konto &amp; bezahlen</button>`:''}</div>`}
   if(isKW())h+=confirmCard();
   return h;
 }
@@ -277,7 +315,7 @@ function pendingPays(){const g={};for(const e of S.entries)if(e.reported&&!e.pai
 function confirmCard(){
   const g=pendingPays(),ids=Object.keys(g);if(!ids.length)return '';
   const sum=ids.reduce((a,pid)=>a+g[pid].reduce((x,e)=>x+(e.amount||0),0),0);
-  return `<button class="payall wait" data-act="openConfirm"><span class="pa-ic">${ICONS.clock}</span><span class="pa-t"><b>Zahlungen bestätigen</b><small>${ids.length} ${ids.length===1?'Spieler hat':'Spieler haben'} bezahlt gemeldet · ${eur(sum)}</small></span>${I('chevR').replace('class="ico"','class="ico chev"')}</button>`;
+  return `<button class="payall wait" data-act="openConfirm"><span class="pa-ic">${ICONS.clock}</span><span class="pa-t"><b>Zahlungen bestätigen${idot('zahlungen')}</b><small>${ids.length} ${ids.length===1?'Spieler hat':'Spieler haben'} bezahlt gemeldet · ${eur(sum)}</small></span>${I('chevR').replace('class="ico"','class="ico chev"')}</button>`;
 }
 function kwCard(){
   const open=zOpen(),ready=!!(S.settings.paypal||S.settings.iban),zl=zAll();
@@ -340,11 +378,11 @@ function uebersicht(){
 // Jeder kann jemanden mit Foto und vorgeschlagener Strafe anzeigen; der Kassenwart trägt die Strafe ein oder lehnt ab.
 const anzOpen=()=>(S.anzeigen||[]).filter(a=>(a.status||'neu')==='neu').sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
 function anzRow(a){const p=pById(a.playerId),by=pById(a.by);
-  return `<div class="row tap" role="button" tabindex="0" data-act="anzView" data-id="${esc(a.id)}">${a.path?`<img class="rthumb" data-bucket="anzeigen" data-path="${esc(a.path)}" alt="Foto">`:avatar(p)}<div class="m"><b>${esc((a.nr?'#'+a.nr+' ':'')+(p?p.name:'Unbekannt')+': '+(a.title||''))}</b><i>${esc('von '+(by?by.name:'?')+' · '+dDE(String(a.createdAt).slice(0,10))+' · '+eur(a.amount||0))}</i></div>${I('chevR').replace('class="ico"','class="ico chev"')}</div>`}
+  return `<div class="row tap" role="button" tabindex="0" data-act="anzView" data-id="${esc(a.id)}">${a.path?`<img class="rthumb" data-bucket="anzeigen" data-path="${esc(a.path)}" alt="Foto">`:avatar(p)}<div class="m"><b>${S.dots?.has('anz')&&a.createdAt>seenAt('anz')?idot('anz',1):''}${esc((a.nr?'#'+a.nr+' ':'')+(p?p.name:'Unbekannt')+': '+(a.title||''))}</b><i>${esc('von '+(by?by.name:'?')+' · '+dDE(String(a.createdAt).slice(0,10))+' · '+eur(a.amount||0))}</i></div>${I('chevR').replace('class="ico"','class="ico chev"')}</div>`}
 function anzeigenBlock(){if(S.status==='loading')return '';
   const open=anzOpen(),kw=S.canWrite===true,mine=open.filter(a=>a.uid===S.uid);
   let h=`<button class="btn primary" style="width:100%;margin:0 0 12px" data-act="anzNew">${I('camera')}Anzeige erstatten</button>`;
-  if(kw&&open.length)h+=`<h2 class="section-h" style="margin-top:0">Offene Anzeigen · ${open.length}</h2><div class="rows" style="margin-bottom:14px">${open.map(anzRow).join('')}</div>`;
+  if(kw&&open.length)h+=`<h2 class="section-h" style="margin-top:0">Offene Anzeigen · ${open.length}${idot('anz')}</h2><div class="rows" style="margin-bottom:14px">${open.map(anzRow).join('')}</div>`;
   else if(!kw&&mine.length)h+=`<h2 class="section-h" style="margin-top:0">Deine offenen Anzeigen · ${mine.length}</h2><div class="rows" style="margin-bottom:14px">${mine.map(anzRow).join('')}</div>`;
   return h}
 // nur diese Strafen kann man anzeigen: Flasche nicht beschriftet, Vergessen von Eigentum, Flasche nicht leer getrunken, Amt vernachlässigt, in der Halle nicht aufgeräumt
@@ -399,7 +437,7 @@ function receiptsBlock(){
   let h=`<button class="btn" style="width:100%;margin:0 0 14px" data-act="newReceipt">${I('camera')}Beleg hochladen</button>`;
   if(!open.length)return h;
   return h+`<h2 class="section-h" style="margin-top:4px">Eingereichte Belege · ${open.length}</h2><div class="rows" style="margin-bottom:6px">`+open.map(r=>{const p=pById(r.playerId);
-    return `<div class="row tap" role="button" tabindex="0" data-act="viewReceipt" data-id="${esc(r.id)}"><img class="rthumb" data-path="${esc(r.path)}" alt="Beleg"><div class="m"><b>${esc(p?p.name:'Unbekannt')}</b><i>${esc(dDE(r.date)+(r.amount?' · '+eur(r.amount):'')+(r.note?' · '+r.note:''))}</i></div>${I('chevR').replace('class="ico"','class="ico chev"')}</div>`}).join('')+`</div>`;
+    return `<div class="row tap" role="button" tabindex="0" data-act="viewReceipt" data-id="${esc(r.id)}"><img class="rthumb" data-path="${esc(r.path)}" alt="Beleg"><div class="m"><b>${isNewAt('rechnungen',r.createdAt,r.uid)?idot('rechnungen',1):''}${esc(p?p.name:'Unbekannt')}</b><i>${esc(dDE(r.date)+(r.amount?' · '+eur(r.amount):'')+(r.note?' · '+r.note:''))}</i></div>${I('chevR').replace('class="ico"','class="ico chev"')}</div>`}).join('')+`</div>`;
 }
 async function hydrateImgs(){
   const els=[...document.querySelectorAll('img[data-path]:not([src])')];if(!els.length||!S.sb)return;
@@ -460,7 +498,7 @@ function rechnungen(){
     const gs=b.kind==='gutschrift';const meta=[dDE(b.date)];if(gs)meta.push('Gutschrift für '+(p?p.name:'?'));else if(!ein)meta.push(p?'ausgelegt von '+p.name:'aus der Kasse');if(b.splitIds?.length)meta.push('umgelegt auf '+b.splitIds.length+' × '+eur(b.perPerson));if(b.note)meta.push(b.note);
     const canW=S.canWrite!==false;
     const tags=(ein?'<span class="tag ok">Sondereinzahlung</span>':gs?'<span class="tag">nur Gutschrift</span>':'')+(p&&b.verrechnet?'<span class="tag ok">mit Strafen verrechnet</span>':p&&b.credited>0?`<span class="tag ok">${eur(b.credited)} verrechnet · Rest ${eur(credLeft(b))}</span>`:'')+(p&&b.verrechnet?'':p&&canW?`<button class="chipbtn ${b.refunded?'on':''}" data-act="refund" data-id="${esc(b.id)}" aria-pressed="${!!b.refunded}">${b.refunded?I('check')+'Erstattet':'Erstattet?'}</button>`:(p&&b.refunded?'<span class="tag ok">erstattet</span>':''));
-    const inner=`${p?avatar(p):`<span class="av">${ein?ICONS.plus:ICONS.euro}</span>`}<div class="m"><b>${esc(b.title||b.cat)}</b><i>${esc((b.title&&b.cat&&b.title!==b.cat?b.cat+' · ':'')+meta.join(' · '))}</i>${tags||b.receiptId?`<div class="tags">${tags}${b.receiptId?'<span class="tag">Beleg</span>':''}</div>`:''}</div><div class="r"><strong class="num" style="${ein?'color:var(--good)':''}">${ein?'+ ':''}${eur(b.amount)}</strong></div>`;
+    const inner=`${p?avatar(p):`<span class="av">${ein?ICONS.plus:ICONS.euro}</span>`}<div class="m"><b>${isNewAt('rechnungen',b.createdAt,b.createdBy)?idot('rechnungen',1):''}${esc(b.title||b.cat)}</b><i>${esc((b.title&&b.cat&&b.title!==b.cat?b.cat+' · ':'')+meta.join(' · '))}</i>${tags||b.receiptId?`<div class="tags">${tags}${b.receiptId?'<span class="tag">Beleg</span>':''}</div>`:''}</div><div class="r"><strong class="num" style="${ein?'color:var(--good)':''}">${ein?'+ ':''}${eur(b.amount)}</strong></div>`;
     h+=canW?`<div class="row tap" role="button" tabindex="0" data-act="editBill" data-id="${esc(b.id)}" aria-label="${esc((b.title||b.cat)+' bearbeiten')}">${inner}${I('chevR').replace('class="ico"','class="ico chev"')}</div>`:`<div class="row">${inner}</div>`;
   }
   return h+'</div>';
@@ -555,7 +593,7 @@ async function kfSave(ids){
 }
 function kontenCopy(){
   const sd=(S.schulden||[]).filter(x=>!x.done);
-  return `<div class="toolbar"><button class="menuitem rechbtn" data-act="tab" data-k="rechnungen"><span class="mi-ic" aria-hidden="true">🧾</span><span class="mi-t"><b>Rechnungen</b><small>Ausgaben, Einzahlungen und Belege</small></span>${I('chevR')}</button></div>`
+  return `<div class="toolbar"><button class="menuitem rechbtn" data-act="tab" data-k="rechnungen"><span class="mi-ic" aria-hidden="true">🧾</span><span class="mi-t"><b>Rechnungen${idot('rechnungen')}</b><small>Ausgaben, Einzahlungen und Belege</small></span>${I('chevR')}</button></div>`
     +(hasRole('kassenwart')?`<div class="toolbar"><button class="menuitem rechbtn" data-act="openSchulden"><span class="mi-ic" aria-hidden="true">📝</span><span class="mi-t"><b>Schulden</b><small>${sd.length?`${sd.length} offen · ${eur(sd.reduce((a,x)=>a+(x.amount||0),0))}`:'Nur für dich sichtbar'}</small></span>${I('chevR')}</button></div>`:'');
 }
 function kontenList(){
@@ -563,7 +601,7 @@ function kontenList(){
   if(!ps.length)return `<div class="empty">Noch keine Personen im Kader.</div>`;
   const num=x=>x.p.number??999;
   if(S.ksort==='high')ps.sort((a,b)=>b.b.net-a.b.net||num(a)-num(b));
-  return `<div class="people">`+ps.map(({p,b})=>`<button class="person" data-act="person" data-id="${esc(p.id)}">${avatar(p)}<span class="n"><b>${esc(p.name)}${drg(p.id)}</b><i>${b.credit?`Strafen ${eur(b.open)} − Guthaben ${eur(b.credit)}`:esc(pLabel(p))}</i>${b.net<0?`<span class="tag ok">bekommt ${eur(-b.net)}</span>`:''}${b.rep?`<span class="tag owe">Zahlung gemeldet</span>`:''}${b.kf?`<span class="tag kf">${b.kf}× Kabinenfest</span>`:''}</span><span class="amt num ${b.net>0?'pos':b.net<0?'neg':'zero'}">${netTxt(b.net)}</span></button>`).join('')+`</div>`;
+  return `<div class="people">`+ps.map(({p,b})=>`<button class="person" data-act="person" data-id="${esc(p.id)}">${avatar(p)}<span class="n"><b>${p.id===myPid()?idot('konto',1):''}${esc(p.name)}${drg(p.id)}</b><i>${b.credit?`Strafen ${eur(b.open)} − Guthaben ${eur(b.credit)}`:esc(pLabel(p))}</i>${b.net<0?`<span class="tag ok">bekommt ${eur(-b.net)}</span>`:''}${b.rep?`<span class="tag owe">Zahlung gemeldet</span>`:''}${b.kf?`<span class="tag kf">${b.kf}× Kabinenfest</span>`:''}</span><span class="amt num ${b.net>0?'pos':b.net<0?'neg':'zero'}">${netTxt(b.net)}</span></button>`).join('')+`</div>`;
 }
 function sortBar(){return `<div class="sortbar"><span class="k">Sortieren</span><div class="seg" role="group" aria-label="Sortierung der Konten">${[['nr','Nummer'],['high','Betrag']].map(([k,l])=>`<button data-act="ksort" data-k="${k}" aria-pressed="${S.ksort===k}">${l}</button>`).join('')}</div></div>`}
 function uebersichtAll(){
@@ -680,7 +718,7 @@ function verwalten(){
   return S.canEdit?verwaltenAdmin():'';
 }
 // Ausklappbare Kachel (merkt sich offen/zu in S.mOpen, siehe toggle-Handler)
-const tile=(key,icon,title,sub,body)=>`<details class="vtile" data-key="${key}" ${S.mOpen[key]?'open':''}><summary class="menuitem"><span class="mi-ic" aria-hidden="true">${icon}</span><span class="mi-t"><b>${title}</b><small>${esc(sub)}</small></span>${I('chevR')}</summary><div class="vt-body">${body}</div></details>`;
+const tile=(key,icon,title,sub,body)=>`<details class="vtile" data-key="${key}" ${S.mOpen[key]?'open':''}><summary class="menuitem"><span class="mi-ic" aria-hidden="true">${icon}</span><span class="mi-t"><b>${title}${idot(key)}</b><small>${esc(sub)}</small></span>${I('chevR')}</summary><div class="vt-body">${body}</div></details>`;
 function verwaltenAdmin(){
   const st=S.settings,kp=pById(kwPid()),z=zt();
   const claims=S.links.filter(l=>l.playerId===kwPid());
@@ -713,7 +751,7 @@ function verwaltenAdmin(){
   h+=tile('vt-strafen','📋','Strafenkatalog',`${fs.length} Strafen`,fBtn+fList);
   const pBtn=`<div class="toolbar"><button class="btn primary block" data-act="editPlayer" data-id="">${I('plus')}Person hinzufügen</button></div>`;
   const ps=sortedPlayers(true);
-  const pList=ps.length?`<div class="people">`+ps.map(p=>`<button class="person" data-act="editPlayer" data-id="${esc(p.id)}">${avatar(p)}<span class="n"><b>${esc(p.name)}${drg(p.id)}</b><i>${esc(pLabel(p))}</i></span>${p.active===false?'<span class="tag">inaktiv</span>':''}</button>`).join('')+`</div>`:`<div class="empty">Noch niemand im Kader.</div>`;
+  const pList=ps.length?`<div class="people">`+ps.map(p=>`<button class="person" data-act="editPlayer" data-id="${esc(p.id)}">${avatar(p)}<span class="n"><b>${p.id===myPid()?idot('konto',1):''}${esc(p.name)}${drg(p.id)}</b><i>${esc(pLabel(p))}</i></span>${p.active===false?'<span class="tag">inaktiv</span>':''}</button>`).join('')+`</div>`:`<div class="empty">Noch niemand im Kader.</div>`;
   h+=tile('vt-kader','🏃','Kader',`${ps.length} Personen`,pBtn+pList);
   return h;
 }
@@ -808,7 +846,7 @@ function doenerSheet(s){
     <a class="btn paypal ${amt>0?'':'off'}" id="dpaylink" ${amt>0?`href="${esc(paypalUrl(amt,'',dt,'Döner Dragons – '+(pById(me)?.name||'')))}" target="_blank" rel="noopener"`:'aria-disabled="true"'}>Mit PayPal bezahlen${amt>0?' · '+eur(amt):''}</a>
     <div class="pp-addr"><span>An: <b>${esc(dt.v)}</b></span><button class="mini" data-act="copyTxt" data-v="${esc(dt.v)}">Kopieren</button></div></div>`}
   if(po&&!po.paid){body+=po.reportedAt?`<button class="btn" style="margin-top:10px;width:100%;opacity:.55" disabled>✓ Bezahlt gemeldet</button><p class="note" style="margin:6px 4px 0">Der Dönerwart hat eine Nachricht bekommen und hakt es ab.</p>`
-    :`<button class="btn good" style="margin-top:10px;width:100%" data-act="doenerPaid" data-w="${esc(po.week)}">Ich habe bezahlt</button><p class="note" style="margin:6px 4px 0">Der Dönerwart bekommt eine Nachricht und hakt es ab.</p>`}
+    :`<button class="btn good" style="margin-top:10px;width:100%" data-act="doenerPaid" data-w="${esc(po.week)}">Ich habe bezahlt${S.doenerNeu?'<span class="idot" role="img" aria-label="neu"></span>':''}</button><p class="note" style="margin:6px 4px 0">Der Dönerwart bekommt eine Nachricht und hakt es ab.</p>`}
   if(po&&po.paid)body+=`<div class="hint" style="margin-top:14px">Dein Döner ist als bezahlt abgehakt. 👍</div>`;
   const tickNote=`<p class="note" style="margin:6px 4px 0">Häkchen links: Zahlung ist angekommen.</p>`;
   const ordRow=(d,canDel)=>{const p=pById(d.pid);
@@ -843,7 +881,28 @@ async function pushLoad(){const st={sub:null,row:null,ready:true};
   try{if(pushSupported()){const reg=await swReg(),sub=reg&&await reg.pushManager.getSubscription();
     if(sub){st.sub=sub;const {data}=await S.sb.from('push_subs').select('endpoint,prefs').eq('endpoint',sub.endpoint).maybeSingle();st.row=data||null}}}catch(e){}
   S.push=st;if(S.sheet&&(S.sheet.type==='push'||S.sheet.type==='menu')){S.still=true;renderSheet(false)}}
-function pushSheet(){const st=S.push||{},head=`<h2>Benachrichtigungen</h2><p>Gilt für dieses Gerät</p>`;let body='',foot='';
+// Benachrichtigungen: oben umschalten zwischen „Verlauf“ (alles, was an dich ging, 30 Tage) und „Einstellung“ (dieses Gerät)
+const pushSeg=()=>`<div class="seg full" role="group" aria-label="Ansicht" style="margin-top:10px">${[['verlauf','Verlauf'],['einstellen','Einstellung']].map(([k,l])=>`<button data-act="pushView" data-k="${k}" aria-pressed="${(S.pushView||'verlauf')===k}">${l}</button>`).join('')}</div>`;
+async function pushLogLoad(){const {data,error}=await S.sb.from('push_verlauf').select('kind,title,body,tag,at').order('at',{ascending:false}).limit(150);
+  S.pushLog=error?'fehler':data||[];if(S.sheet?.type==='push'){S.still=true;renderSheet(false)}}
+// Antippen im Verlauf: dieselbe Aktion wie der passende Knopf in der App (Konto, Döner, Spiel, Reiter …)
+function pushGo(x){const me=myPid(),a=(act,k,v)=>`data-act="${act}"${k?` data-${k}="${esc(v)}"`:''}`;
+  switch(x.kind){
+    case 'strafe':case 'zahltag':return me?a('person','id',me):'';
+    case 'doener':return a('openDoener');case 'fussball':return a('openFussball');case 'geburtstag':return a('openGb');case 'bericht':return a('openBerichte');
+    case 'meldung':return isKW()?a('openConfirm'):'';
+    case 'umfrage':{const id=String(x.tag||'').replace(/^umfrage-/,'');return terminById(id)?a('terminView','id',id):a('pushTab','k','kalender')}
+    case 'plan':return a('pushTab','k','kalender');case 'anzeige':return a('pushTab','k','erfassen');
+    case 'anmeldung':return isAdmin()?a('pushTab','k','verwalten'):'';
+  }return ''}
+function pushLogBody(){const L=S.pushLog;if(!L)return skel();if(L==='fehler')return `<div class="hint">Der Verlauf konnte gerade nicht geladen werden. Prüfe die Verbindung und öffne das Fenster noch einmal.</div>`;if(!L.length)return `<div class="empty">Noch keine Benachrichtigungen in den letzten 30 Tagen.</div>`;
+  const td=tdIso(),day=d=>d===td?'Heute':d===addDays(td,-1)?'Gestern':dDE(d),hm=iso=>new Date(iso).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});let h='',cur='';
+  for(const x of L){const d=isoD(new Date(x.at));if(d!==cur){h+=(cur?'</div>':'')+`<h2 class="section-h">${esc(day(d))}</h2><div class="rows">`;cur=d}
+    const go=pushGo(x);
+    h+=`<div class="row${go?' tap':''}" ${go?`role="button" tabindex="0" data-from="push" ${go}`:''}><div class="m"><b class="wrapb">${esc(x.title)}</b>${x.body?`<i class="wrap">${esc(x.body)}</i>`:''}</div><div class="r"><small class="num">${esc(hm(x.at))}</small></div>${go?I('chevR').replace('class="ico"','class="ico chev"'):''}</div>`}
+  return h+'</div><p class="note" style="margin:10px 4px 0">Hier steht alles, was an dich ging – auch wenn Benachrichtigungen auf diesem Gerät aus sind. Nach 30 Tagen wird es gelöscht.</p>'}
+function pushSheet(){const st=S.push||{},head=`<h2>Benachrichtigungen</h2>${pushSeg()}`;let body='',foot='';
+  if((S.pushView||'verlauf')==='verlauf')return{head,body:pushLogBody(),foot:''};
   const kinds=PUSH_KINDS.filter(k=>k[0]==='anmeldung'?isAdmin():(k[0]!=='meldung'&&k[0]!=='anzeige')||isKW());
   const list=`<div class="rows">`+kinds.map(([k,t,d])=>`<div class="row"><div class="m"><b>${t}</b><i class="wrap">${d}</i></div></div>`).join('')+`</div>`;
   if(!pushSupported())body=isIOS()&&!isStandalone()
@@ -856,7 +915,7 @@ function pushSheet(){const st=S.push||{},head=`<h2>Benachrichtigungen</h2><p>Gil
   else{const pr=st.row.prefs||{};
     body=`<div class="tag ok" style="margin:0 2px 12px">🔔 An auf diesem Gerät</div><div class="rows">`+kinds.map(([k,t,d])=>`<label class="row pushk"><div class="m"><b>${t}</b><i class="wrap">${d}</i></div><input type="checkbox" class="switch" data-pk="${k}" ${pr[k]!==false?'checked':''} aria-label="${esc(t)}"></label>`).join('')+`</div>`;
     foot=`<div class="split"><button class="btn" data-act="pushOff">Ausschalten</button><button class="btn primary" data-act="pushTest">Test senden</button></div>`}
-  return{head,body,foot}}
+  return{head,body:`<p class="note" style="margin:0 4px 12px">Gilt für dieses Gerät.</p>`+body,foot}}
 /* ---------- Trikots: Spieler nach Alter, von jung bis alt ---------- */
 const ageOf=iso=>{const [y,m,d]=iso.split('-').map(Number),n=new Date();let a=n.getFullYear()-y;if(n.getMonth()+1<m||(n.getMonth()+1===m&&n.getDate()<d))a--;return a};
 const validBirth=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||'')&&!isNaN(Date.parse(v))&&v<=today()&&v>='1940-01-01';
@@ -885,10 +944,10 @@ function trikotEditSheet(s){const p=pById(s.id);if(!p||!canTrikot())return triko
   return{head,body,foot}}
 function menuSheet(){
   const w=doenerWeek(),n=doenerList(w.tue).length,last=fbGames()[0],fr=last?fbRounds():null;
-  const item=(act,ic,t,sub)=>`<button class="menuitem" data-act="${act}"><span class="mi-ic" aria-hidden="true">${ic}</span><span class="mi-t"><b>${t}</b><small>${esc(sub)}</small></span>${I('chevR')}</button>`;
+  const item=(act,ic,t,sub)=>`<button class="menuitem" data-act="${act}"><span class="mi-ic" aria-hidden="true">${ic}</span><span class="mi-t"><b>${t}${idot('m:'+act.slice(4).toLowerCase())}</b><small>${esc(sub)}</small></span>${I('chevR')}</button>`;
   return{head:`<h2>Mehr</h2>`,body:`<div class="menulist">`
     +item('openFussball','⚽','Fußball',last?`Siege in Runde ${fr.rounds.length+1}: Jung ${fr.cur.jung} : ${fr.cur.alt} Alt`:'Ergebnisse und Torschützen')
-    +item('openDoener','🥙','Döner',(w.open?'Heute bis 18 Uhr':w.closed?'Bestellschluss vorbei':'Bestellen am Dienstag')+' · '+n+' '+(n===1?'Bestellung':'Bestellungen'))
+    +item('openDoener','🥙','Döner',(()=>{const lt=addDays(w.tue,-7),u=w.tue!==berlinNow().date&&doenerList(lt).some(d=>d.pid===myPid()&&!d.paid&&!d.reportedAt);return u?`Döner vom ${dDE(lt).slice(0,6)} noch nicht bezahlt`:(w.open?'Heute bis 18 Uhr':w.closed?'Bestellschluss vorbei':'Bestellen am Dienstag')+' · '+n+' '+(n===1?'Bestellung':'Bestellungen')})())
     +item('openBaelle','🏐','Bälle entharzen',(()=>{const c=baelleCur();return c?`Diese Woche: ${baelleNames(c)}${c.doneAt?' ✓':''}`:'Kein Plan für diese Woche'})())
     +item('openKf','🎉','Kabinenfest',(()=>{const l=kfList(),tw=kfThisWeek();return l.length?(tw.length?`Diese Woche: ${tw.map(e=>kfWho(e)?.name||'Unbekannt').join(', ')}`:'Diese Woche frei')+` · ${l.length} offen`:'Alles erledigt'})())
     +(canTrikot()?item('openTrikot','👕','Trikots',(()=>{const t=trikotList();return t.withD.length?`${t.withD.length} Spieler · jung bis alt`:'Spieler nach Alter sortiert'})()):'')
@@ -975,11 +1034,11 @@ function meetTxt(x){if(x.type!=='spiel'||x.date<tdIso())return '';
   if(isHome(x)){if(!x.start)return '';const [h,m]=x.start.split(':').map(Number),t=((h*60+m-90)%1440+1440)%1440;return 'Treffpunkt '+String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0')+' Uhr (1:30 h vor Beginn)'}
   return x.meet?'Treffpunkt '+x.meet+' Uhr'+(x.meetPlace?' · '+x.meetPlace:''):'Treffpunkt wird in der Spielwoche bekannt gegeben'}
 function kEvRow(x){const sp=x.type==='spiel',mt=meetTxt(x);
-  return `<div class="kev tap" data-act="terminView" data-id="${esc(x.id)}" role="button" tabindex="0"><span class="t">${esc(tRange(x))}</span><div class="m"><b>${sp?'🤾':'🏃'} ${esc(x.title||(sp?'Spiel':'Training'))}</b><i>${esc([sp?(isHome(x)?'Heimspiel':'Auswärts'):'',x.place||''].filter(Boolean).join(' · '))}</i>${mt?`<i class="meet">${esc(mt)}</i>`:''}</div>${I('chevR')}</div>`}
+  return `<div class="kev tap" data-act="terminView" data-id="${esc(x.id)}" role="button" tabindex="0"><span class="t">${esc(tRange(x))}</span><div class="m"><b>${sp?'🤾':'🏃'} ${esc(x.title||(sp?'Spiel':'Training'))}${idot('poll:'+x.id)}${planDays().has(x.date)?idot('plan'):''}</b><i>${esc([sp?(isHome(x)?'Heimspiel':'Auswärts'):'',x.place||''].filter(Boolean).join(' · '))}</i>${mt?`<i class="meet">${esc(mt)}</i>`:''}</div>${I('chevR')}</div>`}
 const dayExtra=(d,map)=>(wdIdx(d)===3?kfRows(monIso(d),map):'')+baelleRow(d); // Donnerstag: Kabinenfest und Bälle entharzen
 const kfRows=(mon,map=kfWeekMap())=>(map[mon]||[]).map(e=>`<div class="kev"><span class="t">🎉</span><div class="m"><b>Kabinenfest: ${esc(kfWho(e)?.name||'Unbekannt')}</b>${e.kfDone?'<i>erledigt</i>':''}</div></div>`).join('');
 const calNav=(act,label,prev,next)=>`<div class="calnav" style="margin-top:12px"><button class="iconbtn round" data-act="${act}" data-d="-1" aria-label="${prev}">${I('chevL')}</button><b>${label}</b><button class="iconbtn round" data-act="${act}" data-d="1" aria-label="${next}">${I('chevR')}</button></div>`;
-const kday=(d,head,body)=>`<section class="kday${d===tdIso()?' today':''}"><header><b>${WD_LONG[wdIdx(d)]}<small>${esc(dDE(d).slice(0,6))}</small></b>${head}</header>${body}</section>`;
+const kday=(d,head,body)=>`<section class="kday${d===tdIso()?' today':''}"><header><b>${WD_LONG[wdIdx(d)]}<small>${esc(dDE(d).slice(0,6))}</small>${planDays().has(d)?idot('plan'):''}</b>${head}</header>${body}</section>`;
 // Gibt es seit der letzten Meldung der Woche etwas Neues? Fragt die Datenbank (gleiche Regel wie beim Senden) einmal je Stand der Termine.
 let _pc={src:null,mon:null,v:null};
 function planChanged(mon){if(_pc.src!==S.termine||_pc.mon!==mon){const src=S.termine;if(_pc.mon!==mon)_pc.v=null;_pc.src=src;_pc.mon=mon;
@@ -1009,7 +1068,7 @@ function kalMonat(){
 function kalSpiele(){
   const all=S.termine.filter(x=>x.type==='spiel').sort((a,b)=>(a.date+(a.start||'')).localeCompare(b.date+(b.start||''))),td=tdIso();
   const row=x=>{const [,m,d]=x.date.split('-'),mt=meetTxt(x);
-    return `<div class="row tap" data-act="terminView" data-id="${esc(x.id)}" role="button" tabindex="0"><div class="kdate"><b>${+d}.</b><small>${WD_SHORT[wdIdx(x.date)]} ${esc(MONTHS[+m-1].slice(0,3))}</small></div><div class="m"><b class="wrapb">${esc(x.title)}</b><i class="wrap">${esc(x.start?x.start+' Uhr':'')}${x.place?' · '+esc(x.place):''}</i>${mt?`<i class="wrap meet">${esc(mt)}</i>`:''}<div class="tags"><span class="tag ${isHome(x)?'ok':''}">${isHome(x)?'Heimspiel':'Auswärts'}</span>${x.poll&&x.date>=tdIso()&&!(x.poll.until&&Date.parse(x.poll.until)<=Date.now())&&!(S.umfrage||[]).some(a=>a.doc===x.id&&a.pid===myPid())?'<span class="tag kf">🚐 Umfrage – noch abstimmen</span>':''}</div></div>${I('chevR')}</div>`};
+    return `<div class="row tap" data-act="terminView" data-id="${esc(x.id)}" role="button" tabindex="0"><div class="kdate"><b>${+d}.</b><small>${WD_SHORT[wdIdx(x.date)]} ${esc(MONTHS[+m-1].slice(0,3))}</small></div><div class="m"><b class="wrapb">${esc(x.title)}${idot('poll:'+x.id)}${planDays().has(x.date)?idot('plan'):''}</b><i class="wrap">${esc(x.start?x.start+' Uhr':'')}${x.place?' · '+esc(x.place):''}</i>${mt?`<i class="wrap meet">${esc(mt)}</i>`:''}<div class="tags"><span class="tag ${isHome(x)?'ok':''}">${isHome(x)?'Heimspiel':'Auswärts'}</span>${x.poll&&x.date>=tdIso()&&!(x.poll.until&&Date.parse(x.poll.until)<=Date.now())&&!(S.umfrage||[]).some(a=>a.doc===x.id&&a.pid===myPid())?'<span class="tag kf">🚐 Umfrage – noch abstimmen</span>':''}</div></div>${I('chevR')}</div>`};
   const up=all.filter(x=>x.date>=td),past=all.filter(x=>x.date<td).reverse();
   return (canTermin()?`<button class="btn" style="margin:12px 0 0;width:100%" data-act="spielNew">${I('plus')}Spiel hinzufügen</button>`:'')
     +(!all.length?`<div class="empty" style="margin-top:12px">Noch keine Spiele eingetragen.</div>`:'')
@@ -1046,7 +1105,8 @@ function terminViewSheet(s){const x=terminById(s.id);
 const POLL_OPTS=[['treff','🚐 Zum Treffpunkt (Bus)'],['direkt','🚗 Ich fahre direkt']];
 // Vorschlag fürs Ende: Vortag 20 Uhr (für <input type="datetime-local">, Ortszeit)
 const pollDefaultEnd=x=>{const d=new Date(x.date+'T20:00');d.setDate(d.getDate()-1);return isoD(d)+'T20:00'};
-function pollBlock(x){if(x.type!=='spiel'||isHome(x))return '';const me=myPid(),can=canPlan()&&x.date>=tdIso(),open=x.date>=tdIso()&&!(x.poll?.until&&Date.parse(x.poll.until)<=Date.now());
+const pollOpen=x=>x.date>=tdIso()&&!(x.poll?.until&&Date.parse(x.poll.until)<=Date.now());
+function pollBlock(x){if(x.type!=='spiel'||isHome(x))return '';const me=myPid(),can=canPlan()&&x.date>=tdIso(),open=pollOpen(x);
   if(!x.poll)return can?`<h3 class="sub-h">Umfrage</h3><div class="field" style="margin-bottom:10px"><label for="pollq">Frage an die Mannschaft</label><textarea id="pollq" rows="2" maxlength="200">Wer kommt zum Treffpunkt und braucht einen Platz im 9er-Bus?</textarea></div>
     <div class="field" style="margin-bottom:10px"><label for="pollend">Abstimmen bis</label><input id="pollend" type="datetime-local" value="${esc(pollDefaultEnd(x))}" min="${esc(new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,16))}"></div><button class="btn block" data-act="pollStart" data-id="${esc(x.id)}">🚐 Umfrage starten</button>`:'';
   const ans=(S.umfrage||[]).filter(a=>a.doc===x.id),mine=ans.find(a=>a.pid===me),who=c=>ans.filter(a=>a.choice===c).map(a=>pById(a.pid)).filter(Boolean);
@@ -1144,7 +1204,8 @@ function baelleEditSheet(s){const x=S.termine.find(t=>t.id===s.id);if(!x||!isAdm
 async function baelleSwap(ia,pa,ib,pb){if(!isAdmin())return;const A=S.termine.find(t=>t.id===ia),B=S.termine.find(t=>t.id===ib);if(!A||!B||A.doneAt||B.doneAt||ia===ib)return;
   if((B.pids||[]).includes(pa)||(A.pids||[]).includes(pb))return toast('Die Person ist in dieser Woche schon dabei');
   if(await baelleApply({disabled:false},{[ia]:A.pids.map(p=>p===pa?pb:p),[ib]:B.pids.map(p=>p===pb?pa:p)})){S.still=true;renderSheet(false)}}
-function openSheet(s){const sb=$('#sheetRoot .sheet-b');if(sb)sb.scrollTop=0;S.sheet=s;S.confirmDel=null;S.confirmPayAll=null;document.body.classList.add('locked');renderSheet(false)}
+function openSheet(s){if(S.fromPush){S.fromPush=false;if(s.type!=='push'&&!s.back)s={...s,back:{type:'push'}}} // aus dem Verlauf geöffnet: Kreuz führt zurück
+  const sb=$('#sheetRoot .sheet-b');if(sb)sb.scrollTop=0;S.sheet=s;S.confirmDel=null;S.confirmPayAll=null;document.body.classList.add('locked');renderSheet(false)}
 // Kreuz oben rechts: in Unterseiten einen Schritt zurück (Spiel → Fußball); aus einem Bereich (Fußball, Döner …) zurück zur Übersicht
 const SHEET_PARENT={wuerfelAdd:'wuerfel',fbEdit:'fussball',fbRound:'fussball',fbGame:'fussball',trikotEdit:'trikot',gbEdit:'gb',gbPick:'gb'};
 const fbFrom=()=>S.sheet&&S.sheet.type==='fbRound'?{type:'fbRound',no:S.sheet.no}:null; // Herkunft merken, damit „zurück“ in die Runde führt
@@ -1533,10 +1594,10 @@ async function setEntry(id,patch){try{await S.db.doc('entries/'+id).update(patch
     [ids[i],ids[j]]=[ids[j],ids[i]];kfSave(ids);S.still=true;renderSheet(false);const n=document.querySelector('.grip[data-id="'+g.dataset.id+'"]');if(n)n.focus()});
 })();
 document.addEventListener('click',async ev=>{
-  const el=ev.target.closest('[data-act]');if(!el)return;const act=el.dataset.act,id=el.dataset.id;
+  const el=ev.target.closest('[data-act]');if(!el)return;const act=el.dataset.act,id=el.dataset.id;S.fromPush=el.dataset.from==='push';if(S.fromPush)setTimeout(()=>S.fromPush=false); // gilt nur für das Fenster, das dieser Klick öffnet
   if(act==='scrim'&&ev.target!==el)return;
   switch(act){
-    case 'tab':S.tab=el.dataset.k;if(S.tab==='verwalten'&&S.loadMembers)S.loadMembers();try{localStorage.setItem('tab',S.tab)}catch(e){}$('#view').innerHTML='';render();scrollTo(0,0);break;
+    case 'tab':goTab(el.dataset.k);break;
     case 'fine':{const f=S.fines.find(x=>x.id===id);if(f)openSheet({type:'fine',fine:f,sel:new Set(S.preselect?[S.preselect]:[]),qty:f.per&&!f.base?1:0,touched:false,amount:0,spieltag:false,kf:!!f.kabinenfest&&S.canWrite===true,note:'',date:today()});S.preselect=null;break}
     case 'free':openSheet({type:'fine',fine:{id:null,title:'Sonstiges',base:0,per:0,hint:'Freier Betrag, z. B. Würfelergebnis oder Beitrag, der nicht im Katalog steht. Beschreibe ihn in der Notiz.'},sel:new Set(S.preselect?[S.preselect]:[]),qty:0,touched:true,amount:0,spieltag:false,kf:false,note:'',date:today(),col:'strafen'});S.preselect=null;break;
     case 'fav':{const i=S.favs.indexOf(id);if(i>=0)S.favs.splice(i,1);else S.favs.push(id);saveFavs();const fl=$('#finelist');if(fl)fl.innerHTML=fineList();break}
@@ -1649,7 +1710,7 @@ document.addEventListener('click',async ev=>{
       try{if(!S.canWrite){const {error}=await S.sb.rpc('undo_self_report');if(error){toast('Konnte nicht speichern: '+error.message);break}}
         else await Promise.all(S.entries.filter(e=>e.playerId===id&&!e.paid&&e.reported).map(e=>S.db.doc('entries/'+e.id).update({reported:false})));
         toast('Meldung zurückgenommen')}catch(e){toast(errMsg(e))}break}
-    case 'openConfirm':if(isKW())openSheet({type:'confirm'});break;
+    case 'openConfirm':if(isKW()){markSeen(['zahlungen']);openSheet({type:'confirm'})}break;
     case 'confirmPay':{if(!isKW())break;const now=new Date().toISOString();const es=S.entries.filter(e=>e.playerId===id&&!e.paid&&e.reported);
       try{const used=(await payEntries(id,es.map(e=>e.id),'bestaetigt')).used;const lifted=await liftPenalty(id,new Set(es.map(e=>e.id)));
         toast(`Zahlung von ${pById(id)?.name||''} bestätigt${used?` – ${eur(used)} mit Guthaben verrechnet`:''}${lifted?' – Verzugsstrafe entfernt':''}`)}catch(e){toast(errMsg(e))}break}
@@ -1699,7 +1760,7 @@ document.addEventListener('click',async ev=>{
     case 'trikotSave':{if(!isTrikotwart())break;const v=$('#gbd')?.value||'';if(!validBirth(v)){toast('Bitte ein gültiges Geburtsdatum wählen');break}
       el.disabled=true;try{await S.db.doc('geburt/'+id).set({date:v});if(S.gb[id]!==v.slice(5))await S.db.doc('geburtstage/'+id).set({md:v.slice(5)});toast('Gespeichert');S.still=true;openSheet({type:'trikot'})}catch(e){el.disabled=false;toast(errMsg(e))}break}
     case 'trikotDel':{if(!isTrikotwart())break;try{await S.db.doc('geburt/'+id).delete();toast('Geburtsdatum entfernt');S.still=true;openSheet({type:'trikot'})}catch(e){toast(errMsg(e))}break}
-    case 'openGb':case 'gbBack':S.still=true;openSheet({type:'gb'});break;
+    case 'openGb':case 'gbBack':markSeen(['m:gb']);S.still=true;openSheet({type:'gb'});break;
     case 'gbEdit':if(isKW()){S.still=true;openSheet({type:'gbEdit',id})}break;
     case 'gbAdd':if(isKW()){S.still=true;openSheet({type:'gbPick'})}break;
     case 'gbPick':if(isKW()){S.still=true;openSheet({type:'gbEdit',id,back:{type:'gbPick'}})}break;
@@ -1713,9 +1774,11 @@ document.addEventListener('click',async ev=>{
     case 'kfwSave':{const s=S.sheet;if(!canKf()||!s.pid)break;const note=($('#kfwn')?.value||'').trim().slice(0,120),r=kwRange(s.mon);el.disabled=true;
       try{await S.db.collection('entries').doc().set({playerId:s.pid,fineId:'kf-manual',title:'Kabinenfest',amount:0,qty:null,unit:null,col:'strafen',spieltag:false,kabinenfest:true,kfDone:false,kfWeek:s.mon,note:note||('Eingeplant für KW '+r.kw),date:today(),createdAt:new Date().toISOString(),createdBy:S.uid||null,paid:false,paidAt:null});
         toast(`Kabinenfest in KW ${r.kw}: ${kfWho({playerId:s.pid})?.name||''} 🍻`);S.still=true;openSheet(s.back)}catch(e){el.disabled=false;toast(errMsg(e))}break}
-    case 'openPush':S.still=true;S.push={...(S.push||{}),ready:false};openSheet({type:'push'});pushLoad();break;
-    case 'openDoener':S.still=true;openSheet({type:'doener'});break;
-    case 'openFussball':S.still=true;openSheet({type:'fussball'});break;
+    case 'openPush':S.still=true;S.push={...(S.push||{}),ready:false};S.pushLog=null;openSheet({type:'push'});pushLoad();pushLogLoad();break;
+    case 'pushView':S.pushView=el.dataset.k;S.still=true;renderSheet(false);break;
+    case 'pushTab':{const k=el.dataset.k;closeSheet();if(k==='verwalten'){S.mOpen['vt-mitglieder']=true;markSeen(['vt-mitglieder'])}goTab(k);break} // aus dem Verlauf zu einem Reiter
+    case 'openDoener':S.doenerNeu=!!S.dots?.has('m:doener');markSeen(['m:doener']);S.still=true;openSheet({type:'doener'});break; // Punkt im Fenster bleibt, solange es offen ist
+    case 'openFussball':markSeen(['m:fussball']);S.still=true;openSheet({type:'fussball'});break;
     case 'fbBack':S.still=true;openSheet(S.sheet&&S.sheet.back||{type:'fussball'});break;
     case 'saveDoener':{const s=S.sheet,w=doenerWeek(),pid=myPid(),text=($('#dtext')?.value||'').trim().slice(0,200);
       if(!pid)break;if(!w.open){toast('Bestellschluss ist vorbei');S.still=true;renderSheet(false);break}
@@ -1762,7 +1825,7 @@ document.addEventListener('click',async ev=>{
         toast(r.data?(chg?'Änderung an die Mannschaft gesendet':'Wochenplan an die Mannschaft gesendet'):'Wochenplan gespeichert, aber auf keinem Gerät sind Benachrichtigungen an')}
       render();break}
     case 'terminNew':case 'spielNew':if(canTermin())openSheet({type:'termin',id:null,t:act==='spielNew'?{type:'spiel',date:today(),start:'',end:'',title:'TSG Münster - ',place:'',home:true}:{type:'training',date:el.dataset.d||today(),start:'',end:'',title:'',place:''}});break;
-    case 'terminView':if(terminById(id))openSheet({type:'terminView',id});break;
+    case 'terminView':if(terminById(id)){markSeen(['poll:'+id]);openSheet({type:'terminView',id})}break;
     case 'terminEdit':{if(!canTermin())break;let x=terminById(id);if(!x)break;
       if(x.virtual){const rid=trId(x.date,x.start); // alle üblichen Trainings des Tages werden echt gespeichert
         if(!await run(el,()=>Promise.all(termineAt(x.date).filter(v=>v.virtual).map(v=>S.db.doc('termine/'+trId(v.date,v.start)).set(trDoc(v.date,v))))))break;
@@ -1802,7 +1865,7 @@ document.addEventListener('click',async ev=>{
       catch(e){el.disabled=false;toast(errMsg(e))}break}
     case 'fbDel':{const s=S.sheet;if(S.confirmDel!=='fb'){S.confirmDel='fb';S.still=true;renderSheet(false);break}
       try{await S.db.doc('fussball/'+s.id).delete();await syncFbKf().catch(()=>{});toast('Spiel gelöscht');S.still=true;openSheet(s.back||{type:'fussball'})}catch(e){toast(errMsg(e))}break}
-    case 'person':openSheet({type:'person',id});break;
+    case 'person':if(id===myPid())markSeen(['konto']);openSheet({type:'person',id});break;
     case 'addFor':S.preselect=id;closeSheet();S.tab='erfassen';$('#view').innerHTML='';render();toast('Strafe antippen – '+(pById(id)?.name||'')+' ist vorausgewählt');break;
     case 'paid':{const e=S.entries.find(x=>x.id===id);if(!e)break;
       // wieder geöffnet: die Datenbank bucht verbrauchtes Guthaben zurück (wird beim nächsten Zahltag neu verrechnet)
@@ -1875,7 +1938,7 @@ document.addEventListener('change',async ev=>{const t=ev.target;
   if(s.type==='fine'&&t.id==='colsel')s.col=t.value;
   if(s.type==='bill'&&t.id==='bc'){const o=$('#bcown');o.hidden=t.value!=='__other';if(!o.hidden)$('#bco').focus()}
   if(s.type==='bill'&&t.id==='bs'){s.split=t.checked;$('#splitbox').hidden=!t.checked;updateSplit()}});
-document.addEventListener('toggle',e=>{const d=e.target;if(d&&d.classList&&(d.classList.contains('mgroup')||d.classList.contains('vtile')))S.mOpen[d.dataset.key]=d.open},true);
+document.addEventListener('toggle',e=>{const d=e.target;if(d&&d.classList&&(d.classList.contains('mgroup')||d.classList.contains('vtile'))){S.mOpen[d.dataset.key]=d.open;if(d.open)markSeen([d.dataset.key])}},true);
 ['gesturestart','gesturechange','gestureend'].forEach(g=>document.addEventListener(g,e=>e.preventDefault()));
 document.addEventListener('touchmove',e=>{if(e.touches.length>1||S.drag)e.preventDefault()},{passive:false});
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.sheet)stepBack();if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches&&(ev.target.matches('.row.tap')||ev.target.matches('[role=button][data-act]:not(button)'))&&!ev.target.closest('.grip')){ev.preventDefault();ev.target.click()}});
