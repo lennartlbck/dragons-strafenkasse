@@ -980,12 +980,18 @@ const dayExtra=(d,map)=>(wdIdx(d)===3?kfRows(monIso(d),map):'')+baelleRow(d); //
 const kfRows=(mon,map=kfWeekMap())=>(map[mon]||[]).map(e=>`<div class="kev"><span class="t">🎉</span><div class="m"><b>Kabinenfest: ${esc(kfWho(e)?.name||'Unbekannt')}</b>${e.kfDone?'<i>erledigt</i>':''}</div></div>`).join('');
 const calNav=(act,label,prev,next)=>`<div class="calnav" style="margin-top:12px"><button class="iconbtn round" data-act="${act}" data-d="-1" aria-label="${prev}">${I('chevL')}</button><b>${label}</b><button class="iconbtn round" data-act="${act}" data-d="1" aria-label="${next}">${I('chevR')}</button></div>`;
 const kday=(d,head,body)=>`<section class="kday${d===tdIso()?' today':''}"><header><b>${WD_LONG[wdIdx(d)]}<small>${esc(dDE(d).slice(0,6))}</small></b>${head}</header>${body}</section>`;
+// Gibt es seit der letzten Meldung der Woche etwas Neues? Fragt die Datenbank (gleiche Regel wie beim Senden) einmal je Stand der Termine.
+let _pc={src:null,mon:null,v:null};
+function planChanged(mon){if(_pc.src!==S.termine||_pc.mon!==mon){const src=S.termine;if(_pc.mon!==mon)_pc.v=null;_pc.src=src;_pc.mon=mon;
+    S.sb.rpc('wochenplan_geaendert',{mon}).then(({data,error})=>{if(_pc.src===src&&_pc.mon===mon&&_pc.v!==(error?true:!!data)){_pc.v=error?true:!!data;render()}})}
+  return _pc.v}
 function kalWoche(){
   const mon=S.kalMon||monIso(tdIso()),r=kwRange(mon),td=tdIso(),ce=canTermin(),map=kfWeekMap(),pl=S.termine.find(x=>x.id==='plan-'+mon);
   let h=calNav('kalnav',`KW ${r.kw} · ${esc(r.range)}`,'Vorherige Woche','Nächste Woche');
   for(let i=0;i<7;i++){const d=addDays(mon,i),evs=termineAt(d),kf=dayExtra(d,map);
     h+=kday(d,ce?`<button class="mini" data-act="terminNew" data-d="${d}">+ Training</button>`:'',evs.length||kf?evs.map(kEvRow).join('')+kf:`<div class="kfree">Nichts geplant</div>`)}
-  if(canPlan()&&addDays(mon,6)>=td)h+=`<div class="kwcard" style="margin-top:4px"><div><b>Wochenplan</b> <span>${pl?`Zuletzt gemeldet am ${esc(dtDE(pl.sentAt))}${pl.by?' von '+esc(pl.by):''}.`:'Trag erst alles ein und drück dann „Fertig“. Die Mannschaft bekommt eine einzige Nachricht.'}</span></div><button class="btn primary" data-act="planSend" data-mon="${mon}">${S.confirmPlan===mon?'Wirklich an alle senden?':pl?'Änderungen melden':'Fertig – Mannschaft benachrichtigen'}</button></div>`;
+  if(canPlan()&&addDays(mon,6)>=td){const off=pl?.days&&planChanged(mon)!==true; // schon gemeldet und seitdem nichts geändert: Knopf grau
+    h+=`<div class="kwcard" style="margin-top:4px"><div><b>Wochenplan</b> <span>${pl?`Zuletzt gemeldet am ${esc(dtDE(pl.sentAt))}${pl.by?' von '+esc(pl.by):''}.${pl.days?(off?' Seitdem nichts geändert.':' Gemeldet werden nur die geänderten Tage.'):''}`:'Trag erst alles ein und drück dann „Fertig“. Die Mannschaft bekommt eine einzige Nachricht.'}</span></div><button class="btn${off?'':' primary'}" data-act="planSend" data-mon="${mon}"${off?' disabled':''}>${S.confirmPlan===mon?'Wirklich an alle senden?':pl?'Änderungen melden':'Fertig – Mannschaft benachrichtigen'}</button></div>`;}
   return h+(ce?`<button class="linkbtn" style="display:block;margin:6px auto 0" data-act="usualEdit">Übliche Trainingszeiten bearbeiten</button>`:'')}
 function kalMonat(){
   const now=bToday(),cur=S.kalM||{y:now.getFullYear(),m:now.getMonth()},td=isoD(now),map=kfWeekMap(),cache={},ev=d=>cache[d]??=termineAt(d),last=new Date(cur.y,cur.m+1,0,12);
@@ -1751,9 +1757,9 @@ document.addEventListener('click',async ev=>{
       if(await rpcRun(el,'termin_treffpunkt',{doc_id:id,meet,meet_place:mp,travel})){S.termine=S.termine.map(t=>t.id===id?{...t,meet:meet||null,meetPlace:mp||null,travel:travel||null}:t);toast('Treffpunkt gespeichert. Mit „Fertig“ im Wochenplan melden.');S.still=true;renderSheet(false);render()}break}
     case 'planSend':{if(!canPlan())break;const mon=el.dataset.mon;
       if(S.confirmPlan!==mon){S.confirmPlan=mon;render();break}
-      S.confirmPlan=null;const r=await rpcRun(el,'wochenplan_senden',{mon});
-      if(r){S.termine=[...S.termine.filter(x=>x.id!=='plan-'+mon),{id:'plan-'+mon,type:'plan',mon,sentAt:new Date().toISOString(),by:pById(myPid())?.name||null}];
-        toast(r.data?'Wochenplan an die Mannschaft gesendet':'Wochenplan gespeichert, aber auf keinem Gerät sind Benachrichtigungen an')}
+      S.confirmPlan=null;const chg=!!S.termine.find(x=>x.id==='plan-'+mon)?.days,r=await rpcRun(el,'wochenplan_senden',{mon}); // schon gemeldet: nur geänderte Tage
+      if(r){S.termine=[...S.termine.filter(x=>x.id!=='plan-'+mon),{id:'plan-'+mon,type:'plan',mon,sentAt:new Date().toISOString(),by:pById(myPid())?.name||null,days:{}}];
+        toast(r.data?(chg?'Änderung an die Mannschaft gesendet':'Wochenplan an die Mannschaft gesendet'):'Wochenplan gespeichert, aber auf keinem Gerät sind Benachrichtigungen an')}
       render();break}
     case 'terminNew':case 'spielNew':if(canTermin())openSheet({type:'termin',id:null,t:act==='spielNew'?{type:'spiel',date:today(),start:'',end:'',title:'TSG Münster - ',place:'',home:true}:{type:'training',date:el.dataset.d||today(),start:'',end:'',title:'',place:''}});break;
     case 'terminView':if(terminById(id))openSheet({type:'terminView',id});break;

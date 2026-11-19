@@ -909,8 +909,10 @@ do $$ begin alter publication supabase_realtime add table public.trikotwash; exc
 -- Die Spiele der Saison stehen in supabase/seed-spiele.sql (lokal, nicht im Repo).
 create or replace function public.can_termine() returns boolean
 language sql stable security definer set search_path = public as $$ select public.has_role('trainer') or public.has_role('admin') $$;
-create table if not exists public.termine (id text primary key, data jsonb not null default '{}', updated_at timestamptz not null default now(),
-  constraint termine_form check (coalesce(length(data::text) < 1000 and ((data->>'type' in ('training','spiel','cancel') and data->>'date' ~ '^\d{4}-\d{2}-\d{2}$') or (data->>'type' = 'usual' and data->>'wd' ~ '^[0-6]$') or (data->>'type' = 'plan' and data->>'mon' ~ '^\d{4}-\d{2}-\d{2}$') or (data->>'type' = 'baelle' and data->>'date' ~ '^\d{4}-\d{2}-\d{2}$' and jsonb_typeof(data->'pids') = 'array')), false)));
+create table if not exists public.termine (id text primary key, data jsonb not null default '{}', updated_at timestamptz not null default now());
+-- Form der Termine; plan-<mon> darf größer sein (gemeldeter Stand je Tag in data.days)
+alter table public.termine drop constraint if exists termine_form;
+alter table public.termine add constraint termine_form check (coalesce(length(data::text) < case when data->>'type' = 'plan' then 4000 else 1000 end and ((data->>'type' in ('training','spiel','cancel') and data->>'date' ~ '^\d{4}-\d{2}-\d{2}$') or (data->>'type' = 'usual' and data->>'wd' ~ '^[0-6]$') or (data->>'type' = 'plan' and data->>'mon' ~ '^\d{4}-\d{2}-\d{2}$') or (data->>'type' = 'baelle' and data->>'date' ~ '^\d{4}-\d{2}-\d{2}$' and jsonb_typeof(data->'pids') = 'array')), false));
 alter table public.termine enable row level security;
 drop policy if exists termine_read on public.termine;
 create policy termine_read on public.termine for select using (public.is_member());
@@ -939,18 +941,15 @@ end $$;
 -- „Fertig“: eine einzige Benachrichtigung „Wochenplan“ an alle (statt einer pro Eintrag). Der Text wird hier aus den Terminen der Woche
 -- gebaut (kein freier Text vom Aufrufer). Merkt sich, wann sie gesendet wurde.
 drop function if exists public.wochenplan_senden(text, text);
-create or replace function public.wochenplan_senden(mon text) returns int
-language plpgsql security definer set search_path = public as $$
-declare
-  n int; nm text; d date; i int; r record; u record; wd text; t time; mt text; has_tr boolean; body text;
-  lines text[] := '{}'; today date := (now() at time zone 'Europe/Berlin')::date;
+-- Text des Wochenplans je Tag: {"2026-11-23": "19:45–22:00 Kraft + Halle · Spiel 19:30 …", …}, je Tag höchstens 300 Zeichen.
+-- Gleiche Regel wie termineAt() in app.js: übliche Zeiten zählen ab heute, solange der Tag weder ein Training noch eine Absage hat.
+create or replace function public.wochenplan_tage(mon text) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare d date; i int; r record; u record; t time; mt text; dl text[]; days jsonb := '{}'; today date := (now() at time zone 'Europe/Berlin')::date;
 begin
-  if not (public.can_termine() or public.is_mv()) then raise exception 'Keine Berechtigung'; end if;
   if mon is null or mon !~ '^\d{4}-\d{2}-\d{2}$' or extract(isodow from mon::date) <> 1 then raise exception 'Ungültige Woche'; end if;
   for i in 0..6 loop
-    d := mon::date + i;
-    wd := (array['Mo','Di','Mi','Do','Fr','Sa','So'])[i + 1] || ' ' || to_char(d, 'DD.MM');
-    has_tr := exists (select 1 from public.termine where data->>'type' in ('training', 'cancel') and data->>'date' = d::text);
+    d := mon::date + i; dl := '{}';
     for r in select data from public.termine where data->>'type' in ('training', 'spiel') and data->>'date' = d::text order by data->>'start', data->>'type' loop
       if r.data->>'type' = 'spiel' then
         mt := '';
@@ -967,22 +966,65 @@ begin
           end if;
         end if;
         if d >= today and nullif(r.data->>'travel', '') is not null then mt := mt || ' – Anreise: ' || left(regexp_replace(r.data->>'travel', '\s+', ' ', 'g'), 80); end if; -- Zeilenumbrüche würden den Wochenplan zerreißen
-        lines := lines || (wd || ': Spiel ' || coalesce(r.data->>'start', '') || ' ' || coalesce(r.data->>'title', '') || mt);
+        dl := dl || ('Spiel ' || coalesce(r.data->>'start', '') || ' ' || coalesce(r.data->>'title', '') || mt);
       else
-        lines := lines || (wd || ': ' || coalesce(r.data->>'start', '') || '–' || coalesce(r.data->>'end', '') || ' ' || coalesce(nullif(r.data->>'title', ''), 'Training'));
+        dl := dl || (coalesce(r.data->>'start', '') || '–' || coalesce(r.data->>'end', '') || ' ' || coalesce(nullif(r.data->>'title', ''), 'Training'));
       end if;
     end loop;
-    if not has_tr and d >= today then
+    if d >= today and not exists (select 1 from public.termine where data->>'type' in ('training', 'cancel') and data->>'date' = d::text) then
       for u in select data from public.termine where data->>'type' = 'usual' and data->>'wd' = i::text order by data->>'start' loop
-        lines := lines || (wd || ': ' || (u.data->>'start') || '–' || (u.data->>'end') || ' ' || coalesce(nullif(u.data->>'title', ''), 'Training'));
+        dl := dl || ((u.data->>'start') || '–' || (u.data->>'end') || ' ' || coalesce(nullif(u.data->>'title', ''), 'Training'));
       end loop;
     end if;
+    days := days || jsonb_build_object(d::text, left(array_to_string(dl, ' · '), 300));
   end loop;
-  body := left(coalesce(nullif(array_to_string(lines, E'\n'), ''), 'Diese Woche ist nichts geplant.'), 400);
+  return days;
+end $$;
+create or replace function public.wd_kurz(d date) returns text
+language sql immutable as $$ select (array['Mo','Di','Mi','Do','Fr','Sa','So'])[extract(isodow from d)::int] || ' ' || to_char(d, 'DD.MM') $$;
+-- Tage ab heute, die sich seit der letzten Meldung geändert haben (mit altem Stand). null = Woche noch nie mit Tagesstand gemeldet.
+create or replace function public.wochenplan_aenderungen(mon text, tage jsonb) returns text[]
+language plpgsql stable security definer set search_path = public as $$
+declare old jsonb; d date; cur text; prev text; chg text[] := '{}'; today date := (now() at time zone 'Europe/Berlin')::date;
+begin
+  select data->'days' into old from public.termine where id = 'plan-' || mon and data->>'type' = 'plan';
+  if old is null then return null; end if;
+  for d in select generate_series(greatest(mon::date, today), mon::date + 6, interval '1 day')::date loop
+    cur := tage->>(d::text); prev := nullif(old->>(d::text), '');
+    if coalesce(prev, '') <> cur then
+      chg := chg || (public.wd_kurz(d) || ': ' || coalesce(nullif(cur, ''), 'fällt aus') || coalesce(' (statt ' || prev || ')', ''));
+    end if;
+  end loop;
+  return chg;
+end $$;
+-- Für den Knopf im Kalender: gibt es etwas zu melden? (noch nie gemeldet = ja)
+create or replace function public.wochenplan_geaendert(mon text) returns boolean
+language plpgsql stable security definer set search_path = public as $$
+declare c text[];
+begin
+  if not (public.can_termine() or public.is_mv()) then raise exception 'Keine Berechtigung'; end if;
+  c := public.wochenplan_aenderungen(mon, public.wochenplan_tage(mon));
+  return c is null or cardinality(c) > 0;
+end $$;
+-- Erste Meldung einer Woche: kompletter Plan. Danach („Änderungen melden“) nur die geänderten Tage. Der gemeldete Stand steht in plan-<mon>.days.
+create or replace function public.wochenplan_senden(mon text) returns int
+language plpgsql security definer set search_path = public as $$
+declare n int; nm text; tage jsonb; chg text[]; body text;
+begin
+  if not (public.can_termine() or public.is_mv()) then raise exception 'Keine Berechtigung'; end if;
+  tage := public.wochenplan_tage(mon);
+  chg := public.wochenplan_aenderungen(mon, tage);
+  if cardinality(chg) = 0 then raise exception 'Seit der letzten Meldung hat sich nichts geändert'; end if;
   select data->>'name' into nm from public.players where id = public.my_pid();
-  n := public.push_send('plan', null, null, '📅 Wochenplan KW ' || to_char(mon::date, 'IW'), body, 'wochenplan');
+  if chg is null then
+    body := left(coalesce((select string_agg(public.wd_kurz(k::date) || ': ' || v, E'\n' order by k) from jsonb_each_text(tage) e(k, v) where v <> ''), 'Diese Woche ist nichts geplant.'), 400);
+    n := public.push_send('plan', null, null, '📅 Wochenplan KW ' || to_char(mon::date, 'IW'), body, 'wochenplan');
+  else
+    body := left(array_to_string(chg, E'\n'), 400);
+    n := public.push_send('plan', null, null, '📅 Änderung · KW ' || to_char(mon::date, 'IW'), body, 'wochenplan-aenderung');
+  end if;
   insert into public.termine (id, data)
-    values ('plan-' || mon, jsonb_build_object('type', 'plan', 'mon', mon, 'sentAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'by', nm))
+    values ('plan-' || mon, jsonb_build_object('type', 'plan', 'mon', mon, 'sentAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'by', nm, 'days', tage))
   on conflict (id) do update set data = excluded.data, updated_at = now();
   return n;
 end $$;
@@ -1020,8 +1062,9 @@ begin
 end $$;
 revoke execute on function public.baelle_speichern(jsonb) from public, anon;
 grant execute on function public.baelle_speichern(jsonb) to authenticated;
-revoke execute on function public.can_termine(), public.is_mv(), public.termin_treffpunkt(text, text, text, text), public.wochenplan_senden(text), public.baelle_erledigt(text) from public, anon;
-grant execute on function public.can_termine(), public.is_mv(), public.termin_treffpunkt(text, text, text, text), public.wochenplan_senden(text), public.baelle_erledigt(text) to authenticated;
+revoke execute on function public.can_termine(), public.is_mv(), public.termin_treffpunkt(text, text, text, text), public.wochenplan_senden(text), public.wochenplan_geaendert(text), public.baelle_erledigt(text) from public, anon;
+revoke execute on function public.wochenplan_tage(text), public.wochenplan_aenderungen(text, jsonb), public.wd_kurz(date) from public, anon, authenticated;
+grant execute on function public.can_termine(), public.is_mv(), public.termin_treffpunkt(text, text, text, text), public.wochenplan_senden(text), public.wochenplan_geaendert(text), public.baelle_erledigt(text) to authenticated;
 
 -- ---------- Geburtstage (Tag und Monat) ----------
 -- Für alle freigeschalteten Mitglieder sichtbar; eintragen dürfen Kassenwart und Admin.
