@@ -1212,19 +1212,21 @@ end $$;
 revoke execute on function public.bericht_tick(date, boolean) from public, anon, authenticated;
 
 -- ---------- Anzeigen: Spieler melden einen Verstoß (mit Foto), der Kassenwart trägt die Strafe ein oder lehnt ab ----------
--- data: uid, by (Spieler-ID des Anzeigenden), playerId (angezeigt), nr (gesuchte Nummer, freiwillig), fineId, title, amount, note, path (Foto im Bucket „anzeigen“), status neu|ok|nein, createdAt.
--- Sehen dürfen Kassenwart, Admin und wer die Anzeige erstellt hat. Der Angezeigte erfährt es erst über die eingetragene Strafe.
+-- data: uid, by (Spieler-ID des Anzeigenden), playerId (angezeigt), nr (gesuchte Nummer, freiwillig), fineId, title, amount, qty/unit (Menge je Person, z. B. Minuten), note, path (Foto im Bucket „anzeigen“), status neu|ok|nein, createdAt.
+-- Offene Anzeigen (mit Foto) sehen alle Mitglieder – so zeigt niemand dasselbe doppelt an. Erledigte sehen nur Kassenwart, Admin und wer sie erstattet hat.
+-- Jede Strafe aus dem Katalog ist erlaubt, auch sich selbst; mehrere Angezeigte = eine Anzeige pro Person mit demselben Foto.
 create table if not exists public.anzeigen (id text primary key, data jsonb not null default '{}', updated_at timestamptz not null default now(),
   constraint anzeigen_form check (length(data::text) < 2000 and coalesce(data->>'status', 'neu') in ('neu', 'ok', 'nein')));
 alter table public.anzeigen enable row level security;
 drop policy if exists anzeigen_read on public.anzeigen;
-create policy anzeigen_read on public.anzeigen for select using (public.can_book() or (public.is_member() and data->>'uid' = auth.uid()::text));
+create policy anzeigen_read on public.anzeigen for select using (public.can_book() or (public.is_member() and (data->>'uid' = auth.uid()::text or coalesce(data->>'status', 'neu') = 'neu')));
 drop policy if exists anzeigen_ins on public.anzeigen;
 create policy anzeigen_ins on public.anzeigen for insert with check (
   public.is_member() and data->>'uid' = auth.uid()::text and coalesce(data->>'status', 'neu') = 'neu'
   and data->>'by' is not distinct from public.my_pid() and nullif(data->>'playerId', '') is not null
   and (data->>'nr' is null or data->>'nr' ~ '^\d{1,3}$') -- gesuchte Nummer (z. B. von der Flasche), freiwillig
-  and data->>'fineId' in ('f25', 'f43', 'f44', 'f45', 'f50') -- nur: in der Halle nicht aufgeräumt, Eigentum vergessen, Flasche nicht beschriftet / nicht leer, Amt vernachlässigt
+  and (data->>'qty' is null or data->>'qty' ~ '^\d{1,3}$') and length(coalesce(data->>'unit', '')) <= 20 -- Menge je Person (z. B. Minuten)
+  and exists (select 1 from public.fines f where f.id = anzeigen.data->>'fineId') -- jede Strafe aus dem Katalog
   and (data->>'path' is null or data->>'path' like auth.uid()::text || '/%'));
 drop policy if exists anzeigen_upd on public.anzeigen;
 create policy anzeigen_upd on public.anzeigen for update using (public.can_book()) with check (public.can_book());
@@ -1236,7 +1238,8 @@ insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 values ('anzeigen', 'anzeigen', false, 5242880, array['image/jpeg','image/png','image/webp'])
 on conflict (id) do update set public = false, file_size_limit = 5242880, allowed_mime_types = excluded.allowed_mime_types;
 drop policy if exists anzeigen_foto_read on storage.objects;
-create policy anzeigen_foto_read on storage.objects for select using (bucket_id = 'anzeigen' and (public.can_book() or (storage.foldername(name))[1] = auth.uid()::text));
+create policy anzeigen_foto_read on storage.objects for select using (bucket_id = 'anzeigen' and (public.can_book() or (storage.foldername(name))[1] = auth.uid()::text
+  or (public.is_member() and exists (select 1 from public.anzeigen a where a.data->>'path' = name and coalesce(a.data->>'status', 'neu') = 'neu')))); -- Foto einer offenen Anzeige: alle
 drop policy if exists anzeigen_foto_ins on storage.objects;
 create policy anzeigen_foto_ins on storage.objects for insert with check (bucket_id = 'anzeigen' and public.is_member() and (storage.foldername(name))[1] = auth.uid()::text);
 drop policy if exists anzeigen_foto_del on storage.objects;

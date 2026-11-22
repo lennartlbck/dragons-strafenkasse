@@ -541,7 +541,7 @@ details.bank summary{cursor:pointer;font-weight:600;color:var(--brand);min-heigh
 .sheet-h .t{flex:1;min-width:0}
 .sheet-h h2{margin:0;font:700 26px/1.08 var(--f-display);text-wrap:balance}
 .sheet-h p{margin:4px 0 0;color:var(--muted);font-size:14px}
-.sheet-b{overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:18px;flex:1}
+.sheet-b{overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;padding-bottom:18px;flex:1} /* Fenster scrollen nur von oben nach unten, nicht seitlich */
 .sheet-f{flex:none;border-top:1px solid var(--line);background:var(--surface);padding-top:12px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
 .sheet-f .btn{width:100%}
 .sheet-f .split{display:flex;gap:8px}
@@ -604,6 +604,6 @@ details.bank summary{cursor:pointer;font-weight:600;color:var(--brand);min-heigh
 <script src="config.js"></script>
 <script src="vendor/supabase-2.45.4.min.js"></script>
 
-<script src="app.js?v=d9930dfc"></script>
+<script src="app.js?v=9819bfa7"></script>
 </body>
 </html>

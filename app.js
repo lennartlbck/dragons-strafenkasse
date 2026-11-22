@@ -140,7 +140,7 @@ function spots(){if(S.status==='loading')return [];const me=myPid(),meName=pById
       ...(hasRole('doenerwart')?(S.doener||[]).map(d=>d.reportedAt):[])])],
     ['m:fussball','uebersicht',latest((S.fussball||[]).map(g=>g.createdAt))],
     ['m:gb','uebersicht',gbList().withB.some(x=>x.days===0)&&at(td,'09')],
-    ['anz','erfassen',S.canWrite===true&&latest(anzOpen().map(a=>a.createdAt))], // neue Anzeige
+    ['anz','erfassen',hasRole('kassenwart')&&latest(anzOpen().map(a=>a.createdAt))], // neue Anzeige: Punkt nur für den Kassenwart
     ['vt-mitglieder','verwalten',isAdmin()&&latest((S.members||[]).filter(m=>!m.approved).map(m=>m.created_at))], // neue Anmeldung
     ['plan','kalender',latest(S.termine.filter(x=>x.type==='plan'&&x.by!==meName).map(x=>x.sentAt))], // Wochenplan
     ...S.termine.filter(x=>x.poll&&x.type==='spiel'&&pollOpen(x)).map(x=>['poll:'+x.id,'kalender',x.poll.at])] // Umfrage
@@ -376,57 +376,71 @@ function uebersicht(){
 
 /* ---------- Anzeigen ---------- */
 // Jeder kann jemanden mit Foto und vorgeschlagener Strafe anzeigen; der Kassenwart trägt die Strafe ein oder lehnt ab.
+const fotoGeteilt=a=>(S.anzeigen||[]).some(x=>x.id!==a.id&&x.path===a.path); // mehrere Angezeigte teilen sich ein Foto
 const anzOpen=()=>(S.anzeigen||[]).filter(a=>(a.status||'neu')==='neu').sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
 function anzRow(a){const p=pById(a.playerId),by=pById(a.by);
-  return `<div class="row tap" role="button" tabindex="0" data-act="anzView" data-id="${esc(a.id)}">${a.path?`<img class="rthumb" data-bucket="anzeigen" data-path="${esc(a.path)}" alt="Foto">`:avatar(p)}<div class="m"><b>${S.dots?.has('anz')&&a.createdAt>seenAt('anz')?idot('anz',1):''}${esc((a.nr?'#'+a.nr+' ':'')+(p?p.name:'Unbekannt')+': '+(a.title||''))}</b><i>${esc('von '+(by?by.name:'?')+' · '+dDE(String(a.createdAt).slice(0,10))+' · '+eur(a.amount||0))}</i></div>${I('chevR').replace('class="ico"','class="ico chev"')}</div>`}
+  return `<div class="row tap" role="button" tabindex="0" data-act="anzView" data-id="${esc(a.id)}">${a.path?`<img class="rthumb" data-bucket="anzeigen" data-path="${esc(a.path)}" alt="Foto">`:avatar(p)}<div class="m"><b>${S.dots?.has('anz')&&a.createdAt>seenAt('anz')?idot('anz',1):''}${esc((a.nr?'#'+a.nr+' ':'')+(p?p.name:'Unbekannt')+': '+(a.title||''))}</b><i>${esc('von '+(by?by.name:'?')+' · '+dDE(String(a.createdAt).slice(0,10))+' · '+(a.qty?a.qty+' '+(a.unit||'')+' · ':'')+eur(a.amount||0))}</i></div>${I('chevR').replace('class="ico"','class="ico chev"')}</div>`}
 function anzeigenBlock(){if(S.status==='loading')return '';
-  const open=anzOpen(),kw=S.canWrite===true,mine=open.filter(a=>a.uid===S.uid);
+  const open=anzOpen(); // alle sehen die offenen Anzeigen (keine doppelten), bestätigen darf nur der Kassenwart
   let h=`<button class="btn primary" style="width:100%;margin:0 0 12px" data-act="anzNew">${I('camera')}Anzeige erstatten</button>`;
-  if(kw&&open.length)h+=`<h2 class="section-h" style="margin-top:0">Offene Anzeigen · ${open.length}${idot('anz')}</h2><div class="rows" style="margin-bottom:14px">${open.map(anzRow).join('')}</div>`;
-  else if(!kw&&mine.length)h+=`<h2 class="section-h" style="margin-top:0">Deine offenen Anzeigen · ${mine.length}</h2><div class="rows" style="margin-bottom:14px">${mine.map(anzRow).join('')}</div>`;
+  if(open.length)h+=`<h2 class="section-h" style="margin-top:0">Offene Anzeigen · ${open.length}${idot('anz')}</h2><div class="rows" style="margin-bottom:14px">${open.map(anzRow).join('')}</div>`;
   return h}
-// nur diese Strafen kann man anzeigen: Flasche nicht beschriftet, Vergessen von Eigentum, Flasche nicht leer getrunken, Amt vernachlässigt, in der Halle nicht aufgeräumt
-const ANZ_FINES=['f44','f43','f45','f50','f25'];
-const anzFines=()=>S.fines.filter(f=>ANZ_FINES.includes(f.id)).sort((a,b)=>{const ia=CAT_ORDER.indexOf(a.cat),ib=CAT_ORDER.indexOf(b.cat);return (ia<0?99:ia)-(ib<0?99:ib)||(a.order??0)-(b.order??0)});
-// Anzeige in drei Schritten: Wen? (Kader mit Fotos, Suche nach Nummer) → Welche Strafe? (wie der Katalog) → Details mit Foto
-function anzNewSheet(s){const p=pById(s.pid),f=S.fines.find(x=>x.id===s.fid),step=!p?'wer':!f?'was':'details';
-  const who=p?`<div class="row" style="margin-bottom:10px">${avatar(p)}<div class="m"><b>${esc(p.name)}</b><i>${p.number!=null?'#'+p.number:''}</i></div><button class="chipbtn" data-act="anzStep" data-k="wer">ändern</button></div>`:'';
+// anzeigen kann man jede Strafe aus dem Katalog (sortiert wie der Katalog)
+const anzFines=()=>[...S.fines].sort((a,b)=>{const ia=CAT_ORDER.indexOf(a.cat),ib=CAT_ORDER.indexOf(b.cat);return (ia<0?99:ia)-(ib<0?99:ib)||(a.order??0)-(b.order??0)});
+// Strafen mit Preis pro Einheit (z. B. Minuten Verspätung): die Menge je angezeigter Person eingeben
+const anzQty0=f=>f.base?0:1;
+const anzAmt=(f,n)=>Math.round(((f.base||0)+(f.per||0)*n)*100)/100;
+function anzQtyRows(s,f,ps){const u=f.unit||'Stück';
+  return `<h3 class="section-h">${esc(u)} pro Person</h3><div class="rows" style="margin-bottom:12px">`+ps.map(p=>{const n=s.counts?.[p.id]??anzQty0(f);
+    return `<div class="row dq">${avatar(p)}<div class="m"><b>${esc(p.name)}</b><i class="anzsum" data-pid="${esc(p.id)}">${eur(anzAmt(f,n))}</i></div><div class="stepper"><button data-act="anzqty" data-pid="${esc(p.id)}" data-d="-1" aria-label="Weniger ${esc(u)} für ${esc(p.name)}">${I('minus')}</button><input class="dqin anzqin" inputmode="numeric" data-pid="${esc(p.id)}" value="${n}" aria-label="${esc(u)} von ${esc(p.name)}"><button data-act="anzqty" data-pid="${esc(p.id)}" data-d="1" aria-label="Mehr ${esc(u)} für ${esc(p.name)}">${I('plus')}</button></div></div>`}).join('')+`</div>`}
+function anzQtySet(pid,n){const s=S.sheet,f=S.fines.find(x=>x.id===s.fid);if(!f)return;(s.counts??={})[pid]=n;
+  const inp=document.querySelector(`.anzqin[data-pid="${CSS.escape(pid)}"]`);if(inp&&document.activeElement!==inp)inp.value=n;
+  const sum=document.querySelector(`.anzsum[data-pid="${CSS.escape(pid)}"]`);if(sum)sum.textContent=eur(anzAmt(f,n))}
+// Anzeige in drei Schritten: Wen? (ein oder mehrere Spieler, auch man selbst; Suche nach Nummer) → Welche Strafe? (ganzer Katalog) → Details mit Foto
+function anzNewSheet(s){const ps=(s.pids||[]).map(pById).filter(Boolean),f=S.fines.find(x=>x.id===s.fid),step=!s.wer||!ps.length?'wer':!f?'was':'details',me=myPid();
+  const who=ps.length?`<div class="row" style="margin-bottom:10px">${avatar(ps[0])}<div class="m"><b class="wrapb">${esc(ps.map(p=>p.id===me?p.name+' (du)':p.name).join(', '))}</b><i>${ps.length>1?ps.length+' Personen':ps[0].number!=null?'#'+ps[0].number:''}</i></div><button class="chipbtn" data-act="anzStep" data-k="wer">ändern</button></div>`:'';
   const foto=`<label class="btn filebtn" for="anfile">${I('camera')}${s.blob?'Anderes Foto wählen':'Foto aufnehmen oder auswählen'}</label><input id="anfile" type="file" accept="image/*" hidden>${s.preview?`<img class="rbig" src="${esc(s.preview)}" alt="Vorschau" ${step==='wer'?'style="max-height:160px;object-fit:cover"':''}>`:''}`;
-  if(step==='wer')return{head:`<h2>Anzeige erstatten</h2><p>Foto hinzufügen und antippen, wen du anzeigst</p>`,
+  if(step==='wer'){const sel=new Set(s.pids||[]);
+    return{head:`<h2>Anzeige erstatten</h2><p>Foto hinzufügen und antippen, wen du anzeigst – auch mehrere oder dich selbst</p>`,
     body:`<div class="fields" style="margin-bottom:14px">${foto}</div>
       <label class="search" style="margin:0 0 12px">${I('search')}<input id="annr" type="search" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="Nummer suchen (z. B. von der Flasche)" aria-label="Nummer suchen"></label>
-      <div style="min-height:100dvh"><div class="grid" id="anzgrid">${sortedPlayers(false).filter(x=>x.id!==myPid()).map(x=>`<button class="pick" data-act="anzPick" data-id="${esc(x.id)}" data-no="${x.number??''}">${x.number!=null?`<span class="no">${x.number}</span>`:''}${avatar(x)}<b>${esc(x.name.split(' ')[0])}</b><small>${esc(x.name.split(' ').slice(1).join(' '))}</small></button>`).join('')}</div>
-      <div class="empty" id="anznone" hidden>Niemand mit dieser Nummer.</div></div>`,foot:''};
+      <div style="min-height:100dvh"><div class="grid" id="anzgrid">${sortedPlayers(false).map(x=>`<button class="pick" data-act="anzPick" data-id="${esc(x.id)}" data-no="${x.number??''}" aria-pressed="${sel.has(x.id)}">${x.number!=null?`<span class="no">${x.number}</span>`:''}${avatar(x)}<b>${esc(x.name.split(' ')[0])}</b><small>${esc(x.id===me?'du':x.name.split(' ').slice(1).join(' '))}</small></button>`).join('')}</div>
+      <div class="empty" id="anznone" hidden>Niemand mit dieser Nummer.</div></div>`,
+    foot:`<button class="btn primary" data-act="anzWeiter" ${sel.size?'':'disabled'}>${sel.size?`Weiter mit ${sel.size} ${sel.size===1?'Person':'Personen'}`:'Person(en) antippen'}</button>`}}
   if(step==='was'){const fs=anzFines(),groups={};for(const x of fs)(groups[x.cat||'Sonstiges']??=[]).push(x);
     return{head:`<h2>Anzeige erstatten</h2><p>Welche Strafe?</p>`,
-      body:who+`<div id="anzfines">`
-        +Object.entries(groups).map(([c,l])=>`<h2 class="section-h">${esc(c)}</h2><div class="fines">${l.map(x=>`<button class="fine" data-act="anzFine" data-id="${esc(x.id)}"><span class="t"><b>${esc(x.title)}</b>${x.hint?`<i>${esc(x.hint)}</i>`:''}</span><span class="price">${esc(priceLabel(x))}</span>${I('chevR').replace('class="ico"','class="ico chev"')}</button>`).join('')}</div>`).join('')+`</div>`,foot:''}}
+      body:who+`<label class="search" style="margin:0 0 12px">${I('search')}<input id="anq" type="search" autocomplete="off" placeholder="Strafe suchen" aria-label="Strafe suchen"></label><div id="anzfines">`
+        +Object.entries(groups).map(([c,l])=>`<div class="anzg"><h2 class="section-h">${esc(c)}</h2><div class="fines">${l.map(x=>`<button class="fine" data-act="anzFine" data-id="${esc(x.id)}" data-q="${esc((x.title+' '+(x.hint||'')+' '+c).toLowerCase())}"><span class="t"><b>${esc(x.title)}</b>${x.hint?`<i>${esc(x.hint)}</i>`:''}</span><span class="price">${esc(priceLabel(x))}</span>${I('chevR').replace('class="ico"','class="ico chev"')}</button>`).join('')}</div></div>`).join('')+`</div>`,foot:''}}
   return{head:`<h2>Anzeige erstatten</h2><p>Was ist passiert?</p>`,
     body:who+`<div class="row" style="margin-bottom:12px"><div class="m"><b>${esc(f.title)}</b><i>${esc(priceLabel(f))}</i></div><button class="chipbtn" data-act="anzStep" data-k="was">ändern</button></div>
+      ${f.per?anzQtyRows(s,f,ps):''}
       <div class="fields"><div class="field"><label for="ann">Beschreibung (optional)</label><input id="ann" maxlength="200" value="${esc(s.note||'')}" placeholder="z. B. Matte nach dem Training liegen gelassen"></div>
       ${foto}</div>`,
-    foot:`<button class="btn primary" id="ansave" data-act="anzSave">Anzeige abschicken</button>`}}
+    foot:`<button class="btn primary" id="ansave" data-act="anzSave">${ps.length>1?`${ps.length} Anzeigen abschicken`:'Anzeige abschicken'}</button>`}}
 function anzViewSheet(s){const a=(S.anzeigen||[]).find(x=>x.id===s.id);if(!a)return{head:'<h2>Anzeige</h2>',body:'<div class="empty">Diese Anzeige gibt es nicht mehr.</div>',foot:''};
   const p=pById(a.playerId),by=pById(a.by),kw=S.canWrite===true,open=(a.status||'neu')==='neu';
   return{head:`<h2>${esc((p?p.name:'Unbekannt')+': '+(a.title||''))}</h2><p>${esc('Angezeigt von '+(by?by.name:'?')+' am '+dDE(String(a.createdAt).slice(0,10)))}</p>`,
-    body:(a.nr?`<div class="row" style="margin-bottom:12px"><div class="m"><b>Gesuchte Nummer</b></div><div class="r"><strong class="num" style="font-size:22px">#${esc(a.nr)}</strong></div></div>`:'')+(a.path?`<img class="rbig" data-bucket="anzeigen" data-path="${esc(a.path)}" alt="Foto zur Anzeige">`:'<p class="note">Kein Foto.</p>')+(a.note?`<p style="margin:12px 4px 0">${esc(a.note)}</p>`:'')
+    body:(a.qty?`<div class="row" style="margin-bottom:12px"><div class="m"><b>${esc(a.unit||'Menge')}</b></div><div class="r"><strong class="num" style="font-size:22px">${esc(a.qty)}</strong></div></div>`:'')+(a.nr?`<div class="row" style="margin-bottom:12px"><div class="m"><b>Gesuchte Nummer</b></div><div class="r"><strong class="num" style="font-size:22px">#${esc(a.nr)}</strong></div></div>`:'')+(a.path?`<img class="rbig" data-bucket="anzeigen" data-path="${esc(a.path)}" alt="Foto zur Anzeige">`:'<p class="note">Kein Foto.</p>')+(a.note?`<p style="margin:12px 4px 0">${esc(a.note)}</p>`:'')
       +(kw&&open?`<div class="field" style="margin-top:14px"><label for="ana">Betrag (€)</label><input id="ana" inputmode="decimal" value="${esc(String(a.amount||0).replace('.',','))}"></div>`:`<p class="note" style="margin-top:12px">${open?'Wartet auf den Kassenwart.':a.status==='ok'?'Strafe eingetragen.':'Abgelehnt.'}</p>`),
     foot:kw&&open?`<div class="split"><button class="btn danger" data-act="anzNo" data-id="${esc(a.id)}">${S.confirmDel==='an'+a.id?'Wirklich ablehnen?':'Ablehnen'}</button><button class="btn primary" id="anok" data-act="anzOk" data-id="${esc(a.id)}">Strafe eintragen</button></div>`
       :(open&&a.uid===S.uid?`<button class="btn danger" data-act="anzDel" data-id="${esc(a.id)}">${S.confirmDel==='ad'+a.id?'Wirklich zurückziehen?':'Anzeige zurückziehen'}</button>`:'')}}
-async function anzSave(el){const s=S.sheet,pid=s.pid,f=S.fines.find(x=>x.id===s.fid);
-  if(!pid){toast('Bitte antippen, wen du anzeigst');return}if(!f){toast('Bitte eine Strafe auswählen');return}
+async function anzSave(el){const s=S.sheet,pids=(s.pids||[]).filter(pById),f=S.fines.find(x=>x.id===s.fid);
+  if(!pids.length){toast('Bitte antippen, wen du anzeigst');return}if(!f){toast('Bitte eine Strafe auswählen');return}
+  if(f.per&&!f.base){const z=pids.find(p=>!((s.counts?.[p]??anzQty0(f))>0));if(z){toast(`Bitte ${f.unit||'Stück'} für ${pById(z)?.name.split(' ')[0]||'alle'} eingeben`);return}}
   el.disabled=true;let path=null;
   try{
     if(s.blob){path=`${S.uid}/${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}.${({'image/png':'png','image/webp':'webp'})[s.blob.type]||'jpg'}`;
       const up=await S.sb.storage.from('anzeigen').upload(path,s.blob,{contentType:s.blob.type||'image/jpeg'});if(up.error)throw up.error}
-    try{await S.db.doc('anzeigen/a'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)).set({uid:S.uid,by:myPid(),playerId:pid,nr:s.nr||null,fineId:f.id,title:f.title,amount:f.base||f.per||0,note:$('#ann').value.trim()||null,path,status:'neu',createdAt:new Date().toISOString()})}
-    catch(e){if(path)try{await S.sb.storage.from('anzeigen').remove([path])}catch(_){}throw e}
-    closeSheet();toast('Anzeige abgeschickt – der Kassenwart prüft sie');
+    const base={uid:S.uid,by:myPid(),nr:s.nr||null,fineId:f.id,title:f.title,note:$('#ann').value.trim()||null,path,status:'neu',createdAt:new Date().toISOString()};let n=0;
+    try{for(const pid of pids){const q=f.per?(s.counts?.[pid]??anzQty0(f)):null; // Menge (z. B. Minuten) je Person
+      await S.db.doc('anzeigen/a'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)).set({...base,playerId:pid,amount:f.per?anzAmt(f,q):(f.base||0),...(f.per?{qty:q,unit:f.unit||'Stück'}:{})});n++}} // eine Anzeige pro Person, gemeinsames Foto
+    catch(e){if(path&&!n)try{await S.sb.storage.from('anzeigen').remove([path])}catch(_){}if(!n)throw e;toast(`Nur ${n} von ${pids.length} Anzeigen gespeichert: ${errMsg(e)}`);closeSheet();render();return}
+    closeSheet();render();toast(n>1?`${n} Anzeigen abgeschickt – der Kassenwart prüft sie`:'Anzeige abgeschickt – der Kassenwart prüft sie'); // neu zeichnen: die Liste kam eventuell, als das Fenster noch offen war
   }catch(e){el.disabled=false;toast(errMsg(e))}}
 // Kassenwart: Strafe aus der Anzeige eintragen (wie beim normalen Eintragen) und die Anzeige als erledigt markieren
 async function anzOk(el,a){const f=S.fines.find(x=>x.id===a.fineId)||{},amount=Math.round(num($('#ana').value)*100)/100,by=pById(a.by),now=new Date().toISOString(),eid='anz-'+a.id;
   if(!(amount>=0)){toast('Bitte einen Betrag eingeben');return}el.disabled=true;
-  try{await S.db.doc('entries/'+eid).set({playerId:a.playerId,fineId:a.fineId||null,title:a.title,amount,qty:null,unit:null,col:f.col||COL_BY_FINE[a.fineId]||'strafen',spieltag:false,kabinenfest:!!f.kabinenfest,kfDone:false,
+  try{await S.db.doc('entries/'+eid).set({playerId:a.playerId,fineId:a.fineId||null,title:a.title,amount,qty:a.qty??null,unit:a.qty?a.unit||null:null,col:f.col||COL_BY_FINE[a.fineId]||'strafen',spieltag:false,kabinenfest:!!f.kabinenfest,kfDone:false,
       note:'Anzeige von '+(by?by.name:'?')+(a.nr?' (Nummer '+a.nr+')':'')+(a.note?': '+a.note:''),date:String(a.createdAt).slice(0,10),createdAt:now,createdBy:S.uid||null,paid:false,paidAt:null,anzeige:a.id});
     await S.db.doc('anzeigen/'+a.id).update({status:'ok',entryId:eid,doneAt:now});closeSheet();toast('Strafe eingetragen')}
   catch(e){el.disabled=false;toast(errMsg(e))}}
@@ -892,7 +906,7 @@ function pushGo(x){const me=myPid(),a=(act,k,v)=>`data-act="${act}"${k?` data-${
     case 'doener':return a('openDoener');case 'fussball':return a('openFussball');case 'geburtstag':return a('openGb');case 'bericht':return a('openBerichte');
     case 'meldung':return isKW()?a('openConfirm'):'';
     case 'umfrage':{const id=String(x.tag||'').replace(/^umfrage-/,'');return terminById(id)?a('terminView','id',id):a('pushTab','k','kalender')}
-    case 'plan':return a('pushTab','k','kalender');case 'anzeige':return a('pushTab','k','erfassen');
+    case 'plan':return a('pushTab','k','kalender');case 'anzeige':return hasRole('kassenwart')?a('pushTab','k','erfassen'):'';
     case 'anmeldung':return isAdmin()?a('pushTab','k','verwalten'):'';
   }return ''}
 function pushLogBody(){const L=S.pushLog;if(!L)return skel();if(L==='fehler')return `<div class="hint">Der Verlauf konnte gerade nicht geladen werden. Prüfe die Verbindung und öffne das Fenster noch einmal.</div>`;if(!L.length)return `<div class="empty">Noch keine Benachrichtigungen in den letzten 30 Tagen.</div>`;
@@ -903,7 +917,7 @@ function pushLogBody(){const L=S.pushLog;if(!L)return skel();if(L==='fehler')ret
   return h+'</div><p class="note" style="margin:10px 4px 0">Hier steht alles, was an dich ging – auch wenn Benachrichtigungen auf diesem Gerät aus sind. Nach 30 Tagen wird es gelöscht.</p>'}
 function pushSheet(){const st=S.push||{},head=`<h2>Benachrichtigungen</h2>${pushSeg()}`;let body='',foot='';
   if((S.pushView||'verlauf')==='verlauf')return{head,body:pushLogBody(),foot:''};
-  const kinds=PUSH_KINDS.filter(k=>k[0]==='anmeldung'?isAdmin():(k[0]!=='meldung'&&k[0]!=='anzeige')||isKW());
+  const kinds=PUSH_KINDS.filter(k=>k[0]==='anmeldung'?isAdmin():k[0]==='anzeige'?hasRole('kassenwart'):k[0]!=='meldung'||isKW());
   const list=`<div class="rows">`+kinds.map(([k,t,d])=>`<div class="row"><div class="m"><b>${t}</b><i class="wrap">${d}</i></div></div>`).join('')+`</div>`;
   if(!pushSupported())body=isIOS()&&!isStandalone()
     ?`<div class="hint">Auf dem iPhone gehen Benachrichtigungen nur, wenn die Kasse auf dem <b>Home-Bildschirm</b> liegt:<br>In Safari unten auf <b>Teilen</b> tippen → <b>„Zum Home-Bildschirm“</b>. Danach die Kasse über das neue Icon öffnen und hier einschalten. Dafür braucht es iOS 16.4 oder neuer.</div>`
@@ -1210,7 +1224,7 @@ function openSheet(s){if(S.fromPush){S.fromPush=false;if(s.type!=='push'&&!s.bac
 const SHEET_PARENT={wuerfelAdd:'wuerfel',fbEdit:'fussball',fbRound:'fussball',fbGame:'fussball',trikotEdit:'trikot',gbEdit:'gb',gbPick:'gb'};
 const fbFrom=()=>S.sheet&&S.sheet.type==='fbRound'?{type:'fbRound',no:S.sheet.no}:null; // Herkunft merken, damit „zurück“ in die Runde führt
 function stepBack(){const s=S.sheet;if(!s)return;
-  if(s.type==='anzNew'&&(s.pid||s.fid)){s.note=$('#ann')?.value??s.note;if(s.fid)s.fid=null;else s.pid=null;S.still=true;renderSheet(false);return} // Details → Strafe → Person → schließen
+  if(s.type==='anzNew'&&(s.wer||s.fid)){s.note=$('#ann')?.value??s.note;if(s.fid)s.fid=null;else s.wer=false;S.still=true;renderSheet(false);return} // Details → Strafe → Personen (Auswahl bleibt) → schließen
   if(s.back){S.still=true;openSheet(s.back);return} // z. B. Torschützen → Spiel, Spiel → Runde
   const par=SHEET_PARENT[s.type];if(par){S.still=true;openSheet({type:par});return}
   closeSheet()}
@@ -1670,15 +1684,18 @@ document.addEventListener('click',async ev=>{
     case 'anzNew':openSheet({type:'anzNew'});break;
     case 'anzView':openSheet({type:'anzView',id});break;
     case 'anzSave':anzSave(el);break;
-    case 'anzPick':S.sheet.pid=id;S.sheet.nr=$('#annr')?.value.trim()||null;S.still=true;renderSheet(false);break;
-    case 'anzFine':S.sheet.fid=id;S.still=true;renderSheet(false);break;
-    case 'anzStep':{const s=S.sheet;s.note=$('#ann')?.value??s.note;if(el.dataset.k==='wer'){s.pid=null;s.fid=null}else s.fid=null;S.still=true;renderSheet(false);break}
+    case 'anzPick':{const s=S.sheet,l=s.pids||(s.pids=[]),i=l.indexOf(id);if(i<0)l.push(id);else l.splice(i,1);s.nr=$('#annr')?.value.trim()||s.nr||null; // antippen = auswählen / abwählen
+      el.setAttribute('aria-pressed',i<0);const w=document.querySelector('[data-act="anzWeiter"]');if(w){w.disabled=!l.length;w.textContent=l.length?`Weiter mit ${l.length} ${l.length===1?'Person':'Personen'}`:'Person(en) antippen'}break}
+    case 'anzWeiter':if(S.sheet.pids?.length){S.sheet.wer=true;S.still=true;renderSheet(false)}break;
+    case 'anzFine':S.sheet.fid=id;S.sheet.counts={};S.still=true;renderSheet(false);break;
+    case 'anzqty':{const s=S.sheet,f=S.fines.find(x=>x.id===s.fid),pid=el.dataset.pid;if(f)anzQtySet(pid,Math.max(0,Math.min(999,(s.counts?.[pid]??anzQty0(f))+Number(el.dataset.d))));break}
+    case 'anzStep':{const s=S.sheet;s.note=$('#ann')?.value??s.note;if(el.dataset.k==='wer'){s.wer=false;s.fid=null}else s.fid=null;S.still=true;renderSheet(false);break}
     case 'anzOk':{const a=(S.anzeigen||[]).find(x=>x.id===id);if(a&&S.canWrite)anzOk(el,a);break}
     case 'anzNo':if(S.confirmDel!=='an'+id){S.confirmDel='an'+id;S.still=true;renderSheet(false);break}S.confirmDel=null;try{const a=(S.anzeigen||[]).find(x=>x.id===id);await S.db.doc('anzeigen/'+id).update({status:'nein',doneAt:new Date().toISOString(),path:null});
-      if(a&&a.path)try{await S.sb.storage.from('anzeigen').remove([a.path])}catch(_){} // abgelehnt: Foto nicht aufbewahren
+      if(a&&a.path&&!fotoGeteilt(a))try{await S.sb.storage.from('anzeigen').remove([a.path])}catch(_){} // abgelehnt: Foto nicht aufbewahren (außer andere Anzeigen brauchen es)
       closeSheet();toast('Anzeige abgelehnt')}catch(e){toast(errMsg(e))}break;
     case 'anzDel':{const a=(S.anzeigen||[]).find(x=>x.id===id);if(!a)break;if(S.confirmDel!=='ad'+id){S.confirmDel='ad'+id;S.still=true;renderSheet(false);break}S.confirmDel=null;
-      try{await S.db.doc('anzeigen/'+id).delete();if(a.path)try{await S.sb.storage.from('anzeigen').remove([a.path])}catch(_){}closeSheet();toast('Anzeige zurückgezogen')}catch(e){toast(errMsg(e))}break}
+      try{await S.db.doc('anzeigen/'+id).delete();if(a.path&&!fotoGeteilt(a))try{await S.sb.storage.from('anzeigen').remove([a.path])}catch(_){}closeSheet();toast('Anzeige zurückgezogen')}catch(e){toast(errMsg(e))}break}
     case 'openWuerfel':S.still=true;openSheet({type:'wuerfel'});break;
     case 'wfNew':if(S.canWrite)openSheet({type:'wuerfelAdd',sel:new Set(),name:''});break;
     case 'wfPick':{const s=S.sheet;s.name=$('#wfn')?.value||'';s.sel.has(id)?s.sel.delete(id):s.sel.add(id);S.still=true;renderSheet(false);break}
@@ -1898,6 +1915,8 @@ document.addEventListener('click',async ev=>{
 document.addEventListener('input',ev=>{
   const t=ev.target,s=S.sheet;
   if(t.id==='q'){S.q=t.value;$('#finelist').innerHTML=fineList();return}
+  if(t.id==='anq'){const v=t.value.trim().toLowerCase();document.querySelectorAll('#anzfines .anzg').forEach(g=>{let n=0;g.querySelectorAll('.fine').forEach(b=>{const show=!v||b.dataset.q.includes(v);b.hidden=!show;n+=show});g.hidden=!n});return}
+  if(t.classList&&t.classList.contains('anzqin')&&s&&s.type==='anzNew'){anzQtySet(t.dataset.pid,Math.max(0,Math.min(999,parseInt(t.value)||0)));return}
   if(t.id==='annr'){const v=t.value.replace(/\D/g,'');if(v!==t.value)t.value=v;let n=0;
     document.querySelectorAll('#anzgrid .pick').forEach(b=>{const show=!v||b.dataset.no===v;b.hidden=!show;n+=show});$('#anznone').hidden=n>0;return}
   if(t.id==='rpm'){S.rpm=t.value;return}
