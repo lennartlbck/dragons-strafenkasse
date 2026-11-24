@@ -264,10 +264,11 @@ exception when duplicate_object then null;
 end $$;
 
 -- ---------- Guthaben mit Strafen verrechnen ----------
--- Guthaben einer Person = ausgelegte Rechnungen/Gutschriften (bills.paidBy), noch nicht erstattet,
+-- Guthaben einer Person = ausgelegte Rechnungen/Gutschriften (bills.paidBy), noch nicht ausbezahlt (refunded),
 -- minus der Teil, der schon verrechnet wurde (bills.credited).
--- Verrechnet wird NUR beim Start eines Zahltags (apply_credit_all) und wenn der Kassenwart eine Zahlung bucht
--- (pay_entries). Dann gelten offene Einträge, die das Guthaben KOMPLETT abdeckt, als bezahlt (älteste zuerst).
+-- Verrechnet wird SOFORT (credit_auto): sobald eine Rechnung/Gutschrift mit „Bezahlt von“ gespeichert oder ein neuer
+-- offener Eintrag angelegt wird. Dann gelten offene Einträge, die das Guthaben KOMPLETT abdeckt, als bezahlt (älteste zuerst).
+-- Den Rest verrechnet pay_entries, wenn der Kassenwart eine Zahlung bucht; payout_credit setzt ausbezahltes Guthaben auf 0.
 -- Jeder Eintrag merkt sich in creditUsed, wie viel Guthaben er verbraucht hat; wird er wieder geöffnet oder
 -- gelöscht, bucht ein Trigger das Guthaben zurück. app.credit_busy verhindert, dass der Trigger beim Buchen anspringt.
 
@@ -379,9 +380,10 @@ begin
       prev := coalesce(current_setting('app.credit_busy', true), '');
       perform set_config('app.credit_busy', '1', true);
       perform public.give_back_credit(old.data->>'playerId', (old.data->>'creditUsed')::numeric);
-      if tg_op = 'UPDATE' then
-        update public.entries set data = data - 'creditUsed', updated_at = now() where id = new.id;
+      if tg_op = 'UPDATE' then -- bewusst wieder geöffnet: nicht gleich wieder automatisch verrechnen
+        update public.entries set data = (data - 'creditUsed') || '{"noAuto":true}', updated_at = now() where id = new.id;
       end if;
+      perform public.apply_credit(old.data->>'playerId'); -- zurückgebuchtes Guthaben gleich auf andere offene Einträge
       perform set_config('app.credit_busy', prev, true);
     end if;
   end if;
@@ -436,10 +438,53 @@ begin
   return jsonb_build_object('n', n, 'used', used);
 end $$;
 
+-- sofort verrechnen: neue/geänderte Rechnung mit „Bezahlt von“ oder neuer offener Eintrag
+create or replace function public.credit_auto() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if coalesce(current_setting('app.credit_busy', true), '') = '1' then return null; end if;
+  if tg_table_name = 'bills' then
+    if nullif(new.data->>'paidBy', '') is not null and coalesce(new.data->>'kind', '') <> 'einzahlung'
+       and not coalesce((new.data->>'refunded')::boolean, false) then
+      perform public.apply_credit(new.data->>'paidBy');
+    end if;
+  elsif not coalesce((new.data->>'paid')::boolean, false) then
+    perform public.apply_credit(new.data->>'playerId');
+  end if;
+  return null;
+end $$;
+drop trigger if exists bills_credit_auto on public.bills;
+create trigger bills_credit_auto after insert or update on public.bills for each row execute function public.credit_auto();
+drop trigger if exists entries_credit_auto on public.entries;
+create trigger entries_credit_auto after insert on public.entries for each row execute function public.credit_auto();
+
+-- „Ausbezahlt“: der Kassenwart hat das restliche Guthaben überwiesen → Guthaben auf 0 (Rechnungen gelten als erstattet).
+-- Gibt den ausbezahlten Betrag zurück. Nur Kassenwart und Admin.
+create or replace function public.payout_credit(pid text) returns numeric
+language plpgsql security definer set search_path = public as $$
+declare amt numeric; prev text;
+begin
+  if not coalesce(public.can_book(), false) then raise exception 'Nur Kassenwart und Admin'; end if;
+  perform pg_advisory_xact_lock(hashtext('credit:' || pid));
+  perform public.apply_credit(pid); -- erst offene Strafen verrechnen, nur der Rest wird ausbezahlt
+  amt := round(public.credit_left(pid), 2);
+  if amt <= 0 then return 0; end if;
+  prev := coalesce(current_setting('app.credit_busy', true), '');
+  perform set_config('app.credit_busy', '1', true);
+  update public.bills
+     set data = data || jsonb_build_object('refunded', true, 'refundedAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
+         updated_at = now()
+   where data->>'paidBy' = pid and coalesce(data->>'kind','') <> 'einzahlung'
+     and not coalesce((data->>'refunded')::boolean, false)
+     and coalesce((data->>'amount')::numeric,0) - coalesce((data->>'credited')::numeric,0) > 0;
+  perform set_config('app.credit_busy', prev, true);
+  return amt;
+end $$;
+
 revoke execute on function public.credit_left(text), public.consume_credit(text, numeric), public.give_back_credit(text, numeric),
-  public.apply_credit(text), public.credit_trigger() from public, anon, authenticated;
-grant execute on function public.pay_entries(text, text[], text), public.apply_credit_all() to authenticated;
-revoke execute on function public.pay_entries(text, text[], text), public.apply_credit_all() from public, anon;
+  public.apply_credit(text), public.credit_trigger(), public.credit_auto() from public, anon, authenticated;
+grant execute on function public.pay_entries(text, text[], text), public.apply_credit_all(), public.payout_credit(text) to authenticated;
+revoke execute on function public.pay_entries(text, text[], text), public.apply_credit_all(), public.payout_credit(text) from public, anon;
 
 -- ---------- Rechnungen mit verrechnetem Guthaben schützen ----------
 -- Mit einer Rechnung wurden schon Strafen bezahlt (bills.credited > 0): sie darf weder gelöscht noch auf eine andere

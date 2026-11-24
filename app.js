@@ -65,7 +65,7 @@ const credLeft=b=>r2((b.amount||0)-(b.credited||0));
 let _cm={src:null,m:{}};
 function credMap(){if(_cm.src!==S.bills){const m={};for(const b of S.bills){if(b.kind==='einzahlung'||!b.paidBy||b.refunded)continue;const l=credLeft(b);if(l>0)m[b.paidBy]=(m[b.paidBy]||0)+l}_cm={src:S.bills,m}}return _cm.m}
 // Bezahlt Einträge über die Datenbank und verrechnet dabei vorhandenes Guthaben (auch Teilbeträge).
-// Automatisch verrechnet wird sonst nur beim Start des Zahltags (apply_credit_all in schema.sql).
+// Sonst verrechnet die Datenbank sofort, wenn eine Rechnung oder ein Eintrag dazukommt (credit_auto in schema.sql).
 async function payEntries(pid,ids,via){if(!ids.length)return{n:0,used:0};
   const {data,error}=await S.sb.rpc('pay_entries',{pid,ids,via});if(error)throw error;
   try{await S.db.refresh('entries','bills')}catch(e){}
@@ -321,7 +321,7 @@ function kwCard(){
   const open=zOpen(),ready=!!(S.settings.paypal||S.settings.iban),zl=zAll();
   return `<div class="kwcard"><div><b>Kassenwart</b> <span>${open?`Zahltag läuft bis ${esc(dtDE(zt().endsAt))}.`:'Starte den Zahltag – er schließt sich nach genau 7 Tagen von selbst.'}</span></div>
     ${open?`<button class="btn danger" data-act="endZahltag">${S.confirmEnd?'Wirklich beenden? (ohne Strafen)':'Zahltag vorzeitig beenden'}</button>`
-    :`<button class="btn primary" data-act="startZahltag" ${ready&&S.canWrite!==false?'':'disabled'}>Zahltag starten (7 Tage)</button>`}
+    :`<button class="btn primary" data-act="startZahltag" ${ready&&S.canWrite===true?'':'disabled'}>Zahltag starten (7 Tage)</button>`}
     ${zl.length?`<button class="btn block" data-act="openZR" data-id="${esc(zl[0].runId||zl[0].id)}">${open?'Zwischenstand ansehen':'Rückblick auf den letzten Zahltag'}</button>`:''}</div>`;
 }
 function meLine(){
@@ -500,7 +500,7 @@ async function saveEntry(){
 }
 function rechnungen(){
   if(S.status==='loading')return skel();
-  let h=(S.canWrite!==false?`<div class="toolbar" style="margin-top:0"><button class="btn primary" data-act="editBill" data-k="ausgabe">${I('plus')}Rechnung</button><button class="btn" data-act="editBill" data-k="einzahlung">${I('plus')}Einzahlung</button></div>`:'')+receiptsBlock();
+  let h=(S.canWrite===true?`<div class="toolbar" style="margin-top:0"><button class="btn primary" data-act="editBill" data-k="ausgabe">${I('plus')}Rechnung</button><button class="btn" data-act="editBill" data-k="einzahlung">${I('plus')}Einzahlung</button></div>`:'')+receiptsBlock();
   if(!S.bills.length)return h+`<div class="empty">Noch keine Rechnungen. Trag hier Ausgaben fürs Team ein – z. B. Bier, Duschdas oder Kerb-Tickets. Wer ausgelegt hat, bekommt den Betrag als Gutschrift; auf Wunsch wird die Rechnung als Sonderausgabe auf Spieler umgelegt.</div>`;
   const list=[...S.bills].sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.createdAt).localeCompare(String(a.createdAt)));
   let cur='';
@@ -510,8 +510,8 @@ function rechnungen(){
       h+=`<button class="section-h mhead" data-act="bmon" data-m="${esc(mo)}" aria-expanded="${!closed}"><span>${esc(monthName(mo))} · ${eur(sum)} Ausgaben${closed?` · ${n} ${n===1?'Eintrag':'Einträge'}`:''}</span>${I('chevR').replace('class="ico"','class="ico chev"')}</button><div class="rows" ${closed?'hidden':''}>`}
     const p=b.paidBy?pById(b.paidBy):null;const ein=b.kind==='einzahlung';
     const gs=b.kind==='gutschrift';const meta=[dDE(b.date)];if(gs)meta.push('Gutschrift für '+(p?p.name:'?'));else if(!ein)meta.push(p?'ausgelegt von '+p.name:'aus der Kasse');if(b.splitIds?.length)meta.push('umgelegt auf '+b.splitIds.length+' × '+eur(b.perPerson));if(b.note)meta.push(b.note);
-    const canW=S.canWrite!==false;
-    const tags=(ein?'<span class="tag ok">Sondereinzahlung</span>':gs?'<span class="tag">nur Gutschrift</span>':'')+(p&&b.verrechnet?'<span class="tag ok">mit Strafen verrechnet</span>':p&&b.credited>0?`<span class="tag ok">${eur(b.credited)} verrechnet · Rest ${eur(credLeft(b))}</span>`:'')+(p&&b.verrechnet?'':p&&canW?`<button class="chipbtn ${b.refunded?'on':''}" data-act="refund" data-id="${esc(b.id)}" aria-pressed="${!!b.refunded}">${b.refunded?I('check')+'Erstattet':'Erstattet?'}</button>`:(p&&b.refunded?'<span class="tag ok">erstattet</span>':''));
+    const canW=S.canWrite===true;
+    const tags=(ein?'<span class="tag ok">Sondereinzahlung</span>':gs?'<span class="tag">nur Gutschrift</span>':'')+(p&&b.verrechnet?'<span class="tag ok">mit Strafen verrechnet</span>':p&&b.credited>0?`<span class="tag ok">${eur(b.credited)} verrechnet · Rest ${eur(credLeft(b))}</span>`:'')+(p&&b.refunded&&!b.verrechnet?`<span class="tag ok">${b.credited>0?eur(credLeft(b))+' ':''}ausbezahlt</span>`:'');
     const inner=`${p?avatar(p):`<span class="av">${ein?ICONS.plus:ICONS.euro}</span>`}<div class="m"><b>${isNewAt('rechnungen',b.createdAt,b.createdBy)?idot('rechnungen',1):''}${esc(b.title||b.cat)}</b><i>${esc((b.title&&b.cat&&b.title!==b.cat?b.cat+' · ':'')+meta.join(' · '))}</i>${tags||b.receiptId?`<div class="tags">${tags}${b.receiptId?'<span class="tag">Beleg</span>':''}</div>`:''}</div><div class="r"><strong class="num" style="${ein?'color:var(--good)':''}">${ein?'+ ':''}${eur(b.amount)}</strong></div>`;
     h+=canW?`<div class="row tap" role="button" tabindex="0" data-act="editBill" data-id="${esc(b.id)}" aria-label="${esc((b.title||b.cat)+' bearbeiten')}">${inner}${I('chevR').replace('class="ico"','class="ico chev"')}</div>`:`<div class="row">${inner}</div>`;
   }
@@ -624,7 +624,7 @@ function uebersichtAll(){
   return meLine()+`<h2 class="section-h">Monatsübersicht</h2>`+ou.top+kontenCopy()+`<h2 class="section-h">Konten</h2>`+kontenSeg()+(S.kview==='verlauf'?verlauf():S.kview==='statistik'?statistik():sortBar()+kontenList())+ou.bottom;
 }
 function entryRow(e,withPerson,readOnly){
-  const p=pById(e.playerId),canW=!readOnly&&S.canWrite!==false;
+  const p=pById(e.playerId),canW=!readOnly&&S.canWrite===true;
   const meta=[dDE(e.date)];if(e.qty&&e.unit)meta.push(e.qty+' '+e.unit);if(e.note)meta.push(e.note);
   const tags=(e.kabinenfest?(canW?`<button class="chipbtn ${e.kfDone?'on':''}" data-act="kf" data-id="${esc(e.id)}" aria-pressed="${!!e.kfDone}">${e.kfDone?I('check')+'Kabinenfest erledigt':'Kabinenfest offen'}</button>`:`<span class="tag ${e.kfDone?'ok':'kf'}">Kabinenfest${e.kfDone?' erledigt':''}</span>`):'')
     +(e.reported&&!e.paid?'<span class="tag owe">Zahlung gemeldet</span>':'')+(e.paid&&e.paidVia==='gemeldet'?'<span class="tag">selbst gemeldet</span>':'')+(e.paid&&e.paidVia==='bestaetigt'?'<span class="tag ok">bestätigt</span>':'')+(e.paid&&e.paidVia==='guthaben'?'<span class="tag ok">mit Guthaben bezahlt</span>':'')+(e.spieltag?'<span class="tag owe">Spieltag ×2</span>':'')+(e.auto?'<span class="tag kf">automatisch</span>':'')+(e.autoFee?'<span class="tag">automatisch</span>':'');
@@ -1232,7 +1232,7 @@ async function baelleSwap(ia,pa,ib,pb){if(!isAdmin())return;const A=S.termine.fi
   if((B.pids||[]).includes(pa)||(A.pids||[]).includes(pb))return toast('Die Person ist in dieser Woche schon dabei');
   if(await baelleApply({disabled:false},{[ia]:A.pids.map(p=>p===pa?pb:p),[ib]:B.pids.map(p=>p===pb?pa:p)})){S.still=true;renderSheet(false)}}
 function openSheet(s){if(S.fromPush){S.fromPush=false;if(s.type!=='push'&&!s.back)s={...s,back:{type:'push'}}} // aus dem Verlauf geöffnet: Kreuz führt zurück
-  const sb=$('#sheetRoot .sheet-b');if(sb)sb.scrollTop=0;S.sheet=s;S.confirmDel=null;S.confirmPayAll=null;document.body.classList.add('locked');renderSheet(false)}
+  const sb=$('#sheetRoot .sheet-b');if(sb)sb.scrollTop=0;S.sheet=s;S.confirmDel=null;S.confirmPayAll=null;S.confirmPayout=null;document.body.classList.add('locked');renderSheet(false)}
 // Kreuz oben rechts: in Unterseiten einen Schritt zurück (Spiel → Fußball); aus einem Bereich (Fußball, Döner …) zurück zur Übersicht
 const SHEET_PARENT={wuerfelAdd:'wuerfel',fbEdit:'fussball',fbRound:'fussball',fbGame:'fussball',trikotEdit:'trikot',gbEdit:'gb',gbPick:'gb'};
 const fbFrom=()=>S.sheet&&S.sheet.type==='fbRound'?{type:'fbRound',no:S.sheet.no}:null; // Herkunft merken, damit „zurück“ in die Runde führt
@@ -1282,8 +1282,9 @@ function renderSheet(refresh){
     const paSmall=b.open<=0?'Nichts offen':viaCredit?(pa?'Nochmal tippen: '+eur(b.open)+' mit Guthaben verrechnen':eur(b.open)+' offen – wird komplett mit dem Guthaben verrechnet'):b.credit?(pa?'Nochmal tippen: '+eur(b.net)+' erhalten, Rest mit Guthaben verrechnen':eur(b.net)+' zu zahlen – '+eur(b.credit)+' Guthaben wird verrechnet'):(pa?'Nochmal tippen: '+eur(b.open)+' als bezahlt markieren':eur(b.open)+' offen – alle Einträge als bezahlt markieren');
     const payAllCard=isKW()?`<button class="payall ${b.open>0?'':'done'}" data-act="payAll" data-id="${esc(p.id)}" ${b.open>0?'':'disabled'}><span class="pa-ic">${ICONS.check}</span><span class="pa-t"><b>${pa?(viaCredit?'Wirklich verrechnen?':'Wirklich alles bezahlt?'):(viaCredit?'Mit Guthaben verrechnen':'Alles bezahlt')}</b><small>${paSmall}</small></span></button>`:'';
     const credBox=b.credit?`<div class="credbox"><div><span>Offene Strafen</span><b class="num">${eur(b.open)}</b></div><div><span>Guthaben aus Rechnungen</span><b class="num">− ${eur(b.credit)}</b></div><div class="sum"><span>${b.net<0?'Bekommt noch':'Muss noch zahlen'}</span><b class="num ${b.net<0?'neg':'pos'}">${eur(Math.abs(b.net))}</b></div></div>`:'';
-    body=credBox+payAllCard+payBox(p,b)+(list.length?monthGroups(p.id,list):`<div class="empty">Keine Einträge – sauber!</div>`);
-    if(S.canWrite!==false)foot=`<button class="btn" data-act="addFor" data-id="${esc(p.id)}">${I('plus')}Strafe</button>`;
+    const po=S.confirmPayout===p.id,payoutCard=isKW()&&b.net<0?`<button class="payall" data-act="payout" data-id="${esc(p.id)}"><span class="pa-ic">${ICONS.euro}</span><span class="pa-t"><b>${po?'Wirklich ausbezahlt?':'Guthaben ausbezahlt'}</b><small>${po?'Nochmal tippen: '+eur(b.credit)+' überwiesen – Guthaben wird 0':eur(b.credit)+' Guthaben überwiesen? Dann hier tippen'}${b.open>0?' · '+eur(b.open)+' offen bleibt offen':''}</small></span></button>`:'';
+    body=credBox+payAllCard+payoutCard+payBox(p,b)+(list.length?monthGroups(p.id,list):`<div class="empty">Keine Einträge – sauber!</div>`);
+    if(S.canWrite===true)foot=`<button class="btn" data-act="addFor" data-id="${esc(p.id)}">${I('plus')}Strafe</button>`;
   } else if(s.type==='kasse'){
     const k=kasseSoll(),ks=S.kstand||{},checks=ks.checks||[],lastAt=(checks[0]||{}).at||'',clog=((S.klog||{}).items||[]).filter(x=>x.at>lastAt).slice(0,10);
     if(!k||s.editStart){
@@ -1764,7 +1765,9 @@ document.addEventListener('click',async ev=>{
     case 'delBill':if((S.sheet.bill.credited||0)>0){toast('Mit dieser Rechnung wurden schon Strafen bezahlt. Öffne zuerst diese Strafen wieder, dann kannst du sie löschen.');break}
       if(S.confirmDel==='bill'){const b=S.sheet.bill;try{const linked=S.entries.filter(e=>e.billId===b.id);await Promise.all(linked.map(e=>S.db.doc('entries/'+e.id).delete()));await S.db.doc('bills/'+b.id).delete();logChange(`Rechnung gelöscht: ${b.title||b.cat||'Rechnung'}`,b.amount);if(b.receiptId&&S.receipts.some(r=>r.id===b.receiptId)){try{await S.db.doc('receipts/'+b.receiptId).update({status:'neu',billId:null})}catch(_){}}closeSheet();toast(linked.length?`Rechnung und ${linked.length} umgelegte Einträge gelöscht`:'Rechnung gelöscht')}catch(e){toast(errMsg(e))}}
       else{S.confirmDel='bill';el.textContent=S.entries.some(e=>e.billId===S.sheet.bill.id)?'Inkl. umgelegter Einträge löschen?':'Wirklich löschen?'}break;
-    case 'refund':{const b=S.bills.find(x=>x.id===id);if(b)try{await S.db.doc('bills/'+id).update({refunded:!b.refunded,refundedAt:b.refunded?null:new Date().toISOString()})}catch(e){toast(errMsg(e))}break}
+    case 'payout':{if(!isKW())break;const b=balance(id);if(S.confirmPayout!==id){S.confirmPayout=id;renderSheet(false);clearTimeout(S._pot);S._pot=setTimeout(()=>{S.confirmPayout=null;if(S.sheet)renderSheet(false)},4000);break}
+      S.confirmPayout=null;try{const {data,error}=await S.sb.rpc('payout_credit',{pid:id});if(error)throw error;try{await S.db.refresh('bills')}catch(e){}
+        toast(`${eur(data||b.credit)} Guthaben an ${pById(id)?.name||''} ausbezahlt`)}catch(e){toast(errMsg(e))}break}
     case 'copyMonth':{const o=S._lastOverview;if(!o)break;
       const lines=o.rows.filter(r=>r.aus||r.gut).map(r=>`${r.p.name}: ${eur(r.sum)}${r.gut?` (Ausgaben ${eur(r.aus)} − Gutschrift ${eur(r.gut)})`:''}`);
       const txt=`Mannschaftskasse – ${monthName(S.month)}\n\n${lines.join('\n')}\n\nEinnahmen: ${eur(o.einnahmen)}\nAusgaben: ${eur(o.ausgaben)}\nSondereinzahlungen: ${eur(o.sonderein)}\nNetto: ${eur(o.netto)}`;
@@ -1903,8 +1906,8 @@ document.addEventListener('click',async ev=>{
       try{await S.db.doc('fussball/'+s.id).delete();await syncFbKf().catch(()=>{});toast('Spiel gelöscht');S.still=true;openSheet(s.back||{type:'fussball'})}catch(e){toast(errMsg(e))}break}
     case 'person':if(id===myPid())markSeen(['konto']);openSheet({type:'person',id});break;
     case 'addFor':S.preselect=id;closeSheet();S.tab='erfassen';$('#view').innerHTML='';render();toast('Strafe antippen – '+(pById(id)?.name||'')+' ist vorausgewählt');break;
-    case 'paid':{const e=S.entries.find(x=>x.id===id);if(!e)break;
-      // wieder geöffnet: die Datenbank bucht verbrauchtes Guthaben zurück (wird beim nächsten Zahltag neu verrechnet)
+    case 'paid':{const e=S.entries.find(x=>x.id===id);if(!e||!isKW())break; // einzelne Strafen abhaken nur Kassenwart/Admin; Spieler melden über „Ich habe bezahlt“ (alles)
+      // wieder geöffnet: die Datenbank bucht verbrauchtes Guthaben zurück (wird erst bei der nächsten Zahlung wieder verrechnet)
       if(e.paid){try{await S.db.doc('entries/'+id).update({paid:false,paidAt:null,paidVia:null});logChange(`Bezahlt-Haken entfernt: ${pById(e.playerId)?.name||'?'} – ${e.title}`,e.amount);toast(e.creditUsed>0?'Wieder offen – Guthaben zurückgebucht':'Wieder offen')}catch(err){toast(errMsg(err))}break}
       setEntry(id,{paid:!e.paid,paidAt:e.paid?null:new Date().toISOString(),paidVia:e.paid?null:(isKW()?'kassenwart':'manuell')});break}
     case 'kf':{const e=S.entries.find(x=>x.id===id);if(e&&canKf())kfPatch(id,{kfDone:!e.kfDone}).catch(err=>toast(errMsg(err)));break}
