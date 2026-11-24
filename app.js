@@ -1065,7 +1065,20 @@ function kalWoche(){
     h+=kday(d,ce?`<button class="mini" data-act="terminNew" data-d="${d}">+ Training</button>`:'',evs.length||kf?evs.map(kEvRow).join('')+kf:`<div class="kfree">Nichts geplant</div>`)}
   if(canPlan()&&addDays(mon,6)>=td){const off=pl?.days&&planChanged(mon)!==true; // schon gemeldet und seitdem nichts geändert: Knopf grau
     h+=`<div class="kwcard" style="margin-top:4px"><div><b>Wochenplan</b> <span>${pl?`Zuletzt gemeldet am ${esc(dtDE(pl.sentAt))}${pl.by?' von '+esc(pl.by):''}.${pl.days?(off?' Seitdem nichts geändert.':' Gemeldet werden nur die geänderten Tage.'):''}`:'Trag erst alles ein und drück dann „Fertig“. Die Mannschaft bekommt eine einzige Nachricht.'}</span></div><button class="btn${off?'':' primary'}" data-act="planSend" data-mon="${mon}"${off?' disabled':''}>${S.confirmPlan===mon?'Wirklich an alle senden?':pl?'Änderungen melden':'Fertig – Mannschaft benachrichtigen'}</button></div>`;}
-  return h+(ce?`<button class="linkbtn" style="display:block;margin:6px auto 0" data-act="usualEdit">Übliche Trainingszeiten bearbeiten</button>`:'')}
+  return h+`<button class="btn block" style="margin-top:10px" data-act="kalIcs" data-mon="${mon}">${I('kalender')}Woche in meinen Kalender</button>`
+    +(ce?`<button class="linkbtn" style="display:block;margin:6px auto 0" data-act="usualEdit">Übliche Trainingszeiten bearbeiten</button>`:'')}
+// Woche als .ics: Trainings und Spiele (gleiche Liste wie in der Wochenansicht). Feste UID je Termin (Training: Tag + Beginn), damit erneutes Laden aktualisiert statt doppelt anlegt.
+function weekIcs(mon){
+  const tx=v=>String(v||'').replace(/[\\;,]/g,m=>'\\'+m).replace(/\r?\n/g,'\\n'),dt=(d,t)=>d.replace(/-/g,'')+'T'+t.replace(':','')+'00',
+    add2=t=>{const [h,m]=t.split(':').map(Number),x=Math.min(h*60+m+120,1439);return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0')},
+    stamp=new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z',ev=[];
+  for(let i=0;i<7;i++){const d=addDays(mon,i);for(const x of termineAt(d)){const sp=x.type==='spiel',
+      when=x.start?`DTSTART:${dt(d,x.start)}\r\nDTEND:${dt(d,x.end||add2(x.start))}`:`DTSTART;VALUE=DATE:${d.replace(/-/g,'')}\r\nDTEND;VALUE=DATE:${addDays(d,1).replace(/-/g,'')}`;
+    ev.push(`BEGIN:VEVENT\r\nUID:${tx(!sp&&x.start?trId(d,x.start):x.id)}@dragons-kasse\r\nDTSTAMP:${stamp}\r\n${when}\r\nSUMMARY:${tx((sp?'🤾 ':'🏃 ')+(x.title||(sp?'Spiel':'Training')))}`
+      +(x.place?`\r\nLOCATION:${tx(x.place)}`:'')+`\r\nDESCRIPTION:${tx([sp?(isHome(x)?'Heimspiel':'Auswärts'):'Training',meetTxt(x)].filter(Boolean).join('\n'))}\r\nEND:VEVENT`)}}
+  // Zeilen nach RFC 5545 auf höchstens 75 Byte falten (Folgezeile beginnt mit Leerzeichen)
+  const fold=l=>{let o='',n=0;for(const c of l){const b=new TextEncoder().encode(c).length;if(n+b>74){o+='\r\n ';n=1}o+=c;n+=b}return o};
+  return ev.length?`BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//TSG Dragons//Kasse//DE\r\nCALSCALE:GREGORIAN\r\nX-WR-CALNAME:Dragons\r\n${ev.join('\r\n')}\r\nEND:VCALENDAR`.split('\r\n').map(fold).join('\r\n')+'\r\n':''}
 function kalMonat(){
   const now=bToday(),cur=S.kalM||{y:now.getFullYear(),m:now.getMonth()},td=isoD(now),map=kfWeekMap(),cache={},ev=d=>cache[d]??=termineAt(d),last=new Date(cur.y,cur.m+1,0,12);
   let h=calNav('kalmonth',`${MONTHS[cur.m]} ${cur.y}`,'Vorheriger Monat','Nächster Monat')+(S.kalM?`<button class="btn block" style="margin-bottom:10px" data-act="kalmonth" data-d="0">Zum aktuellen Monat</button>`:'')
@@ -1808,6 +1821,12 @@ document.addEventListener('click',async ev=>{
     case 'dwPaid':{const d=S.doener.find(x=>x.id===id);if(!d||!isDoenerwart())break;
       if(await rpcRun(el,'doener_set_paid',{doc_id:id,paid:!d.paid})){S.doener=S.doener.map(x=>x.id===id?{...x,paid:!d.paid,paidAt:d.paid?null:new Date().toISOString()}:x);S.still=true;renderSheet(false)}break}
     case 'usualEdit':if(canTermin())toUsual();break;
+    case 'kalIcs':{const m=el.dataset.mon,t=weekIcs(m),name=`dragons-kw${kwRange(m).kw}.ics`;if(!t){toast('In dieser Woche ist nichts geplant');break}
+      // iPhone: Herunterladen öffnet direkt „Alle hinzufügen“. Android: lieber Teilen (Kalender-App wählbar), sonst Download mit Hinweis.
+      if(/Android/i.test(navigator.userAgent)){const f=new File([t],name,{type:'text/calendar'});
+        if(navigator.canShare?.({files:[f]})){navigator.share({files:[f],title:'Dragons · KW '+kwRange(m).kw}).catch(e=>{if(e?.name!=='AbortError')downloadFile(name,t,'text/calendar')});break}
+        downloadFile(name,t,'text/calendar');toast('Datei öffnen und mit deinem Kalender importieren');break}
+      downloadFile(name,t,'text/calendar');break}
     case 'usualBack':toUsual();break;
     case 'usualAdd':if(canTermin())openSheet({type:'usualItem',id:null,t:{wd:0,start:'',end:'',title:''},back:{type:'usual'}});break;
     case 'usualItem':{const x=S.termine.find(t=>t.id===id&&t.type==='usual');if(x&&canTermin())openSheet({type:'usualItem',id,t:{...x},back:{type:'usual'}});break}
