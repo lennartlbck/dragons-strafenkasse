@@ -56,16 +56,18 @@ function sortedPlayers(all){
     if(sa===0)return (a.number??999)-(b.number??999);return (a.order??50)-(b.order??50)||a.name.localeCompare(b.name)});
 }
 function balance(pid){let open=0,paid=0,kf=0,credit=0,rep=0;for(const e of S.entries){if(e.playerId!==pid)continue;
-  if(e.paid)paid+=e.amount||0;else{open+=e.amount||0;if(e.reported)rep++} if(e.kabinenfest&&!e.kfDone)kf++;}
+  if(e.paid)paid+=e.amount||0;else{open+=eRest(e);if(e.reported)rep++} if(e.kabinenfest&&!e.kfDone)kf++;}
   credit=r2(credMap()[pid]||0);open=r2(open);return{open,paid,kf,credit,rep,net:r2(open-credit)}}
 const r2=x=>Math.round(x*100)/100;
+// offener Rest eines Eintrags: beim Zahltag kann schon ein Teil mit Guthaben verrechnet sein (creditUsed)
+const eRest=e=>r2((e.amount||0)-(e.paid?0:(e.creditUsed||0)));
 // Guthaben aus ausgelegten Rechnungen/Gutschriften: was davon noch nicht erstattet oder mit Strafen verrechnet ist
 // ACHTUNG: spiegelt credit_left()/consume_credit() in supabase/schema.sql – Regeländerungen immer an beiden Stellen machen
 const credLeft=b=>r2((b.amount||0)-(b.credited||0));
 let _cm={src:null,m:{}};
 function credMap(){if(_cm.src!==S.bills){const m={};for(const b of S.bills){if(b.kind==='einzahlung'||!b.paidBy||b.refunded)continue;const l=credLeft(b);if(l>0)m[b.paidBy]=(m[b.paidBy]||0)+l}_cm={src:S.bills,m}}return _cm.m}
 // Bezahlt Einträge über die Datenbank und verrechnet dabei vorhandenes Guthaben (auch Teilbeträge).
-// Sonst verrechnet die Datenbank sofort, wenn eine Rechnung oder ein Eintrag dazukommt (credit_auto in schema.sql).
+// Sonst bleiben Strafen bis zum Zahltag offen stehen; beim Start des Zahltags verrechnet apply_credit_all alles, auch Teilbeträge.
 async function payEntries(pid,ids,via){if(!ids.length)return{n:0,used:0};
   const {data,error}=await S.sb.rpc('pay_entries',{pid,ids,via});if(error)throw error;
   try{await S.db.refresh('entries','bills')}catch(e){}
@@ -116,7 +118,7 @@ function avatar(p,cls=''){if(!p)return `<span class="av ${cls}">?</span>`;
   if(p.img)return `<span class="av ${cls}"><img src="${esc(p.img)}" alt="" loading="lazy"></span>`;
   const ini=p.name.split(/\s+/).map(w=>w[0]).slice(0,2).join('');return `<span class="av ${cls}">${esc(ini)}</span>`}
 S.termine=[];S.kalView='woche';S.kalMon=null;S.kalM=null;
-const ROLES=[['member','Spieler'],['kassenwart','Kassenwart'],['admin','Admin'],['deckenzaehler','Deckenzähler'],['doenerwart','Dönerwart'],['trainer','Trainer'],['mannschaftsverantwortlicher','Mannschaftsverantwortlicher'],['trikotwart','Trikotwart'],['wasserwart','Wasserwart'],['aufraeumdienst','Aufräumdienst'],['kabinenfestwart','Kabinenfestwart']];
+const ROLES=[['member','Spieler'],['kassenwart','Kassenwart'],['admin','Admin'],['deckenzaehler','Deckenzähler'],['doenerwart','Dönerwart'],['trainer','Trainer'],['mannschaftsverantwortlicher','Mannschaftsverantwortlicher'],['trikotwart','Trikotwart'],['wasserwart','Wasserwart'],['aufraeumdienst','Aufräumdienst'],['kabinenfestwart','Kabinenfestwart'],['strafenwart','Strafenwart']];
 const roleName=r=>(ROLES.find(x=>x[0]===r)||[0,r])[1];
 const pLabel=p=>p?(p.role==='Spieler'&&p.number!=null?'#'+p.number+' · ':'')+(p.role&&p.role!=='Spieler'?p.role:'Spieler'):'';
 
@@ -170,6 +172,7 @@ function statusBanner2(){
   if(S.status==='nodb')return `<div class="banner">Die Kasse ist gerade nicht erreichbar. Prüfe deine Internetverbindung und lade die Seite neu.</div>`;
   if(S.stale)return `<div class="banner">Die Daten sind gerade nicht erreichbar. Was du siehst, ist eventuell nicht aktuell.</div>`;
   if(S.amtFines)return `<div class="info">Als ${esc(S.amtRoles.join(' und '))} trägst du ${esc([...S.amtFines].map(id=>'„'+(S.fines.find(f=>f.id===id)?.title||id)+'“').join(', '))} ein. Alles andere macht der Kassenwart.</div>`;
+  if(S.sw)return `<div class="info">Als Strafenwart trägst du Strafen aus dem Katalog ein, auf Wunsch mit Foto. Zahlungen und Rechnungen macht der Kassenwart.</div>`;
   if(S.canWrite===false)return `<div class="info">Du siehst die Kasse und kannst bezahlen. Strafen und Rechnungen trägt der Kassenwart ein. Fotos von Rechnungen kannst du unter „Rechnungen“ hochladen.</div>`;
   return '';
 }
@@ -205,7 +208,7 @@ function fineList(){
   const groups={};for(const f of fines)(groups[f.cat||'Sonstiges']??=[]).push(f);
   const cats=Object.keys(groups).sort((a,b)=>{const ia=CAT_ORDER.indexOf(a),ib=CAT_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)});
   let h='';
-  if(!q&&!S.amtFines)h+=`<button class="free" data-act="free">${I('plus')} Freier Betrag (Sonstiges, Würfeln …)</button>`;
+  if(!q&&S.canWrite===true)h+=`<button class="free" data-act="free">${I('plus')} Freier Betrag (Sonstiges, Würfeln …)</button>`;
   if(!cats.length)h+=`<div class="empty" style="margin-top:12px">Keine Strafe passt zu „${esc(S.q)}“.</div>`;
   const byOrder=(a,b)=>(a.order??0)-(b.order??0);
   const row=f=>{const fav=S.favs.includes(f.id);return `<div class="finerow"><button class="star" data-act="fav" data-id="${esc(f.id)}" aria-pressed="${fav}" aria-label="${esc(f.title)} ${fav?'aus den Favoriten entfernen':'zu den Favoriten hinzufügen'}">${I(fav?'starFill':'star')}</button><button class="fine" data-act="fine" data-id="${esc(f.id)}"><span class="t"><b>${esc(f.title)}</b>${f.hint?`<i>${esc(f.hint)}</i>`:''}</span><span class="price">${esc(priceLabel(f))}</span>${I('chevR').replace('class="ico"','class="ico chev"')}</button></div>`};
@@ -232,14 +235,15 @@ const myPid=()=>S.me?S.me.player_id:null;
 // Ämter mit Strafrechten (wie amt_fine in schema.sql): nur diese Strafen dürfen sie selbst eintragen. Wasserwart/Aufräumdienst melden per Anzeige.
 const AMT_FINES={deckenzaehler:['f26']};
 function setPerms(){const mgr=hasRole('admin','kassenwart'),a=Object.entries(AMT_FINES).filter(([r])=>hasRole(r));S.canEdit=mgr;S.canWrite=mgr;
-  S.amtFines=!mgr&&a.length?new Set(a.flatMap(x=>x[1])):null;S.amtRoles=a.map(x=>roleName(x[0]))}
+  S.sw=!mgr&&hasRole('strafenwart'); // Strafenwart: alle Katalog-Strafen eintragen (wie sw_entry in schema.sql)
+  S.amtFines=!mgr&&!S.sw&&a.length?new Set(a.flatMap(x=>x[1])):null;S.amtRoles=a.map(x=>roleName(x[0]))}
 const favKey=()=>'favs-'+(S.uid||'x');
 function loadFavs(){try{const v=JSON.parse(localStorage.getItem(favKey())||'[]');return Array.isArray(v)?v:[]}catch(e){return[]}}
 function saveFavs(){try{localStorage.setItem(favKey(),JSON.stringify(S.favs))}catch(e){}}
 // Strafen mit Zwei-Schritt-Ablauf: Spieler wählen → Weiter → Anzahl pro Spieler
 const COUNT_FLOW={f26:'Deckentreffer',f02:'Bier',f03:'Radler'};
 const countFine=f=>!!f&&f.id in COUNT_FLOW;
-const canEnter=f=>S.canWrite===true||!!(S.amtFines&&f&&S.amtFines.has(f.id))||(!!f&&f.id==='kf-manual'&&hasRole('kabinenfestwart'));
+const canEnter=f=>S.canWrite===true||(!!S.sw&&!!f&&!!f.id&&f.id!=='kf-manual')||!!(S.amtFines&&f&&S.amtFines.has(f.id))||(!!f&&f.id==='kf-manual'&&hasRole('kabinenfestwart'));
 // Kabinenfeste planen und abhaken: Kassenwart, Admin, Kabinenfestwart
 const canKf=()=>S.canWrite===true||hasRole('kabinenfestwart');
 // nur kfDone/kfOrder/kfWeek ändern (geht auch für den Kabinenfestwart, siehe kf_patch in schema.sql)
@@ -286,7 +290,7 @@ function payBox(p,b){
   const z=zt(),amt=toPay(b),url=paypalUrl(amt,p.name),t=ppTarget();
   const mine=myPid()===p.id,canMark=mine||isKW()||S.canEdit;
   const myOpen=S.entries.filter(e=>e.playerId===p.id&&!e.paid),toReport=myOpen.filter(e=>!e.reported),pending=myOpen.filter(e=>e.reported);
-  const repSum=toReport.reduce((a,e)=>a+(e.amount||0),0),direct=isKW();
+  const repSum=toReport.reduce((a,e)=>a+eRest(e),0),direct=isKW();
   const head=`<div class="pay-h"><span>Zahltag · bis ${esc(dtDE(z.endsAt))} · ${esc(leftTxt(Date.parse(z.endsAt)-Date.now()))}</span>${amt>0?`<b class="num">${eur(amt)}</b>`:''}</div>`;
   if(amt<=0)return `<div class="paybox done">${head}<span>${esc(mine?'Du musst':p.name.split(' ')[0]+' muss')} gerade nichts zahlen${b.credit>b.open?` – Guthaben ${eur(b.credit-b.open)}`:''}.</span></div>`;
   if(!direct&&pending.length&&!toReport.length)return `<div class="paybox wait">${head}<p><b>Zahlung gemeldet</b></p><p class="note">Der Kassenwart prüft, ob das Geld angekommen ist, und bestätigt es dann. Bis dahin steht der Betrag noch als offen da.</p><button class="btn" data-act="unreport" data-id="${esc(p.id)}">Meldung zurücknehmen</button></div>`;
@@ -314,7 +318,7 @@ function zahltagBanner(){
 function pendingPays(){const g={};for(const e of S.entries)if(e.reported&&!e.paid&&pById(e.playerId))(g[e.playerId]??=[]).push(e);return g}
 function confirmCard(){
   const g=pendingPays(),ids=Object.keys(g);if(!ids.length)return '';
-  const sum=ids.reduce((a,pid)=>a+g[pid].reduce((x,e)=>x+(e.amount||0),0),0);
+  const sum=ids.reduce((a,pid)=>a+g[pid].reduce((x,e)=>x+eRest(e),0),0);
   return `<button class="payall wait" data-act="openConfirm"><span class="pa-ic">${ICONS.clock}</span><span class="pa-t"><b>Zahlungen bestätigen${idot('zahlungen')}</b><small>${ids.length} ${ids.length===1?'Spieler hat':'Spieler haben'} bezahlt gemeldet · ${eur(sum)}</small></span>${I('chevR').replace('class="ico"','class="ico chev"')}</button>`;
 }
 function kwCard(){
@@ -344,7 +348,7 @@ function reportData(m){
   const ent=S.entries.filter(e=>inPeriod(e.date,m)),bills=S.bills.filter(b=>inPeriod(b.date,m));
   for(const p of sortedPlayers(true)){
     const r={p,beitrag:0,strafen:0,fussball:0,bier:0,sonder:0,gut:0,open:0,n:0};
-    for(const e of ent)if(e.playerId===p.id){r[colOf(e)]+=e.amount||0;r.n++;if(!e.paid)r.open+=e.amount||0}
+    for(const e of ent)if(e.playerId===p.id){r[colOf(e)]+=e.amount||0;r.n++;if(!e.paid)r.open+=eRest(e)}
     for(const b of bills)if(b.kind!=='einzahlung'&&b.paidBy===p.id)r.gut+=b.amount||0;
     r.aus=r.beitrag+r.strafen+r.fussball+r.bier+r.sonder;r.sum=r.aus-r.gut;
     if(p.role!=='Spieler'&&!r.aus&&!r.gut)continue;
@@ -627,11 +631,11 @@ function entryRow(e,withPerson,readOnly){
   const p=pById(e.playerId),canW=!readOnly&&S.canWrite===true;
   const meta=[dDE(e.date)];if(e.qty&&e.unit)meta.push(e.qty+' '+e.unit);if(e.note)meta.push(e.note);
   const tags=(e.kabinenfest?(canW?`<button class="chipbtn ${e.kfDone?'on':''}" data-act="kf" data-id="${esc(e.id)}" aria-pressed="${!!e.kfDone}">${e.kfDone?I('check')+'Kabinenfest erledigt':'Kabinenfest offen'}</button>`:`<span class="tag ${e.kfDone?'ok':'kf'}">Kabinenfest${e.kfDone?' erledigt':''}</span>`):'')
-    +(e.reported&&!e.paid?'<span class="tag owe">Zahlung gemeldet</span>':'')+(e.paid&&e.paidVia==='gemeldet'?'<span class="tag">selbst gemeldet</span>':'')+(e.paid&&e.paidVia==='bestaetigt'?'<span class="tag ok">bestätigt</span>':'')+(e.paid&&e.paidVia==='guthaben'?'<span class="tag ok">mit Guthaben bezahlt</span>':'')+(e.spieltag?'<span class="tag owe">Spieltag ×2</span>':'')+(e.auto?'<span class="tag kf">automatisch</span>':'')+(e.autoFee?'<span class="tag">automatisch</span>':'');
+    +(e.reported&&!e.paid?'<span class="tag owe">Zahlung gemeldet</span>':'')+(e.paid&&e.paidVia==='gemeldet'?'<span class="tag">selbst gemeldet</span>':'')+(e.paid&&e.paidVia==='bestaetigt'?'<span class="tag ok">bestätigt</span>':'')+(e.paid&&e.paidVia==='guthaben'?'<span class="tag ok">mit Guthaben bezahlt</span>':'')+(!e.paid&&e.creditUsed>0?`<span class="tag ok">${eur(e.creditUsed)} mit Guthaben verrechnet · noch ${eur(eRest(e))}</span>`:'')+(e.spieltag?'<span class="tag owe">Spieltag ×2</span>':'')+(e.auto?'<span class="tag kf">automatisch</span>':'')+(e.autoFee?'<span class="tag">automatisch</span>':'');
   const lead=canW?`<button class="tick" data-act="paid" data-id="${esc(e.id)}" aria-pressed="${!!e.paid}" aria-label="${e.paid?'Als offen markieren':'Als bezahlt markieren'}"><span>${ICONS.check}</span></button>`:(withPerson?avatar(p):'');
   const del=canW?(S.confirmDel===e.id?`<button class="iconbtn warn" data-act="del" data-id="${esc(e.id)}">Löschen?</button>`:`<button class="iconbtn" data-act="del" data-id="${esc(e.id)}" aria-label="Eintrag löschen">${I('trash')}</button>`):'';
   const title=withPerson?(p?.name||'Unbekannt'):e.title, sub=(withPerson?e.title+' · ':'')+meta.join(' · ');
-  return `<div class="row ${e.paid?'paid':''}">${lead}<div class="m${canW?' editable':''}" ${canW?`data-act="editEntry" data-id="${esc(e.id)}" role="button" tabindex="0" aria-label="${esc(e.title+' bearbeiten')}"`:''}><b>${esc(title)}</b><i>${esc(sub)}</i>${e.history&&e.history.length?'<span class="edtag">bearbeitet</span>':''}${tags?`<div class="tags">${tags}</div>`:''}</div><div class="r"><strong class="num">${eur(e.amount)}</strong></div>${del}</div>`;
+  return `<div class="row ${e.paid?'paid':''}">${lead}<div class="m${canW?' editable':''}" ${canW?`data-act="editEntry" data-id="${esc(e.id)}" role="button" tabindex="0" aria-label="${esc(e.title+' bearbeiten')}"`:''}><b>${esc(title)}</b><i>${esc(sub)}</i>${e.history&&e.history.length?'<span class="edtag">bearbeitet</span>':''}${tags?`<div class="tags">${tags}</div>`:''}</div>${e.path?`<button class="fthumb" data-act="fotoView" data-path="${esc(e.path)}" aria-label="Foto ansehen"><img class="rthumb" data-bucket="strafen" data-path="${esc(e.path)}" alt=""></button>`:''}<div class="r"><strong class="num">${eur(e.amount)}</strong></div>${del}</div>`;
 }
 /* ---------- Monatsabschluss (PDF / Excel) ---------- */
 const csvCell=v=>{const t=String(v??'');return /[;"\n\r]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t};
@@ -1261,6 +1265,7 @@ function renderSheet(refresh){
   } else if(s.type==='fine'){
     const f=s.fine;
     head=`<h2>${esc(f.title)}</h2><p>${esc(priceLabel(f))}</p>`;
+    body+=feFotoBlock(s);
     body+=f.hint?`<div class="hint" style="margin-bottom:12px">${esc(f.hint)}</div>`:'';
     const allSel=sortedPlayers(false).every(p=>s.sel.has(p.id));
     body+=f.id==='f01'?`<div class="whohead"><h3 class="section-h">Wer?</h3><button class="chipbtn" id="pickall" data-act="pickall">${allSel?'Auswahl aufheben':'Alle auswählen'}</button></div><div class="grid">`:`<h3 class="section-h">Wer?</h3><div class="grid">`;
@@ -1274,6 +1279,8 @@ function renderSheet(refresh){
     body+=`<div class="field"><label for="nt">Notiz (optional)</label><input id="nt" value="${esc(s.note)}" placeholder="${f.wuerfeln?'z. B. gewürfelt: 4':'z. B. Training Dienstag'}"></div>`;
     body+=`<p class="note" style="margin:0">Jede Strafe kann gewürfelt werden – das Ergebnis einfach als Betrag eintragen.</p></div>`;
     foot=`<button class="btn primary" id="submit" data-act="submitFine"></button>`;
+  } else if(s.type==='foto'){
+    head=`<h2>Foto zur Strafe</h2>`;body=`<img class="rbig" data-bucket="strafen" data-path="${esc(s.path)}" alt="Foto zur Strafe">`;
   } else if(s.type==='person'){
     const p=pById(s.id);if(!p){closeSheet();return}
     const b=balance(p.id);const list=S.entries.filter(e=>e.playerId===p.id).sort((a,c)=>(a.paid?1:0)-(c.paid?1:0)||String(c.date).localeCompare(String(a.date)));
@@ -1282,7 +1289,8 @@ function renderSheet(refresh){
     const paSmall=b.open<=0?'Nichts offen':viaCredit?(pa?'Nochmal tippen: '+eur(b.open)+' mit Guthaben verrechnen':eur(b.open)+' offen – wird komplett mit dem Guthaben verrechnet'):b.credit?(pa?'Nochmal tippen: '+eur(b.net)+' erhalten, Rest mit Guthaben verrechnen':eur(b.net)+' zu zahlen – '+eur(b.credit)+' Guthaben wird verrechnet'):(pa?'Nochmal tippen: '+eur(b.open)+' als bezahlt markieren':eur(b.open)+' offen – alle Einträge als bezahlt markieren');
     const payAllCard=isKW()?`<button class="payall ${b.open>0?'':'done'}" data-act="payAll" data-id="${esc(p.id)}" ${b.open>0?'':'disabled'}><span class="pa-ic">${ICONS.check}</span><span class="pa-t"><b>${pa?(viaCredit?'Wirklich verrechnen?':'Wirklich alles bezahlt?'):(viaCredit?'Mit Guthaben verrechnen':'Alles bezahlt')}</b><small>${paSmall}</small></span></button>`:'';
     const credBox=b.credit?`<div class="credbox"><div><span>Offene Strafen</span><b class="num">${eur(b.open)}</b></div><div><span>Guthaben aus Rechnungen</span><b class="num">− ${eur(b.credit)}</b></div><div class="sum"><span>${b.net<0?'Bekommt noch':'Muss noch zahlen'}</span><b class="num ${b.net<0?'neg':'pos'}">${eur(Math.abs(b.net))}</b></div></div>`:'';
-    const po=S.confirmPayout===p.id,payoutCard=isKW()&&b.net<0?`<button class="payall" data-act="payout" data-id="${esc(p.id)}"><span class="pa-ic">${ICONS.euro}</span><span class="pa-t"><b>${po?'Wirklich ausbezahlt?':'Guthaben ausbezahlt'}</b><small>${po?'Nochmal tippen: '+eur(b.credit)+' überwiesen – Guthaben wird 0':eur(b.credit)+' Guthaben überwiesen? Dann hier tippen'}${b.open>0?' · '+eur(b.open)+' offen bleibt offen':''}</small></span></button>`:'';
+    const cov=r2(S.entries.filter(e=>e.playerId===p.id&&!e.paid&&!e.reported&&!e.noAuto).reduce((a,e)=>a+eRest(e),0)),pay=r2(Math.max(0,b.credit-cov)),keep=r2(b.open-cov);
+    const po=S.confirmPayout===p.id,payoutCard=isKW()&&b.net<0?`<button class="payall" data-act="payout" data-id="${esc(p.id)}"><span class="pa-ic">${ICONS.euro}</span><span class="pa-t"><b>${po?'Wirklich ausbezahlt?':'Guthaben ausbezahlt'}</b><small>${po?'Nochmal tippen: '+eur(pay)+' überwiesen – Guthaben wird 0':eur(pay)+' überwiesen? Dann hier tippen'}${cov>0?' · vorher werden die offenen '+eur(cov)+' verrechnet':''}${keep>0?' · gemeldete '+eur(keep)+' bleiben offen':''}</small></span></button>`:'';
     body=credBox+payAllCard+payoutCard+payBox(p,b)+(list.length?monthGroups(p.id,list):`<div class="empty">Keine Einträge – sauber!</div>`);
     if(S.canWrite===true)foot=`<button class="btn" data-act="addFor" data-id="${esc(p.id)}">${I('plus')}Strafe</button>`;
   } else if(s.type==='kasse'){
@@ -1325,7 +1333,7 @@ function renderSheet(refresh){
   } else if(s.type==='confirm'){
     const g=pendingPays(),ids=Object.keys(g).sort((a,c)=>(pById(a)?.number??999)-(pById(c)?.number??999));
     head=`<h2>Zahlungen bestätigen</h2><p>${ids.length?ids.length+' gemeldet – mit PayPal und Konto vergleichen':'Nichts zu bestätigen'}</p>`;
-    body=ids.length?`<div class="rows">`+ids.map(pid=>{const p=pById(pid),es=g[pid],sum=es.reduce((a,e)=>a+(e.amount||0),0),last=es.map(e=>e.reportedAt).filter(Boolean).sort().pop();
+    body=ids.length?`<div class="rows">`+ids.map(pid=>{const p=pById(pid),es=g[pid],sum=es.reduce((a,e)=>a+eRest(e),0),last=es.map(e=>e.reportedAt).filter(Boolean).sort().pop();
       return `<div class="mrow cf">${avatar(p)}<div class="m"><b>${esc(p.name)}${drg(p.id)}</b><i>${last?'gemeldet '+esc(dtDE(last)):'gemeldet'} · ${es.length} ${es.length===1?'Eintrag':'Einträge'}</i></div><div class="r"><strong class="num">${eur(sum)}</strong></div>
         <div class="acts"><button class="mini on" data-act="confirmPay" data-id="${esc(pid)}">${I('check')} Bestätigt</button><button class="mini" data-act="rejectPay" data-id="${esc(pid)}">Nicht erhalten</button></div></div>`}).join('')+`</div>`:`<div class="empty">Alle gemeldeten Zahlungen sind bestätigt.</div>`;
   } else if(s.type==='kf'){
@@ -1442,7 +1450,7 @@ function renderSheet(refresh){
 function monthGroups(pid,list){
   const g={};for(const e of list)(g[String(e.date||'').slice(0,7)||'ohne']??=[]).push(e);
   return Object.keys(g).sort().reverse().map(mo=>{
-    const es=g[mo],tot=es.reduce((a,e)=>a+(e.amount||0),0),open=es.filter(e=>!e.paid).reduce((a,e)=>a+(e.amount||0),0);
+    const es=g[mo],tot=es.reduce((a,e)=>a+(e.amount||0),0),open=es.filter(e=>!e.paid).reduce((a,e)=>a+eRest(e),0);
     const key=pid+'|'+mo,isOpen=key in S.mOpen?S.mOpen[key]:(mo===curMonth()||open>0);
     return `<details class="mgroup" data-key="${esc(key)}" ${isOpen?'open':''}><summary><span class="mg-t"><b>${mo==='ohne'?'Ohne Datum':esc(monthName(mo))}</b><small>${es.length} ${es.length===1?'Eintrag':'Einträge'} · ${eur(tot)}</small></span>${open>0?`<span class="tag owe num">offen ${eur(open)}</span>`:'<span class="tag ok">bezahlt</span>'}${I('chevR').replace('class="ico"','class="ico chev"')}</summary><div class="rows">${es.map(e=>entryRow(e,false)).join('')}</div></details>`}).join('');
 }
@@ -1460,7 +1468,7 @@ function deckeSheet(s){
   }
   const ps=sortedPlayers(false).filter(p=>s.sel.has(p.id));
   return{head:`<h2>${esc(f.title)}</h2><p>${esc(COUNT_FLOW[f.id])} pro Spieler · ${eur(deckePer(f))} pro ${esc(deckeUnit(f))}</p>`,
-    body:`<div class="rows">`+ps.map(p=>`<div class="row dq">${avatar(p)}<div class="m"><b>${esc(p.name)}${drg(p.id)}</b><i>${p.role==='Spieler'&&p.number!=null?'#'+p.number:esc(p.role||'')}</i></div><div class="stepper"><button data-act="dqty" data-pid="${esc(p.id)}" data-d="-1" aria-label="Weniger ${esc(COUNT_FLOW[f.id])} für ${esc(p.name)}">${I('minus')}</button><input class="dqin" inputmode="numeric" data-pid="${esc(p.id)}" value="${s.counts[p.id]||0}" aria-label="${esc(COUNT_FLOW[f.id])} von ${esc(p.name)}"><button data-act="dqty" data-pid="${esc(p.id)}" data-d="1" aria-label="Mehr ${esc(COUNT_FLOW[f.id])} für ${esc(p.name)}">${I('plus')}</button></div></div>`).join('')+`</div>
+    body:feFotoBlock(s)+`<div class="rows">`+ps.map(p=>`<div class="row dq">${avatar(p)}<div class="m"><b>${esc(p.name)}${drg(p.id)}</b><i>${p.role==='Spieler'&&p.number!=null?'#'+p.number:esc(p.role||'')}</i></div><div class="stepper"><button data-act="dqty" data-pid="${esc(p.id)}" data-d="-1" aria-label="Weniger ${esc(COUNT_FLOW[f.id])} für ${esc(p.name)}">${I('minus')}</button><input class="dqin" inputmode="numeric" data-pid="${esc(p.id)}" value="${s.counts[p.id]||0}" aria-label="${esc(COUNT_FLOW[f.id])} von ${esc(p.name)}"><button data-act="dqty" data-pid="${esc(p.id)}" data-d="1" aria-label="Mehr ${esc(COUNT_FLOW[f.id])} für ${esc(p.name)}">${I('plus')}</button></div></div>`).join('')+`</div>
       <div class="fields"><div class="field"><label for="dt">Datum</label><input id="dt" type="date" value="${esc(s.date)}"></div>
       ${canSpieltag(f)?`<label class="check"><input type="checkbox" id="spt" ${s.spieltag?'checked':''}> Spieltag – Strafe zählt doppelt</label><p class="note" id="sptinfo" style="margin:-6px 4px 0" ${s.spieltag?'':'hidden'}></p>`:''}
       <div class="field"><label for="nt">Notiz (optional)</label><input id="nt" value="${esc(s.note)}" placeholder="z. B. Training Dienstag"></div></div>`,
@@ -1469,20 +1477,22 @@ function deckeSheet(s){
 function deckeUpdate(s){
   if(s.step!=='count'){const b=$('#dnext');if(!b)return;const n=s.sel.size;b.disabled=!n;b.textContent=n?`Weiter (${n})`:'Weiter';return}
   const b=$('#submit');if(!b)return;const t=deckeTotal(s),n=[...s.sel].filter(pid=>(s.counts[pid]||0)>0).length;
-  b.disabled=!(t>0)||S.status!=='ready'||!canEnter(s.fine)||s.busy;
-  b.textContent=t>0?`Eintragen (${n}) · ${eur(t)}`:`${COUNT_FLOW[s.fine.id]} eintragen`;
+  const over=swOver(Math.max(0,...[...s.sel].map(pid=>(s.counts[pid]||0)*deckePer(s.fine)*deckeMult(s))));
+  b.disabled=!(t>0)||over||S.status!=='ready'||!canEnter(s.fine)||s.busy;
+  b.textContent=over?SW_OVER:t>0?`Eintragen (${n}) · ${eur(t)}`:`${COUNT_FLOW[s.fine.id]} eintragen`;
   const si=$('#sptinfo');if(si){si.hidden=!s.spieltag;si.textContent=s.spieltag?`Doppelt: alle Beträge zählen ×2.`:''}
 }
 async function submitDecke(){
   const s=S.sheet,f=s.fine;if(!s||!S.db)return;s.busy=true;deckeUpdate(s);
   const mult=deckeMult(s),per=deckePer(f),now=new Date().toISOString(),col=S.db.collection('entries');
-  const ids=[...s.sel].filter(pid=>(s.counts[pid]||0)>0);
+  const ids=[...s.sel].filter(pid=>(s.counts[pid]||0)>0);let path=null;
   try{
-    const refs=await Promise.all(ids.map(pid=>{const n=s.counts[pid],r=col.doc();return r.set({playerId:pid,fineId:f.id,col:f.col||COL_BY_FINE[f.id]||'strafen',title:f.title,amount:Math.round(n*per*mult*100)/100,qty:n,unit:deckeUnit(f),
+    path=await feUpload(s);
+    const refs=await Promise.all(ids.map(pid=>{const n=s.counts[pid],r=col.doc();return r.set({...(path?{path}:{}),playerId:pid,fineId:f.id,col:f.col||COL_BY_FINE[f.id]||'strafen',title:f.title,amount:Math.round(n*per*mult*100)/100,qty:n,unit:deckeUnit(f),
       spieltag:mult===2,kabinenfest:false,kfDone:false,note:s.note.trim(),date:s.date||today(),createdAt:now,createdBy:S.uid||null,paid:false,paidAt:null}).then(()=>r)}));
     closeSheet();
-    toast(`${f.title}: ${refs.length===1?esc(pById(ids[0])?.name||''):refs.length+' Spieler'} eingetragen`,async()=>{await Promise.all(refs.map(r=>r.delete()));toast('Rückgängig gemacht')});
-  }catch(e){s.busy=false;deckeUpdate(s);toast(errMsg(e))}
+    toast(`${f.title}: ${refs.length===1?esc(pById(ids[0])?.name||''):refs.length+' Spieler'} eingetragen`,async()=>{await Promise.all(refs.map(r=>r.delete()));feDrop(path);toast('Rückgängig gemacht')});
+  }catch(e){feDrop(path);s.busy=false;deckeUpdate(s);toast(errMsg(e))}
 }
 function updateSplit(){
   const s=S.sheet,i=$('#splitinfo');if(!s||!i)return;
@@ -1512,12 +1522,15 @@ async function saveBill(){
     closeSheet();toast(split?`Rechnung gespeichert und auf ${d.splitIds.length} Personen umgelegt`:'Gespeichert');
   }catch(e){if(btn)btn.disabled=false;toast(errMsg(e))}
 }
+// Strafenwart: höchstens 200 € pro Strafe (wie sw_entry in schema.sql), größere trägt der Kassenwart ein
+const SW_MAX=200,SW_OVER='Höchstens 200 € – größere Strafen trägt der Kassenwart ein',swOver=a=>!!S.sw&&a>SW_MAX;
 function updateSubmit(){
   if(S.sheet&&S.sheet.type==='fine'&&countFine(S.sheet.fine)){deckeUpdate(S.sheet);return}
   const s=S.sheet,b=$('#submit');if(!b||!s)return;
   const a=fineAmount(s),n=s.sel.size,np=[...s.sel].filter(i=>!String(i).startsWith('team-')).length;
-  b.disabled=!n||(a<=0&&!s.kf)||S.status!=='ready'||!canEnter(s.fine)||s.busy;
-  b.textContent=!n?'Person(en) auswählen':`Eintragen für ${n} ${n===1?'Person':'Personen'} · ${eur(a*np)}${s.kf?' + Kabinenfest':''}`;
+  const over=swOver(a);
+  b.disabled=!n||over||(a<=0&&!s.kf)||S.status!=='ready'||!canEnter(s.fine)||s.busy;
+  b.textContent=over?SW_OVER:!n?'Person(en) auswählen':`Eintragen für ${n} ${n===1?'Person':'Personen'} · ${eur(a*np)}${s.kf?' + Kabinenfest':''}`;
   const amt=$('#amt');if(amt&&!s.touched&&document.activeElement!==amt)amt.value=String(baseAmount(s)).replace('.',',');
   const si=$('#sptinfo');if(si){si.hidden=!s.spieltag;si.textContent=s.spieltag?`Doppelt: ${eur(a)} pro Person statt ${eur(a/2)}.`:''}
 }
@@ -1556,16 +1569,26 @@ async function liftPenalty(pid,justPaid){
 let toastT;
 function toast(msg,undo){const t=$('#toast');t.innerHTML=`<span>${esc(msg)}</span>${undo?'<button data-act="undo">Rückgängig</button>':''}`;t.hidden=false;S.undo=undo||null;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true;S.undo=null},undo?7000:3500)}
 function errMsg(e){const c=e&&e.code;if(e&&/schon Strafen bezahlt/.test(String(e.message)))return String(e.message);return c==='invalid_argument'?'Keine Berechtigung zum Speichern.':c==='quota_exceeded'?'Speicher voll – bitte alte Einträge löschen.':'Speichern fehlgeschlagen. Bitte noch einmal versuchen.'}
+// Foto zur Strafe (Kassenwart, Strafenwart): ein Bild für alle ausgewählten Personen, Bucket „strafen“
+const feFotoBlock=s=>S.canWrite===true||S.sw?`<div id="fefoto" class="fields" style="margin-bottom:14px">${feFoto(s)}</div>`:'';
+const feFoto=s=>`<label class="btn filebtn" for="fefile">${I('camera')}${s.blob?'Anderes Foto wählen':'Foto hinzufügen (optional)'}</label><input id="fefile" type="file" accept="image/*" hidden>${s.preview?`<img class="rbig" src="${esc(s.preview)}" alt="Vorschau" style="max-height:200px;object-fit:cover">`:''}`;
+// Foto löschen, wenn kein Eintrag es mehr braucht
+const fotoFrei=(path,ohne=[])=>{if(path&&!S.entries.some(e=>e.path===path&&!ohne.includes(e.id)))S.sb.storage.from('strafen').remove([path]).catch(()=>{})};
+async function feUpload(s){if(!s.blob)return null;const path=`${S.uid}/${Date.now().toString(36)}${Math.random().toString(36).slice(2,8)}.jpg`;
+  const up=await S.sb.storage.from('strafen').upload(path,s.blob,{contentType:s.blob.type||'image/jpeg'});if(up.error)throw up.error;return path}
+const feDrop=path=>{if(path)S.sb.storage.from('strafen').remove([path]).catch(()=>{})};
 async function submitFine(){
   if(S.sheet&&S.sheet.fine&&countFine(S.sheet.fine))return submitDecke();
   const s=S.sheet;if(!s||!S.db)return;s.busy=true;updateSubmit();
-  const a=Math.round(fineAmount(s)*100)/100,f=s.fine;const now=new Date().toISOString();const col=S.db.collection('entries');
+  const a=Math.round(fineAmount(s)*100)/100,f=s.fine;const now=new Date().toISOString();const col=S.db.collection('entries');let path=null;
   try{
-    const refs=await Promise.all([...s.sel].map(pid=>{const r=col.doc();return r.set({playerId:pid,fineId:f.id||null,title:f.title,amount:String(pid).startsWith('team-')?0:a,qty:f.per?s.qty:null,unit:f.per?(f.unit||'Stück'):null,
+    path=await feUpload(s);
+    const refs=await Promise.all([...s.sel].map(pid=>{const r=col.doc();return r.set({...(path?{path}:{}),playerId:pid,fineId:f.id||null,title:f.title,amount:String(pid).startsWith('team-')?0:a,qty:f.per?s.qty:null,unit:f.per?(f.unit||'Stück'):null,
       col:f.id?(f.col||COL_BY_FINE[f.id]||'strafen'):(s.col||'strafen'),spieltag:!!(s.spieltag&&canSpieltag(f)),kabinenfest:!!s.kf,kfDone:false,note:s.note.trim(),date:s.date||today(),createdAt:now,createdBy:S.uid||null,paid:false,paidAt:null}).then(()=>r)}));
     const n=refs.length;closeSheet();
-    toast(`${f.title}: ${n===1?esc(pById([...s.sel][0])?.name||''):n+' Personen'} eingetragen`,async()=>{await Promise.all(refs.map(r=>r.delete()));toast('Rückgängig gemacht')});
-  }catch(e){s.busy=false;updateSubmit();toast(errMsg(e))}
+    if(s.preview)URL.revokeObjectURL(s.preview);
+    toast(`${f.title}: ${n===1?esc(pById([...s.sel][0])?.name||''):n+' Personen'} eingetragen`,async()=>{await Promise.all(refs.map(r=>r.delete()));feDrop(path);toast('Rückgängig gemacht')});
+  }catch(e){feDrop(path);s.busy=false;updateSubmit();toast(errMsg(e))}
 }
 async function setEntry(id,patch){try{await S.db.doc('entries/'+id).update(patch)}catch(e){toast(errMsg(e))}}
 
@@ -1754,6 +1777,7 @@ document.addEventListener('click',async ev=>{
     case 'saveEntry':saveEntry();break;
     case 'newReceipt':openSheet({type:'receipt',blob:null,preview:null,back:S.sheet});break;
     case 'saveReceipt':saveReceipt();break;
+    case 'fotoView':openSheet({type:'foto',path:el.dataset.path,back:S.sheet||null});break;
     case 'viewReceipt':{const cur=S.sheet;
       if(el.dataset.back&&cur&&cur.type==='bill'&&$('#ba')){const b=cur.bill,v=$('#bc')?.value;
         cur.bill={...b,cat:v==='__other'?($('#bco')?.value.trim()||''):(v||b.cat),title:$('#bt').value.trim()||null,amount:num($('#ba').value),date:$('#bd').value||b.date,paidBy:$('#bp')?$('#bp').value||null:b.paidBy,note:$('#bn').value.trim()||null}}
@@ -1911,7 +1935,7 @@ document.addEventListener('click',async ev=>{
       if(e.paid){try{await S.db.doc('entries/'+id).update({paid:false,paidAt:null,paidVia:null});logChange(`Bezahlt-Haken entfernt: ${pById(e.playerId)?.name||'?'} – ${e.title}`,e.amount);toast(e.creditUsed>0?'Wieder offen – Guthaben zurückgebucht':'Wieder offen')}catch(err){toast(errMsg(err))}break}
       setEntry(id,{paid:!e.paid,paidAt:e.paid?null:new Date().toISOString(),paidVia:e.paid?null:(isKW()?'kassenwart':'manuell')});break}
     case 'kf':{const e=S.entries.find(x=>x.id===id);if(e&&canKf())kfPatch(id,{kfDone:!e.kfDone}).catch(err=>toast(errMsg(err)));break}
-    case 'del':if(S.confirmDel===id){S.confirmDel=null;const de=S.entries.find(x=>x.id===id);try{await S.db.doc('entries/'+id).delete();if(de&&de.paid)logChange(`Bezahlte Strafe gelöscht: ${pById(de.playerId)?.name||'?'} – ${de.title}`,de.amount);toast(de&&de.paid&&de.creditUsed>0?'Eintrag gelöscht – Guthaben zurückgebucht':'Eintrag gelöscht')}catch(e){toast(errMsg(e))}}else{S.confirmDel=id;render();if(S.sheet)renderSheet(false)}break;
+    case 'del':if(S.confirmDel===id){S.confirmDel=null;const de=S.entries.find(x=>x.id===id);try{await S.db.doc('entries/'+id).delete();if(de&&de.path)fotoFrei(de.path,[id]);if(de&&de.paid)logChange(`Bezahlte Strafe gelöscht: ${pById(de.playerId)?.name||'?'} – ${de.title}`,de.amount);toast(de&&de.paid&&de.creditUsed>0?'Eintrag gelöscht – Guthaben zurückgebucht':'Eintrag gelöscht')}catch(e){toast(errMsg(e))}}else{S.confirmDel=id;render();if(S.sheet)renderSheet(false)}break;
     case 'payAll':{if(!isKW()){toast('Nur Kassenwart und Admin können das');break}
       if(S.confirmPayAll!==id){S.confirmPayAll=id;renderSheet(false);clearTimeout(S._pat);S._pat=setTimeout(()=>{S.confirmPayAll=null;if(S.sheet)renderSheet(false)},4000);break}
       S.confirmPayAll=null;const now=new Date().toISOString();const open=S.entries.filter(e=>e.playerId===id&&!e.paid);try{const r=await payEntries(id,open.map(e=>e.id),'kassenwart');toast(`${r.n} Einträge als bezahlt markiert${r.used>0?` – ${eur(r.used)} mit Guthaben verrechnet`:''}`)}catch(e){toast(errMsg(e))}break}
@@ -1966,6 +1990,8 @@ document.addEventListener('change',async ev=>{const t=ev.target;
   if(t.id==='pfile'&&S.sheet&&S.sheet.type==='editPlayer'){const s=S.sheet,f=t.files&&t.files[0];if(!f)return;keepPlayer();
     const b=await shrinkImage(f,400);if(!b||b.size>1048576){toast(b?'Das Foto ist zu groß (höchstens 1 MB)':'Das Foto konnte nicht gelesen werden');return}
     if(s.preview)URL.revokeObjectURL(s.preview);s.blob=b;s.preview=URL.createObjectURL(b);s.photoDel=false;renderSheet(false);return}
+  if(t.id==='fefile'&&S.sheet&&S.sheet.type==='fine'){const s=S.sheet,f=t.files&&t.files[0];if(!f)return;
+    const b=await shrinkImage(f);if(!b){toast('Das Foto konnte nicht gelesen werden');return}if(s.preview)URL.revokeObjectURL(s.preview);s.blob=b;s.preview=URL.createObjectURL(b);const w=$('#fefoto');if(w)w.innerHTML=feFoto(s);return}
   if(t.id==='anfile'&&S.sheet&&S.sheet.type==='anzNew'){const s=S.sheet,f=t.files&&t.files[0];if(!f)return;s.note=$('#ann')?.value||'';
     const b=await shrinkImage(f);if(!b){toast('Das Foto konnte nicht gelesen werden');return}if(s.preview)URL.revokeObjectURL(s.preview);s.blob=b;s.preview=URL.createObjectURL(b);renderSheet(false);return}
   if(t.id==='rcfile'&&S.sheet&&S.sheet.type==='receipt'){const s=S.sheet,f=t.files&&t.files[0];if(!f)return;

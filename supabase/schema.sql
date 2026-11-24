@@ -14,7 +14,7 @@ create table if not exists public.members (
   created_at timestamptz not null default now()
 );
 
--- Rollen: member (Spieler), kassenwart, admin, deckenzaehler (wie Spieler + „Fußball an der Decke“ selbst eintragen), wasserwart / aufraeumdienst (nur Bezeichnung), kabinenfestwart (plant und hakt Kabinenfeste ab), doenerwart (wie Spieler, hakt Döner-Zahlungen ab), trainer (wie Spieler, ändert alles im Kalender), mannschaftsverantwortlicher (wie Spieler, trägt Treffpunkte bei Spielen ein), trikotwart (wie Spieler, ändert als Einziger die Trikots)
+-- Rollen: member (Spieler), kassenwart, admin, deckenzaehler (wie Spieler + „Fußball an der Decke“ selbst eintragen), wasserwart / aufraeumdienst (nur Bezeichnung), kabinenfestwart (plant und hakt Kabinenfeste ab), strafenwart (trägt Strafen aus dem Katalog ein, auch mit Foto), doenerwart (wie Spieler, hakt Döner-Zahlungen ab), trainer (wie Spieler, ändert alles im Kalender), mannschaftsverantwortlicher (wie Spieler, trägt Treffpunkte bei Spielen ein), trikotwart (wie Spieler, ändert als Einziger die Trikots)
 -- Eine Person kann mehrere Rollen haben: `role` ist die Hauptrolle, `roles` die weiteren Rollen.
 alter table public.members add column if not exists roles text[] not null default '{}';
 do $$
@@ -23,8 +23,8 @@ begin
   for c in select conname from pg_constraint where conrelid = 'public.members'::regclass and contype = 'c' and pg_get_constraintdef(oid) like '%role%' loop
     execute format('alter table public.members drop constraint %I', c);
   end loop;
-  alter table public.members add constraint members_role_check check (role in ('member','kassenwart','admin','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart','wasserwart','aufraeumdienst','kabinenfestwart'));
-  alter table public.members add constraint members_roles_check check (roles <@ array['kassenwart','admin','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart','wasserwart','aufraeumdienst','kabinenfestwart']);
+  alter table public.members add constraint members_role_check check (role in ('member','kassenwart','admin','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart','wasserwart','aufraeumdienst','kabinenfestwart','strafenwart'));
+  alter table public.members add constraint members_roles_check check (roles <@ array['kassenwart','admin','deckenzaehler','doenerwart','trainer','mannschaftsverantwortlicher','trikotwart','wasserwart','aufraeumdienst','kabinenfestwart','strafenwart']);
 end $$;
 
 create or replace function public.my_role() returns text
@@ -266,9 +266,10 @@ end $$;
 -- ---------- Guthaben mit Strafen verrechnen ----------
 -- Guthaben einer Person = ausgelegte Rechnungen/Gutschriften (bills.paidBy), noch nicht ausbezahlt (refunded),
 -- minus der Teil, der schon verrechnet wurde (bills.credited).
--- Verrechnet wird SOFORT (credit_auto): sobald eine Rechnung/Gutschrift mit „Bezahlt von“ gespeichert oder ein neuer
--- offener Eintrag angelegt wird. Dann gelten offene Einträge, die das Guthaben KOMPLETT abdeckt, als bezahlt (älteste zuerst).
--- Den Rest verrechnet pay_entries, wenn der Kassenwart eine Zahlung bucht; payout_credit setzt ausbezahltes Guthaben auf 0.
+-- Bis zum Zahltag bleiben die Strafen offen stehen; die App zeigt nur „offen − Guthaben“ an.
+-- Verrechnet wird beim Start des Zahltags (apply_credit_all): älteste Einträge zuerst, solange Guthaben da ist, werden sie
+-- bezahlt; reicht der Rest nicht für den nächsten Eintrag, wird er dort als Teilbetrag gebucht (creditUsed, Eintrag bleibt offen).
+-- pay_entries verrechnet beim Bestätigen einer Zahlung, payout_credit setzt ausbezahltes Guthaben auf 0.
 -- Jeder Eintrag merkt sich in creditUsed, wie viel Guthaben er verbraucht hat; wird er wieder geöffnet oder
 -- gelöscht, bucht ein Trigger das Guthaben zurück. app.credit_busy verhindert, dass der Trigger beim Buchen anspringt.
 
@@ -330,34 +331,35 @@ begin
   end loop;
 end $$;
 
--- bucht offene Einträge einer Person mit ihrem Guthaben (nur solche, die komplett abgedeckt sind)
+-- bucht offene Einträge einer Person mit ihrem Guthaben (älteste zuerst; der letzte bekommt ggf. einen Teilbetrag)
 create or replace function public.apply_credit(pid text) returns int
 language plpgsql security definer set search_path = public as $$
-declare cred numeric; e record; n int := 0; used numeric := 0; ts text; prev text;
+declare cred numeric; e record; n int := 0; used numeric := 0; take numeric; ts text; prev text;
 begin
   if pid is null then return 0; end if;
   perform pg_advisory_xact_lock(hashtext('credit:' || pid));
-  cred := public.credit_left(pid);
+  cred := round(public.credit_left(pid), 2);
   if cred <= 0 then return 0; end if;
   prev := coalesce(current_setting('app.credit_busy', true), '');
   perform set_config('app.credit_busy', '1', true);
   ts := to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
-  for e in select id, (data->>'amount')::numeric as amt from public.entries
+  for e in select id, (data->>'amount')::numeric as amt, coalesce((data->>'creditUsed')::numeric, 0) as cu from public.entries
      where data->>'playerId' = pid
        and not coalesce((data->>'paid')::boolean, false)
        and not coalesce((data->>'reported')::boolean, false)   -- schon als bezahlt gemeldet: Kassenwart prüft die echte Zahlung
        and not coalesce((data->>'noAuto')::boolean, false)
-       and coalesce((data->>'amount')::numeric, 0) > 0
+       and coalesce((data->>'amount')::numeric, 0) - coalesce((data->>'creditUsed')::numeric, 0) > 0
      order by data->>'date', data->>'createdAt', id
      for update
   loop
-    if e.amt <= cred + 0.001 then
-      update public.entries
-         set data = data || jsonb_build_object('paid', true, 'paidAt', ts, 'paidVia', 'guthaben', 'creditUsed', e.amt),
-             updated_at = now()
-       where id = e.id;
-      cred := cred - e.amt; used := used + e.amt; n := n + 1;
-    end if;
+    exit when cred <= 0;
+    take := least(cred, e.amt - e.cu);
+    update public.entries
+       set data = data || jsonb_build_object('creditUsed', round(e.cu + take, 2))
+                 || case when take >= e.amt - e.cu then jsonb_build_object('paid', true, 'paidAt', ts, 'paidVia', 'guthaben') else '{}'::jsonb end,
+           updated_at = now()
+     where id = e.id;
+    cred := round(cred - take, 2); used := used + take; n := n + 1;
   end loop;
   if used > 0 then perform public.consume_credit(pid, used); end if;
   perform set_config('app.credit_busy', prev, true);
@@ -372,18 +374,23 @@ begin
   if tg_table_name = 'entries' then
     -- Eintrag, der Guthaben verbraucht hatte, wird wieder geöffnet oder gelöscht → Guthaben zurück.
     -- NEW gibt es bei DELETE nicht; PostgreSQL garantiert keine Kurzschluss-Auswertung, deshalb getrennt prüfen.
+    -- Gelöscht wird auch ein offener Eintrag mit Teilbetrag (creditUsed) → dessen Guthaben zurück.
     if tg_op = 'DELETE' then reopened := true;
-    else reopened := not coalesce((new.data->>'paid')::boolean, false); end if;
+    else reopened := coalesce((old.data->>'paid')::boolean, false) and not coalesce((new.data->>'paid')::boolean, false); end if;
+    -- Offener Eintrag mit Teilbetrag bekommt eine andere Person oder einen kleineren Betrag → Teilbetrag zurück an den alten Spieler.
+    if not reopened and tg_op = 'UPDATE' and not coalesce((new.data->>'paid')::boolean, false)
+       and ((new.data->>'playerId') is distinct from (old.data->>'playerId')
+            or coalesce((new.data->>'amount')::numeric, 0) < coalesce((old.data->>'creditUsed')::numeric, 0)) then
+      reopened := true;
+    end if;
     if reopened
-       and coalesce((old.data->>'paid')::boolean, false)
        and coalesce((old.data->>'creditUsed')::numeric, 0) > 0 then
       prev := coalesce(current_setting('app.credit_busy', true), '');
       perform set_config('app.credit_busy', '1', true);
       perform public.give_back_credit(old.data->>'playerId', (old.data->>'creditUsed')::numeric);
-      if tg_op = 'UPDATE' then -- bewusst wieder geöffnet: nicht gleich wieder automatisch verrechnen
-        update public.entries set data = (data - 'creditUsed') || '{"noAuto":true}', updated_at = now() where id = new.id;
+      if tg_op = 'UPDATE' then -- wieder offen: Guthaben ist zurück, beim nächsten Zahltag wird neu verrechnet
+        update public.entries set data = data - 'creditUsed', updated_at = now() where id = new.id;
       end if;
-      perform public.apply_credit(old.data->>'playerId'); -- zurückgebuchtes Guthaben gleich auf andere offene Einträge
       perform set_config('app.credit_busy', prev, true);
     end if;
   end if;
@@ -417,19 +424,19 @@ begin
   prev := coalesce(current_setting('app.credit_busy', true), '');
   perform set_config('app.credit_busy', '1', true);
   ts := to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
-  select coalesce(sum(coalesce((data->>'amount')::numeric,0)), 0) into total from public.entries
+  select coalesce(sum(coalesce((data->>'amount')::numeric,0) - coalesce((data->>'creditUsed')::numeric,0)), 0) into total from public.entries
    where id = any(ids) and data->>'playerId' = pid and not coalesce((data->>'paid')::boolean, false);
   used := public.consume_credit(pid, total);
   rest := used;
-  for e in select id, coalesce((data->>'amount')::numeric,0) as amt from public.entries
+  for e in select id, coalesce((data->>'amount')::numeric,0) as amt, coalesce((data->>'creditUsed')::numeric,0) as cu from public.entries
      where id = any(ids) and data->>'playerId' = pid and not coalesce((data->>'paid')::boolean, false)
      order by data->>'date', data->>'createdAt', id
      for update
   loop
-    part := least(rest, e.amt); rest := rest - part;
+    part := greatest(least(rest, e.amt - e.cu), 0); rest := rest - part;
     update public.entries
        set data = data || jsonb_build_object('paid', true, 'paidAt', ts, 'paidVia', via)
-                 || case when part > 0 then jsonb_build_object('creditUsed', part) else '{}'::jsonb end,
+                 || case when e.cu + part > 0 then jsonb_build_object('creditUsed', round(e.cu + part, 2)) else '{}'::jsonb end,
            updated_at = now()
      where id = e.id;
     n := n + 1;
@@ -438,25 +445,10 @@ begin
   return jsonb_build_object('n', n, 'used', used);
 end $$;
 
--- sofort verrechnen: neue/geänderte Rechnung mit „Bezahlt von“ oder neuer offener Eintrag
-create or replace function public.credit_auto() returns trigger
-language plpgsql security definer set search_path = public as $$
-begin
-  if coalesce(current_setting('app.credit_busy', true), '') = '1' then return null; end if;
-  if tg_table_name = 'bills' then
-    if nullif(new.data->>'paidBy', '') is not null and coalesce(new.data->>'kind', '') <> 'einzahlung'
-       and not coalesce((new.data->>'refunded')::boolean, false) then
-      perform public.apply_credit(new.data->>'paidBy');
-    end if;
-  elsif not coalesce((new.data->>'paid')::boolean, false) then
-    perform public.apply_credit(new.data->>'playerId');
-  end if;
-  return null;
-end $$;
+-- früher: sofort verrechnen (credit_auto) – jetzt erst beim Zahltag
 drop trigger if exists bills_credit_auto on public.bills;
-create trigger bills_credit_auto after insert or update on public.bills for each row execute function public.credit_auto();
 drop trigger if exists entries_credit_auto on public.entries;
-create trigger entries_credit_auto after insert on public.entries for each row execute function public.credit_auto();
+drop function if exists public.credit_auto();
 
 -- „Ausbezahlt“: der Kassenwart hat das restliche Guthaben überwiesen → Guthaben auf 0 (Rechnungen gelten als erstattet).
 -- Gibt den ausbezahlten Betrag zurück. Nur Kassenwart und Admin.
@@ -482,7 +474,7 @@ begin
 end $$;
 
 revoke execute on function public.credit_left(text), public.consume_credit(text, numeric), public.give_back_credit(text, numeric),
-  public.apply_credit(text), public.credit_trigger(), public.credit_auto() from public, anon, authenticated;
+  public.apply_credit(text), public.credit_trigger() from public, anon, authenticated;
 grant execute on function public.pay_entries(text, text[], text), public.apply_credit_all(), public.payout_credit(text) to authenticated;
 revoke execute on function public.pay_entries(text, text[], text), public.apply_credit_all(), public.payout_credit(text) from public, anon;
 
@@ -867,7 +859,7 @@ begin
               where coalesce((data->>'active')::boolean, false)
                 and (data->>'endsAt')::timestamptz > now() and (data->>'endsAt')::timestamptz <= now() + interval '24 hours' loop
       for r in select key from jsonb_each(coalesce(z.data->'due', '{}'::jsonb)) loop
-        select coalesce(sum(public.num_or0(e.data->>'amount')), 0) into rest from public.entries e
+        select coalesce(sum(public.num_or0(e.data->>'amount') - public.num_or0(e.data->>'creditUsed')), 0) into rest from public.entries e
          where e.id in (select jsonb_array_elements_text(coalesce(z.data->'entryIds', '[]'::jsonb)))
            and e.data->>'playerId' = r.key
            and not coalesce((e.data->>'paid')::boolean, false) and not coalesce((e.data->>'reported')::boolean, false);
@@ -1418,3 +1410,36 @@ begin
 end $$;
 revoke execute on function public.termin_umfrage(text, text, timestamptz), public.umfrage_offen(text) from public, anon;
 grant execute on function public.termin_umfrage(text, text, timestamptz), public.umfrage_offen(text) to authenticated;
+
+-- ---------- Strafenwart ----------
+-- Trägt Strafen aus dem Katalog für alle ein (ohne Kabinenfest, höchstens 200 €), optional mit Foto (Bucket „strafen“).
+-- Eigene, noch unbezahlte Einträge darf er ändern und zurücknehmen (z. B. „Rückgängig“). Alles andere bleibt beim Kassenwart.
+create or replace function public.sw_entry(d jsonb) returns boolean language sql stable security definer set search_path = public as $$
+  select public.has_role('strafenwart') and d->>'createdBy' = auth.uid()::text and coalesce(d->>'playerId', '') !~ '^team-'
+    and exists (select 1 from public.fines f where f.id = d->>'fineId') and d->>'fineId' <> 'kf-manual'
+    and not coalesce((d->>'paid')::boolean, false) and not coalesce((d->>'kabinenfest')::boolean, false)
+    and not coalesce((d->>'reported')::boolean, false) and d->>'creditUsed' is null
+    and coalesce((d->>'amount')::numeric, -1) between 0 and 200
+    and (d->>'path' is null or d->>'path' like auth.uid()::text || '/%')
+$$;
+revoke execute on function public.sw_entry(jsonb) from public, anon;
+grant execute on function public.sw_entry(jsonb) to authenticated;
+drop policy if exists entries_sw_ins on public.entries;
+create policy entries_sw_ins on public.entries for insert with check (id ~ '^[a-z0-9]{9,20}$' and public.sw_entry(data));
+drop policy if exists entries_sw_upd on public.entries;
+create policy entries_sw_upd on public.entries for update using (public.sw_entry(data)) with check (public.sw_entry(data));
+drop policy if exists entries_sw_del on public.entries;
+create policy entries_sw_del on public.entries for delete using (public.sw_entry(data));
+
+-- Fotos zu Strafen: privat, max. 5 MB, nur Bilder; Pfad immer <user-id>/<datei>.
+-- Sehen dürfen es Kassenwart/Admin, wer es hochgeladen hat und die Person, der die Strafe gehört.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('strafen', 'strafen', false, 5242880, array['image/jpeg','image/png','image/webp'])
+on conflict (id) do update set public = false, file_size_limit = 5242880, allowed_mime_types = excluded.allowed_mime_types;
+drop policy if exists strafen_foto_read on storage.objects;
+create policy strafen_foto_read on storage.objects for select using (bucket_id = 'strafen' and (public.can_book() or (storage.foldername(name))[1] = auth.uid()::text
+  or exists (select 1 from public.entries e where e.data->>'path' = name and e.data->>'playerId' = public.my_pid())));
+drop policy if exists strafen_foto_ins on storage.objects;
+create policy strafen_foto_ins on storage.objects for insert with check (bucket_id = 'strafen' and (public.can_book() or public.has_role('strafenwart')) and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists strafen_foto_del on storage.objects;
+create policy strafen_foto_del on storage.objects for delete using (bucket_id = 'strafen' and (public.can_book() or (storage.foldername(name))[1] = auth.uid()::text));
